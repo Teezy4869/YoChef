@@ -55,3 +55,6 @@ Thumbs.db
 
 # Seed build output (generated from the dataset zip)
 supabase/.seed-out/
+
+# Evidence logs are part of the audit trail (L3)
+!docs/evidence/**/*.log
