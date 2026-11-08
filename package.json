@@ -10,7 +10,8 @@
     "test": "npm --prefix app test && npm --prefix admin test",
     "check": "npm run typecheck && npm run lint && npm test",
     "supabase": "supabase",
-    "test:db": "node --test supabase/tests/*.test.mjs"
+    "test:db": "node --test supabase/tests/*.test.mjs",
+    "seed:build": "node supabase/seed/import_recipes.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.3.15",

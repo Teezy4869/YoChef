@@ -52,3 +52,6 @@ supabase/.branches/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Seed build output (generated from the dataset zip)
+supabase/.seed-out/
