@@ -27,7 +27,34 @@ npm --prefix admin run dev
 npm --prefix admin run build
 ```
 
-Yêu cầu: Node.js >= 22 (đang dùng 24.18.0), npm 11.
+Yêu cầu: Node.js >= 22 (đang dùng 24.18.0), npm 11. Không cần Docker.
+
+## Database (Supabase v2, project `bdhphjwhagygbwtfhhxn`)
+
+```bash
+npx supabase login                       # một lần, trên máy chủ dự án
+npx supabase link --project-ref bdhphjwhagygbwtfhhxn
+npx supabase migration list --linked     # lịch sử migration phải khớp repo
+npx supabase db push --linked            # chỉ sau khi test:db xanh và chủ dự án duyệt
+```
+
+Nạp lại 250 công thức (idempotent, zip nằm ngoài repo, kiểm tra sha256):
+
+```bash
+npm run seed:build -- --zip <đường dẫn>/recipes_001_250_release_candidate.zip
+npx supabase db query --linked -f supabase/.seed-out/seed.sql
+npx supabase storage cp -r supabase/.seed-out/recipe-images ss:/// --linked --content-type image/webp --experimental -j 4
+```
+
+## Ba tầng kiểm thử (K8)
+
+| Tầng | Lệnh | Chứng minh |
+|---|---|---|
+| 1. Unit / UI | `npm run check` | typecheck, lint, test của app và admin |
+| 2. Database cục bộ | `npm run test:db` | Migration thật trên PGlite (PostgreSQL 17): RLS, grant, trigger, seed |
+| 3. Live | `npm run smoke:live` | REST và Storage thật của v2, vai trò khách, publishable key trong `app/.env` |
+
+Một bước chỉ được coi là xong khi tầng 3 xanh cho phần chạm tới database (L2). Log bằng chứng lưu ở `docs/evidence/`.
 
 ## Quy tắc
 

@@ -1,0 +1,47 @@
+# 2026-11-08T16:08:02Z commit cca6419
+  ✔ RLS is enabled on every table in public (5.657ms)
+  ✔ anon has no write privilege on any table in public (5.5644ms)
+  ✔ authenticated has no INSERT/DELETE/TRUNCATE on any table in public (3.2552ms)
+  ✔ every SECURITY DEFINER function pins search_path to empty (3.258ms)
+  ✔ no is_admin() helper exists (1.9189ms)
+  ✔ a table created later is not opened to anon or authenticated (default privileges) (9.1549ms)
+✔ global security invariants (4032.7808ms)
+  ✔ anon reads published recipes only (15.3948ms)
+  ✔ children of a staged recipe are hidden from anon and authenticated (45.508ms)
+  ✔ taxonomy is publicly readable (5.4817ms)
+  ✔ clients cannot write catalog tables (23.9607ms)
+  ✔ "to taste" must be NULL, never 0 (6.0844ms)
+  ✔ a timer needs a duration (2.7975ms)
+  ✔ a published recipe must be complete (3.9929ms)
+  ✔ updated_at is maintained by trigger (9.0009ms)
+  ✔ recipe-images bucket exists and is public with limits (6.9105ms)
+✔ 0001_catalog (120.3345ms)
+  ✔ sign-up creates a profile with a trimmed display name (1.6678ms)
+  ✔ sign-up never fails on bad metadata (13.8101ms)
+  ✔ profiles has no role column (11.1009ms)
+  ✔ public reads display fields but not bio (14.2541ms)
+  ✔ a user updates only their own profile (25.835ms)
+  ✔ a user cannot create profiles or change their id (10.8994ms)
+  ✔ avatar_path must live in the owner folder (13.5095ms)
+  ✔ users cannot grant themselves a role (11.4731ms)
+  ✔ users read only their own roles, and helpers reflect them (40.0263ms)
+  ✔ super_admin implies editor and moderator (10.3725ms)
+  ✔ anon cannot execute role helpers (6.576ms)
+  ✔ deleting the auth user cascades to profile and roles (8.3304ms)
+✔ 0002_identity_rbac (168.7568ms)
+  ✔ loads the expected row counts (1.6888ms)
+  ✔ is idempotent: a second run leaves every row identical (ids and timestamps included) (323.1709ms)
+  ✔ repairs drift: an edited child row and an extra step are restored on re-run (312.3736ms)
+  ✔ stores "to taste" as NULL quantity and unit (2.8757ms)
+  ✔ quarantined covers have no image path; every other recipe points at <slug>/cover.webp (7.9257ms)
+  ✔ anon sees exactly the published recipes and their children (15.6054ms)
+  ✔ a count mismatch aborts the whole import (568.4546ms)
+✔ seed import (6376.2498ms)
+ℹ tests 34
+ℹ suites 4
+ℹ pass 34
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6673.3877
