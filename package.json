@@ -1,0 +1,20 @@
+{
+  "name": "yochef",
+  "private": true,
+  "version": "0.1.0",
+  "description": "YoChef rebuild (v2): Expo mobile app, Vite admin web, Supabase migrations.",
+  "scripts": {
+    "install:all": "npm install && npm --prefix app install && npm --prefix admin install",
+    "typecheck": "npm --prefix app run typecheck && npm --prefix admin run typecheck",
+    "lint": "npm --prefix app run lint && npm --prefix admin run lint",
+    "test": "npm --prefix app test && npm --prefix admin test",
+    "check": "npm run typecheck && npm run lint && npm test",
+    "supabase": "supabase"
+  },
+  "devDependencies": {
+    "supabase": "2.122.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

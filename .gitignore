@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+
+# Expo / React Native
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.metro-health-check*
+*.tsbuildinfo
+.kotlin/
+*.orig.*
+app/ios/
+app/android/
+
+# Logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log
+
+# Testing & coverage
+coverage/
+
+# Environment files: only templates are committed
+.env
+.env.*
+!.env.example
+
+# Certificates, keys & credentials
+*.pem
+*.key
+*.cert
+*.crt
+*.p8
+*.p12
+*.pfx
+*.keystore
+*.jks
+*.mobileprovision
+
+# Supabase CLI local state
+supabase/.temp/
+supabase/.branches/
+
+# Database dumps
+*.dump
+*.sql.gz
+
+# IDE & OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
