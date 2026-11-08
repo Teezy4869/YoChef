@@ -11,7 +11,8 @@
     "check": "npm run typecheck && npm run lint && npm test",
     "supabase": "supabase",
     "test:db": "node --test supabase/tests/*.test.mjs",
-    "seed:build": "node supabase/seed/import_recipes.mjs"
+    "seed:build": "node supabase/seed/import_recipes.mjs",
+    "smoke:live": "node --env-file=app/.env scripts/live_smoke.mjs --log docs/evidence/phase-0/live_smoke.log"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.3.15",
