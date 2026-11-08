@@ -1,6 +1,6 @@
 # YoChef v2: Schema chuẩn (SCHEMA_V2)
 
-**Trạng thái:** thiết kế (bước 0.3). Chưa có migration nào được áp. Tài liệu này là **nguồn sự thật duy nhất** về schema: migration viết theo nó, và khi migration buộc phải khác, tài liệu được sửa trong cùng commit.
+**Trạng thái:** `0001_catalog` = `supabase/migrations/20261108130000_catalog.sql`, `0002_identity_rbac` = `20261108130100_identity_rbac.sql` (bước 0.4). Tên logic `00NN_*` trong tài liệu ứng với file có tiền tố timestamp mà Supabase CLI yêu cầu. Tài liệu này là **nguồn sự thật duy nhất** về schema: migration viết theo nó, và khi migration buộc phải khác, tài liệu được sửa trong cùng commit.
 **Project:** Supabase `bdhphjwhagygbwtfhhxn` (YoChef v2), PostgreSQL 17.
 **Ngày:** 2026-11-08.
 

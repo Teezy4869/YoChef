@@ -9,9 +9,11 @@
     "lint": "npm --prefix app run lint && npm --prefix admin run lint",
     "test": "npm --prefix app test && npm --prefix admin test",
     "check": "npm run typecheck && npm run lint && npm test",
-    "supabase": "supabase"
+    "supabase": "supabase",
+    "test:db": "node --test supabase/tests/*.test.mjs"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.3.15",
     "supabase": "2.122.0"
   },
   "engines": {
