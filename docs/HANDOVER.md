@@ -36,33 +36,33 @@ Chi tiết lộ trình: gói tài liệu gốc `YoChef_born_again/03_PHASE_0_REB
 
 | Mục | Giá trị |
 |---|---|
-| Repo GitHub | `<URL repo>` |
+| Repo GitHub | https://github.com/Teezy4869/YoChef |
 | Người bàn giao / liên hệ | `<tên, email>` |
 | Người nhận | `<tên, email>` |
 | Ngày bàn giao | `<yyyy-mm-dd>` |
-| Gói tài liệu gốc `YoChef_born_again` (nơi lưu) | `<đường dẫn / link>` |
-| Zip dữ liệu `recipes_001_250_release_candidate.zip` (nơi lưu) | `<đường dẫn / link>` |
+| Gói tài liệu gốc `YoChef_born_again` (nơi lưu) | Máy người bàn giao: `D:\PTIT\Ung_dung\YoChef_born_again` (và bản nén `YoChef_born_again.zip` cùng cấp). Link chia sẻ: `<điền sau khi đưa lên Drive>` |
+| Zip dữ liệu `recipes_001_250_release_candidate.zip` (nơi lưu) | Trong gói trên: `30_data\recipes_001_250_release_candidate.zip` (55 MB, sha256 trong `supabase/seed/dataset.sha256`). Link chia sẻ: `<điền sau khi đưa lên Drive>` |
 
 ## 4. Tài khoản và dịch vụ cần có
 
 | Dịch vụ | Dùng để | Chủ tài khoản | Ghi chú |
 |---|---|---|---|
-| GitHub | Mã nguồn | `<...>` | Cần quyền ghi repo |
-| Supabase | Database, Auth, Storage | `<...>` | Tổ chức: `<org>` |
-| Google Cloud (YouTube Data API) | Video tham khảo (Phase 4.4) | `<...>` | Khóa chỉ đặt ở Edge Function |
-| USDA FoodData Central | Dinh dưỡng (Phase 4.3) | `<...>` | Khóa chỉ đặt ở Edge Function |
-| Expo (EAS), nếu build bản cài | Build app | `<...>` | Chưa cần ở Phase 0 |
+| GitHub | Mã nguồn | Tài khoản `Teezy4869` | Cần quyền ghi repo |
+| Supabase | Database, Auth, Storage | `<email đăng nhập Dashboard>` | Tổ chức chứa v2: `lqnbivordcxkbiubogjt` |
+| Google Cloud (YouTube Data API) | Video tham khảo (Phase 4.4) | Chưa tạo | Khóa chỉ đặt ở Edge Function |
+| USDA FoodData Central | Dinh dưỡng (Phase 4.3) | Chưa tạo | Khóa chỉ đặt ở Edge Function |
+| Expo (EAS), nếu build bản cài | Build app | Chưa dùng | Chưa cần ở Phase 0 |
 
 ## 5. Dự án Supabase (điền)
 
 | Mục | Giá trị |
 |---|---|
-| Tên project v2 | `<tên>` |
-| Project ref | `<ref>` |
-| URL | `https://<ref>.supabase.co` |
-| Vùng (region) | `<region>` |
-| Gói dịch vụ (Free/Pro) | `<...>` |
-| Project cũ (chỉ đọc, tham chiếu) | `<ref hoặc "không có">` |
+| Tên project v2 | `YoChef` |
+| Project ref | `bdhphjwhagygbwtfhhxn` |
+| URL | `https://bdhphjwhagygbwtfhhxn.supabase.co` |
+| Vùng (region) | `ap-northeast-1` (Tokyo), PostgreSQL 17 |
+| Gói dịch vụ (Free/Pro) | `<điền: Dashboard → Organization → Billing>` |
+| Project cũ (chỉ đọc, tham chiếu) | `ihfuftmpsfgtwvmtfdja` (tên `cooking-app`, thuộc tổ chức khác với v2, không ghi, không xóa) |
 | Quản trị Dashboard bởi | `<email>` |
 
 Mật khẩu database: lưu ở `<trình quản lý mật khẩu>`. **Không ghi ở đây.**
@@ -71,11 +71,11 @@ Mật khẩu database: lưu ở `<trình quản lý mật khẩu>`. **Không ghi
 
 | Bí mật | Dùng ở | Được phép đặt ở | Nơi lưu thực tế |
 |---|---|---|---|
-| Publishable key | App, Admin (công khai, nhúng trong bundle) | `app/.env`, `admin/.env` | `<...>` |
-| Mật khẩu database | Chỉ người quản trị, khi cần | Trình quản lý mật khẩu | `<...>` |
-| Secret / service_role key | Chỉ Edge Function, không bao giờ ở client | Supabase secrets | `<...>` |
-| `YOUTUBE_API_KEY` | Edge Function | `supabase secrets set` | `<...>` |
-| USDA API key | Edge Function | `supabase secrets set` | `<...>` |
+| Publishable key | App, Admin (công khai, nhúng trong bundle) | `app/.env`, `admin/.env` | `app/.env` và `admin/.env` trên máy người bàn giao (không có trong git). Lấy lại: Dashboard → Project Settings → API Keys |
+| Mật khẩu database | Chỉ người quản trị, khi cần | Trình quản lý mật khẩu | `<tên trình quản lý mật khẩu>` |
+| Secret / service_role key | Chỉ Edge Function, không bao giờ ở client | Supabase secrets | Chưa tạo, chưa dùng |
+| `YOUTUBE_API_KEY` | Edge Function | `supabase secrets set` | Chưa tạo (Phase 4.4) |
+| USDA API key | Edge Function | `supabase secrets set` | Chưa tạo (Phase 4.3) |
 | Access token Supabase CLI | Máy dev | `supabase login` (lưu cục bộ) | máy từng người |
 
 Quy tắc: secret key, service_role và mật khẩu database **không** đi vào app, git hay chat. Mỗi người nhận tự tạo key của mình, không dùng chung bằng cách gửi file `.env`.
@@ -85,7 +85,7 @@ Quy tắc: secret key, service_role và mật khẩu database **không** đi và
 Yêu cầu: Node.js >= 22, npm 11, Git. Không cần Docker.
 
 ```bash
-git clone <URL repo> YoChef
+git clone https://github.com/Teezy4869/YoChef.git YoChef
 cd YoChef
 npm run install:all
 ```
@@ -101,7 +101,7 @@ cp admin/.env.example admin/.env
 
 | Biến | Giá trị |
 |---|---|
-| `EXPO_PUBLIC_SUPABASE_URL` / `VITE_SUPABASE_URL` | `https://<ref>.supabase.co` |
+| `EXPO_PUBLIC_SUPABASE_URL` / `VITE_SUPABASE_URL` | `https://bdhphjwhagygbwtfhhxn.supabase.co` (nếu dùng project mới: `https://<ref mới>.supabase.co`) |
 | `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` / `VITE_SUPABASE_PUBLISHABLE_KEY` | `<sb_publishable_...>` (Dashboard → Project Settings → API Keys) |
 
 Chỉ dùng **publishable key**. Chỉ biến có tiền tố `EXPO_PUBLIC_` hoặc `VITE_` được nhúng vào bundle.
@@ -194,6 +194,6 @@ npm --prefix admin run build    # build admin
 - [ ] Người nhận tự tạo `app/.env`, `admin/.env` (không nhận file từ người khác)
 - [ ] `npm run check`, `npm run test:db`, `npm run smoke:live` đều xanh trên máy người nhận
 - [ ] Đã chuyển quyền sở hữu hoặc thêm người nhận vào: GitHub `<>`, Supabase `<>`, Google Cloud `<>`, USDA `<>`
-- [ ] Đã đổi hoặc thu hồi mọi key người bàn giao từng dùng (nếu rời dự án): `<danh sách>`
+- [ ] Đã đổi hoặc thu hồi mọi key người bàn giao từng dùng (nếu rời dự án). Cần xử lý: publishable key hiện tại (đổi ở Dashboard → Project Settings → API Keys); token Supabase CLI tạo ngày 2026-11-08 (tên bắt đầu `cli_THEGIOILAP@`, thu hồi ở Dashboard → Account → Access Tokens); thêm: `<nếu có>`
 - [ ] Đã chốt người quyết cho các việc ở mục 12
 - [ ] Ngày và chữ ký xác nhận: `<...>`
