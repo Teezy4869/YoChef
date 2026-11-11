@@ -1,21 +1,38 @@
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { useMemo } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-// Phase 0 placeholder. Navigation, theme and Auth arrive in Phase 1.
-export default function App() {
+import { AppText } from '@/components/AppText';
+import { Screen } from '@/components/Screen';
+import { rawEnvFromProcess, validateEnv, type AppEnv, type RawEnv } from '@/lib/env';
+import { createSupabaseClient, SupabaseContext, type YoChefClient } from '@/lib/supabase';
+import { ConfigErrorScreen } from '@/screens/ConfigErrorScreen';
+
+export type AppProps = {
+  /** Injected in tests; production reads EXPO_PUBLIC_* at build time. */
+  rawEnv?: RawEnv;
+  /** Injected in tests to avoid a real network client. */
+  createClient?: (env: AppEnv) => YoChefClient;
+};
+
+export default function App({ rawEnv, createClient = createSupabaseClient }: AppProps) {
+  const envResult = useMemo(() => validateEnv(rawEnv ?? rawEnvFromProcess()), [rawEnv]);
+  const client = useMemo(() => (envResult.ok ? createClient(envResult.env) : null), [envResult, createClient]);
+
   return (
-    <View style={styles.container}>
-      <Text>YoChef</Text>
-      <StatusBar style="auto" />
-    </View>
+    <SafeAreaProvider>
+      <StatusBar style="dark" />
+      {envResult.ok && client ? (
+        <SupabaseContext.Provider value={client}>
+          <Screen centered>
+            <AppText variant="display" align="center">
+              YoChef
+            </AppText>
+          </Screen>
+        </SupabaseContext.Provider>
+      ) : (
+        <ConfigErrorScreen problems={envResult.ok ? [] : envResult.problems} />
+      )}
+    </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FAF7F2',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
