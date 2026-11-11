@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/react-native';
 
 import App from '@/app/App';
-import type { YoChefClient } from '@/lib/supabase';
+
+import { createFakeSupabase } from './helpers/fakeSupabase';
 
 describe('App env gate', () => {
   it('shows the config error and never creates a client when env is missing', () => {
@@ -21,8 +22,9 @@ describe('App env gate', () => {
     expect(createClient).not.toHaveBeenCalled();
   });
 
-  it('starts the app with a valid env', () => {
-    const createClient = jest.fn(() => ({}) as YoChefClient);
+  it('starts the app with a valid env', async () => {
+    const fake = createFakeSupabase();
+    const createClient = jest.fn(() => fake.client);
     render(
       <App
         rawEnv={{ url: 'https://bdhphjwhagygbwtfhhxn.supabase.co', key: 'sb_publishable_ok' }}
@@ -31,5 +33,6 @@ describe('App env gate', () => {
     );
     expect(createClient).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId('config-error')).toBeNull();
+    expect(await screen.findByText('Món Việt, nấu từng bước.')).toBeTruthy();
   });
 });

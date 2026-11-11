@@ -2,11 +2,12 @@ import { StatusBar } from 'expo-status-bar';
 import { useMemo } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { AppText } from '@/components/AppText';
-import { Screen } from '@/components/Screen';
+import { AuthProvider } from '@/features/auth/AuthProvider';
 import { rawEnvFromProcess, validateEnv, type AppEnv, type RawEnv } from '@/lib/env';
 import { createSupabaseClient, SupabaseContext, type YoChefClient } from '@/lib/supabase';
 import { ConfigErrorScreen } from '@/screens/ConfigErrorScreen';
+
+import { RootNavigator } from './navigation/RootNavigator';
 
 export type AppProps = {
   /** Injected in tests; production reads EXPO_PUBLIC_* at build time. */
@@ -24,11 +25,9 @@ export default function App({ rawEnv, createClient = createSupabaseClient }: App
       <StatusBar style="dark" />
       {envResult.ok && client ? (
         <SupabaseContext.Provider value={client}>
-          <Screen centered>
-            <AppText variant="display" align="center">
-              YoChef
-            </AppText>
-          </Screen>
+          <AuthProvider>
+            <RootNavigator />
+          </AuthProvider>
         </SupabaseContext.Provider>
       ) : (
         <ConfigErrorScreen problems={envResult.ok ? [] : envResult.problems} />
