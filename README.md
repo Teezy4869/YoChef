@@ -53,6 +53,7 @@ npx supabase storage cp -r supabase/.seed-out/recipe-images ss:/// --linked --co
 | 1. Unit / UI | `npm run check` | typecheck, lint, test của app và admin |
 | 2. Database cục bộ | `npm run test:db` | Migration thật trên PGlite (PostgreSQL 17): RLS, grant, trigger, seed |
 | 3. Live | `npm run smoke:live` | REST và Storage thật của v2, vai trò khách, publishable key trong `app/.env` |
+| 3. Live (Auth) | `npm run smoke:auth` | User thật trên v2: đăng nhập, trigger tạo profile, RLS khi đã đăng nhập, bucket `avatars`, đăng xuất. Cần thêm `.env.smoke` (`SMOKE_EMAIL`, `SMOKE_PASSWORD`); lần đầu chạy với `-- --signup` |
 
 Một bước chỉ được coi là xong khi tầng 3 xanh cho phần chạm tới database (L2). Log bằng chứng lưu ở `docs/evidence/`.
 

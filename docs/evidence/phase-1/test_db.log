@@ -1,0 +1,58 @@
+
+> yochef@0.1.0 test:db
+> node --test supabase/tests/*.test.mjs
+
+▶ global security invariants
+  ✔ RLS is enabled on every table in public (5.4726ms)
+  ✔ anon has no write privilege on any table in public (5.9908ms)
+  ✔ authenticated has no INSERT/DELETE/TRUNCATE on any table in public (3.3269ms)
+  ✔ every SECURITY DEFINER function pins search_path to empty (10.1295ms)
+  ✔ no is_admin() helper exists (4.0219ms)
+  ✔ a table created later is not opened to anon or authenticated (default privileges) (11.0377ms)
+✔ global security invariants (2038.6178ms)
+▶ 0001_catalog
+  ✔ anon reads published recipes only (6.6403ms)
+  ✔ children of a staged recipe are hidden from anon and authenticated (19.1619ms)
+  ✔ taxonomy is publicly readable (4.5522ms)
+  ✔ clients cannot write catalog tables (19.133ms)
+  ✔ "to taste" must be NULL, never 0 (5.6819ms)
+  ✔ a timer needs a duration (2.6242ms)
+  ✔ a published recipe must be complete (2.6314ms)
+  ✔ updated_at is maintained by trigger (7.6048ms)
+  ✔ recipe-images bucket exists and is public with limits (2.2612ms)
+✔ 0001_catalog (71.2628ms)
+▶ 0002_identity_rbac
+  ✔ sign-up creates a profile with a trimmed display name (1.8797ms)
+  ✔ sign-up never fails on bad metadata (6.2563ms)
+  ✔ profiles has no role column (9.0833ms)
+  ✔ public reads display fields but not bio (8.1622ms)
+  ✔ a user updates only their own profile (10.0706ms)
+  ✔ a user cannot create profiles or change their id (7.1636ms)
+  ✔ avatar_path must live in the owner folder (6.7391ms)
+  ✔ users cannot grant themselves a role (5.8265ms)
+  ✔ users read only their own roles, and helpers reflect them (17.6779ms)
+  ✔ super_admin implies editor and moderator (6.8406ms)
+  ✔ anon cannot execute role helpers (2.8854ms)
+  ✔ deleting the auth user cascades to profile and roles (4.9927ms)
+✔ 0002_identity_rbac (88.3919ms)
+▶ avatars bucket
+  ✔ is public, 5 MB, images only (7.6145ms)
+  ✔ a user uploads only inside their own folder (19.5839ms)
+  ✔ anon cannot upload, and a user cannot overwrite or delete another user object (25.4317ms)
+  ✔ a user cannot list another user avatar objects (5.4455ms)
+✔ avatars bucket (2032.8902ms)
+▶ get_my_profile
+  ✔ returns the caller row including bio (6.1816ms)
+  ✔ never returns another user row, and anon cannot call it (8.428ms)
+  ✔ bio is still hidden from the public profiles table (6.3828ms)
+✔ get_my_profile (21.4821ms)
+﹣ seed import (0.7059ms) # dataset zip not found at F:\Downloads\YoChef\YoChef_born_again\30_data\recipes_001_250_release_candidate.zip (set YOCHEF_DATASET_ZIP)
+ℹ tests 34
+ℹ suites 6
+ℹ pass 34
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2465.7721
+exit 0

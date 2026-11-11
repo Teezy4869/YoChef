@@ -24,7 +24,7 @@ Không có backend Node riêng, không dùng Docker.
 | Phase | Trạng thái |
 |---|---|
 | 0. Nền móng (repo, schema, dữ liệu 250 công thức, test 3 tầng) | **Xong**, tag `phase-0-complete` |
-| 1. Khung app, theme, Auth, hồ sơ | Chưa làm |
+| 1. Khung app, theme, Auth, hồ sơ | Code xong trên nhánh `phase-1/*`, chưa live check, chưa merge. Xem `docs/reports/PHASE_1_PROGRESS.md` |
 | 2. Recipe core (tìm kiếm, chi tiết, khẩu phần, chế độ nấu) | Chưa làm |
 | 3. Yêu thích, mua sắm, đánh giá, bình luận, ảnh | Chưa làm |
 | 4. Admin: RBAC, kiểm duyệt, dinh dưỡng, YouTube, CMS | Chưa làm |
@@ -141,6 +141,7 @@ Ba tầng kiểm thử (một bước chỉ xong khi tầng 3 xanh cho phần ch
 | 1. Unit / UI | `npm run check` | Không |
 | 2. Database cục bộ | `npm run test:db` | Zip dữ liệu (nếu thiếu, phần seed bị bỏ qua và báo rõ) |
 | 3. Live trên Supabase | `npm run smoke:live` | `app/.env` có URL và publishable key |
+| 3. Live, người dùng đăng nhập | `npm run smoke:auth` | Như trên, thêm `.env.smoke` ở gốc repo với `SMOKE_EMAIL`, `SMOKE_PASSWORD` của hộp thư test |
 
 Kết quả mong đợi hiện tại: `check` exit 0; `test:db` 34/34; `smoke:live` 19/19 PASS. Log mẫu: `docs/evidence/phase-0/`.
 
