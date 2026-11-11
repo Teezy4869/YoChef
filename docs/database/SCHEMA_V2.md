@@ -349,7 +349,7 @@ Quy tắc chi tiết nằm trong `phase4_08_nutrition_data_contract.md`. Public 
 | Bucket | Public | Đường dẫn | Ghi | Migration |
 |---|---|---|---|---|
 | `recipe-images` | Có | `<recipe slug>/cover.webp` | Phase 0: chỉ script seed (secret key). 4.5: editor | 0001 |
-| `avatars` | Có | `<user id>/<file>` | Chủ sở hữu, trong thư mục của mình | Phase 1 |
+| `avatars` | Có | `<user id>/<file>` | Chủ sở hữu, trong thư mục của mình (policy trên `storage.objects`) | 1.1 (`20261111120000`) |
 | `cooking-photos` | Không (signed URL) | `<user id>/<uuid>.<ext>` | Chủ sở hữu; quyền đọc file đi theo `status` của dòng | 3.5 |
 
 - Giới hạn: tối đa 5 MB; chỉ nhận `image/jpeg`, `image/png`, `image/webp` (`app-in4` §7.2).
@@ -403,6 +403,6 @@ Script `supabase/seed/import_recipes.mjs` (bước 0.5) upsert theo `source_key`
 | # | Việc | Khi nào | Ai quyết |
 |---|---|---|---|
 | O1 | Giữ video ID sau 30 ngày hay xóa (chính sách YouTube III.E.4) | 4.4 | Chủ dự án |
-| O2 | Chủ sở hữu đọc `bio` của mình bằng RPC hay view | Phase 1 | Agent |
+| O2 | ~~Chủ sở hữu đọc `bio` của mình bằng RPC hay view~~ **Đã chốt (bước 1.1): RPC `public.get_my_profile()`**, trả đúng dòng của `auth.uid()`. | Phase 1 | Agent |
 | O3 | Điểm trung bình đánh giá: view hay RPC | 3.3 | Agent |
 | O4 | Default privileges của project v2 mới (Supabase có thể đã đổi mặc định cho bảng mới): kiểm tra thật khi viết 0001; C8 vẫn áp dụng dù kết quả thế nào | 0.4 | Agent, có log |
