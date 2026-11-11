@@ -56,6 +56,58 @@ export function createFakeSupabase(initial: Session | null = null) {
     }),
   };
 
-  const client = { auth } as unknown as YoChefClient;
-  return { client, auth, setSession: (s: Session | null, event = 'TOKEN_REFRESHED') => ((session = s), emit(event)) };
+  // profiles: one row per user, created on first read like the sign-up trigger.
+  const profiles = new Map<string, Record<string, unknown>>();
+  const profileOf = (id: string) => {
+    if (!profiles.has(id)) {
+      profiles.set(id, { id, display_name: null, avatar_path: null, bio: null, created_at: '2026-11-11T00:00:00Z' });
+    }
+    return profiles.get(id)!;
+  };
+
+  const rpc = jest.fn(async (fn: string) => {
+    if (fn !== 'get_my_profile') return { data: null, error: { message: `unknown rpc ${fn}` } };
+    return { data: session ? [{ ...profileOf(session.user.id) }] : [], error: null };
+  });
+
+  const from = jest.fn((table: string) => ({
+    update: (patch: Record<string, unknown>) => ({
+      eq: (_col: string, id: string) => ({
+        select: async () => {
+          if (table !== 'profiles' || !session || session.user.id !== id) return { data: [], error: null };
+          Object.assign(profileOf(id), patch);
+          return { data: [{ id }], error: null };
+        },
+      }),
+    }),
+  }));
+
+  const objects = new Set<string>();
+  const bucket = {
+    upload: jest.fn(async (path: string, _body: unknown, _opts?: unknown) => {
+      objects.add(path);
+      return { data: { path }, error: null };
+    }),
+    remove: jest.fn(async (paths: string[]) => {
+      paths.forEach((p) => objects.delete(p));
+      return { data: [], error: null };
+    }),
+    getPublicUrl: jest.fn((path: string) => ({
+      data: { publicUrl: `https://bdhphjwhagygbwtfhhxn.supabase.co/storage/v1/object/public/avatars/${path}` },
+    })),
+  };
+  const storage = { from: jest.fn((_name: string) => bucket) };
+
+  const client = { auth, rpc, from, storage } as unknown as YoChefClient;
+  return {
+    client,
+    auth,
+    rpc,
+    from,
+    bucket,
+    objects,
+    profiles,
+    profileOf,
+    setSession: (s: Session | null, event = 'TOKEN_REFRESHED') => ((session = s), emit(event)),
+  };
 }
