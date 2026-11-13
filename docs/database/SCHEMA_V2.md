@@ -153,7 +153,7 @@ Phase 0 không có đường ghi nào từ client. Dữ liệu được nạp b�
 
 **Index:** `(status, category_id)`, `category_id`.
 
-**Tìm kiếm tiếng Việt (Phase 2):** thêm cột `search_text` (chữ thường, bỏ dấu) do trigger cập nhật, cùng RPC `search_recipes` dạng `SECURITY INVOKER`. `unaccent()` của PostgreSQL là `STABLE`, không phải `IMMUTABLE` như tài liệu v1 ghi, nên không dùng được trong generated column hay index biểu thức. Trigger thì dùng được. Với 250 công thức, quét tuần tự là đủ nhanh, chưa cần index trigram.
+**Tìm kiếm tiếng Việt (Phase 2, bước 2.1, `20261113120000_recipe_search`):** không thêm cột `search_text`, không dùng `unaccent`. `public.fold_vi(text)` (IMMUTABLE, dựng từ `normalize(NFD)` + `regexp_replace`, đổi `đ` thành `d`) và RPC `public.search_recipes(q, category_slug, difficulty, max_total_minutes, limit, offset)` dạng `SECURITY INVOKER`, nên RLS của người gọi áp dụng (chỉ thấy `published`). Mọi từ khóa phải khớp (AND), theo tên công thức hoặc tên/alias nguyên liệu; khớp tên xếp trước khớp nguyên liệu. Lọc thời gian loại công thức có `prep_time_minutes` hoặc `cook_time_minutes` là `NULL` (không biết khác 0). `limit` kẹp 1–100. Với 250 công thức, gấp chữ tại chỗ đủ nhanh, chưa cần index.
 
 ### 3.5 `recipe_ingredients`
 | Cột | Kiểu | Ràng buộc |
