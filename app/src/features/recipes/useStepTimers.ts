@@ -50,11 +50,14 @@ export function useStepTimers(onDone: (stepNumber: number) => void, now: () => n
     return () => clearInterval(id);
   }, [anyRunning, now, commit]);
 
+  /** Applies `fn` to one step and returns its new state (callers schedule alarms from it). */
   const update = useCallback(
-    (step: number, fn: (s: TimerState, t: number) => TimerState) => {
+    (step: number, fn: (s: TimerState, t: number) => TimerState): TimerState => {
       const t = now();
       setClock(t);
-      commit({ ...ref.current, [step]: fn(ref.current[step] ?? IDLE, t) });
+      const next = fn(ref.current[step] ?? IDLE, t);
+      commit({ ...ref.current, [step]: next });
+      return next;
     },
     [now, commit],
   );

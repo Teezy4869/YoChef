@@ -1,4 +1,6 @@
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import * as Notifications from 'expo-notifications';
 import { Vibration } from 'react-native';
 
 import App from '@/app/App';
@@ -81,9 +83,25 @@ describe('cooking mode', () => {
   });
 
   describe('timer on the screen', () => {
-    beforeEach(() => {
+    const notif = jest.mocked(Notifications);
+    const ALARM_1 = 'cook:001-thit-kho:1';
+    let permission: 'undetermined' | 'granted' | 'denied';
+    let userAnswer: boolean;
+
+    beforeEach(async () => {
       jest.useFakeTimers({ now: new Date('2026-11-13T10:00:00Z') });
       jest.spyOn(Vibration, 'vibrate').mockImplementation(() => undefined);
+      jest.clearAllMocks();
+      await AsyncStorage.clear();
+      permission = 'undetermined';
+      userAnswer = true;
+      const status = () =>
+        ({ granted: permission === 'granted', canAskAgain: permission === 'undetermined', status: permission, expires: 'never' }) as never;
+      notif.getPermissionsAsync.mockImplementation(async () => status());
+      notif.requestPermissionsAsync.mockImplementation(async () => {
+        permission = userAnswer ? 'granted' : 'denied';
+        return status();
+      });
     });
     afterEach(() => {
       jest.useRealTimers();
@@ -148,6 +166,57 @@ describe('cooking mode', () => {
       expect(screen.getByLabelText('Bước 1 · 01:20')).toBeTruthy();
       fireEvent.press(screen.getByLabelText('Bước 1 · 01:20'));
       expect(screen.getByTestId('step-counter')).toHaveTextContent('Bước 1/2');
+    });
+
+    it('asks for notifications at the first start and schedules the alarm at the end time', async () => {
+      await toTimerStep();
+      expect(notif.requestPermissionsAsync).not.toHaveBeenCalled(); // never on opening the screen
+
+      const startedAt = Date.now();
+      fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu hẹn giờ' }));
+      await waitFor(() => expect(notif.scheduleNotificationAsync).toHaveBeenCalledTimes(1));
+      expect(notif.requestPermissionsAsync).toHaveBeenCalledTimes(1);
+      expect(notif.scheduleNotificationAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          identifier: ALARM_1,
+          content: expect.objectContaining({ title: 'Hết giờ bước 1', body: 'Thịt lợn kho cốt dừa' }),
+          trigger: expect.objectContaining({ type: 'date', date: startedAt + 90_000 }),
+        }),
+      );
+
+      fireEvent.press(screen.getByRole('button', { name: 'Tạm dừng' }));
+      await waitFor(() => expect(notif.cancelScheduledNotificationAsync).toHaveBeenCalledWith(ALARM_1));
+
+      fireEvent.press(screen.getByRole('button', { name: 'Tiếp tục' }));
+      await waitFor(() => expect(notif.scheduleNotificationAsync).toHaveBeenCalledTimes(2));
+      expect(notif.requestPermissionsAsync).toHaveBeenCalledTimes(1); // granted already, not asked again
+      expect(screen.queryByTestId('alarm-off-hint')).toBeNull();
+    });
+
+    it('keeps the timer when notifications are refused, says so, and never asks again', async () => {
+      userAnswer = false;
+      await toTimerStep();
+      fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu hẹn giờ' }));
+      expect(await screen.findByTestId('alarm-off-hint')).toBeTruthy();
+      expect(notif.scheduleNotificationAsync).not.toHaveBeenCalled();
+
+      fireEvent.press(screen.getByRole('button', { name: 'Đặt lại' }));
+      fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu hẹn giờ' }));
+      await act(async () => {
+        jest.advanceTimersByTime(1_000);
+      });
+      expect(screen.getByTestId('timer-clock')).toHaveTextContent('01:29');
+      expect(notif.requestPermissionsAsync).toHaveBeenCalledTimes(1);
+      expect(notif.scheduleNotificationAsync).not.toHaveBeenCalled();
+    });
+
+    it('cancels the alarms when leaving cooking mode', async () => {
+      await toTimerStep();
+      fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu hẹn giờ' }));
+      await waitFor(() => expect(notif.scheduleNotificationAsync).toHaveBeenCalledTimes(1));
+      fireEvent.press(screen.getByRole('button', { name: 'Bước tiếp' }));
+      fireEvent.press(screen.getByRole('button', { name: 'Hoàn thành' }));
+      await waitFor(() => expect(notif.cancelScheduledNotificationAsync).toHaveBeenCalledWith(ALARM_1));
     });
   });
 

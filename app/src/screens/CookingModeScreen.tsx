@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Vibration, View } from 'react-native';
 
 import type { RootStackScreenProps } from '@/app/navigation/types';
@@ -10,7 +10,8 @@ import { Screen } from '@/components/Screen';
 import { formatClock, formatSeconds } from '@/features/recipes/format';
 import { IngredientRows } from '@/features/recipes/IngredientRows';
 import { clampServings } from '@/features/recipes/servings';
-import { remainingSeconds } from '@/features/recipes/timer';
+import { remainingSeconds, type TimerState } from '@/features/recipes/timer';
+import { cancelAlarm, scheduleAlarm } from '@/features/recipes/timerAlarms';
 import type { RecipeDetail } from '@/features/recipes/types';
 import { useRecipeDetail } from '@/features/recipes/useRecipeDetail';
 import { useStepTimers } from '@/features/recipes/useStepTimers';
@@ -64,6 +65,18 @@ function CookingView({
   const [showIngredients, setShowIngredients] = useState(false);
   const alarm = useCallback(() => Vibration.vibrate(ALARM_PATTERN), []);
   const timers = useStepTimers(alarm);
+  const [alarmsOff, setAlarmsOff] = useState(false);
+  const { slug, name } = recipe;
+
+  // Also ring in the background (spec 20); false means permission refused or unavailable.
+  const ring = (stepNumber: number, s: TimerState) => {
+    if (s.status === 'running') void scheduleAlarm(slug, stepNumber, name, s.endsAt).then((ok) => setAlarmsOff(!ok));
+  };
+  const silence = (stepNumber: number, s: TimerState) => {
+    if (s.status !== 'running') void cancelAlarm(slug, stepNumber);
+  };
+  // Timers live only on this screen for now, so their alarms leave with it.
+  useEffect(() => () => steps.forEach((s) => void cancelAlarm(slug, s.stepNumber)), [slug, steps]);
 
   const step = steps[index];
   const isLast = index === steps.length - 1;
@@ -90,7 +103,7 @@ function CookingView({
       {doneSteps.map((s) => (
         <View key={s.stepNumber} style={styles.alarm} testID="timer-done">
           <Banner tone="success" message={`Hết giờ bước ${s.stepNumber}!`} />
-          <Button title={`Tắt báo bước ${s.stepNumber}`} variant="secondary" onPress={() => timers.reset(s.stepNumber)} />
+          <Button title={`Tắt báo bước ${s.stepNumber}`} variant="secondary" onPress={() => silence(s.stepNumber, timers.reset(s.stepNumber))} />
         </View>
       ))}
 
@@ -109,18 +122,23 @@ function CookingView({
             </AppText>
             <View style={styles.timerButtons}>
               {state.status === 'idle' ? (
-                <Button title="Bắt đầu hẹn giờ" onPress={() => timers.start(step.stepNumber, duration)} />
+                <Button title="Bắt đầu hẹn giờ" onPress={() => ring(step.stepNumber, timers.start(step.stepNumber, duration))} />
               ) : null}
               {state.status === 'running' ? (
-                <Button title="Tạm dừng" variant="secondary" onPress={() => timers.pause(step.stepNumber)} />
+                <Button title="Tạm dừng" variant="secondary" onPress={() => silence(step.stepNumber, timers.pause(step.stepNumber))} />
               ) : null}
               {state.status === 'paused' ? (
-                <Button title="Tiếp tục" onPress={() => timers.resume(step.stepNumber)} />
+                <Button title="Tiếp tục" onPress={() => ring(step.stepNumber, timers.resume(step.stepNumber))} />
               ) : null}
               {state.status !== 'idle' ? (
-                <Button title="Đặt lại" variant="ghost" onPress={() => timers.reset(step.stepNumber)} />
+                <Button title="Đặt lại" variant="ghost" onPress={() => silence(step.stepNumber, timers.reset(step.stepNumber))} />
               ) : null}
             </View>
+            {alarmsOff ? (
+              <AppText variant="caption" tone="muted" testID="alarm-off-hint">
+                Thông báo đang tắt: hẹn giờ chỉ báo khi YoChef đang mở.
+              </AppText>
+            ) : null}
           </View>
         ) : null}
 
