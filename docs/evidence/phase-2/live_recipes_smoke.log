@@ -1,0 +1,28 @@
+YoChef live recipe smoke  2026-11-13T08:32:18.987Z  target bdhphjwhagygbwtfhhxn.supabase.co  role anon
+PASS  search_recipes callable by anon  (HTTP 200)
+PASS  empty search counts exactly the published recipes  (total 236, expected 236)
+PASS  limit is clamped to 100  (rows 100)
+PASS  first row has the fields the app reads
+PASS  no staged recipe is ever returned
+PASS  pages are disjoint and totals stable  (p1 20, p2 20)
+PASS  offset past the end returns no rows  (HTTP 200)
+PASS  "thịt" finds recipes  (total 104)
+PASS  "thit" (no accents) finds the same recipes  (104 vs 104)
+PASS  upper case gives the same result  (104 vs 104)
+PASS  "đậu" is covered by "dau" (đ folds to d)  (đậu 230, dau 230)
+PASS  more terms narrow the result (AND)  (91 <= 104)
+PASS  a nonsense query returns nothing
+PASS  "%" is a literal, not a wildcard
+PASS  categories readable  (HTTP 200, 10 rows)
+PASS  category totals add up to all published recipes  (sum 236)
+PASS  difficulty totals never exceed the published count  (sum 236)
+PASS  time filter is monotonic  (30: 29, 60: 135)
+PASS  time-filtered rows really are within the limit
+PASS  detail loads with a single object request  (HTTP 200)
+PASS  detail has ingredients with names, and steps
+PASS  detail credits its source
+PASS  no "to taste" line carries a quantity  (HTTP 200)
+PASS  no step has a timer without a duration  (HTTP 200)
+PASS  every published recipe has default servings (stepper always available)  (HTTP 200)
+PASS  a staged recipe is not readable by slug  (HTTP 200)
+ALL PASS
