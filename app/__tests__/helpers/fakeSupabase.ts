@@ -90,7 +90,80 @@ export function createFakeSupabase(initial: Session | null = null) {
     return { data: null, error: { message: `unknown rpc ${fn}` } };
   });
 
-  const from = jest.fn((table: string) => ({
+  // Phase 3 user tables: a tiny in-memory store with owner-only rows, which is
+  // roughly what RLS returns. `decorate` adds embeds; `failNext` simulates an error.
+  type Row = Record<string, unknown>;
+  type Failure = { message: string; code?: string };
+  const tables: Record<string, Row[]> = {};
+  const decorate: Record<string, (row: Row) => Row> = {};
+  const failures = new Map<string, Failure>();
+  let seq = 0;
+  const DENIED: Failure = { message: 'new row violates row-level security policy', code: '42501' };
+
+  function userQuery(table: string, op: 'select' | 'insert' | 'update' | 'delete', payload?: Row | Row[]) {
+    const filters: ((r: Row) => boolean)[] = [];
+    let order: { col: string; asc: boolean } | null = null;
+    let range: [number, number] = [0, Number.MAX_SAFE_INTEGER];
+    let returning = op === 'select';
+    const view = (r: Row) => (decorate[table] ? decorate[table]({ ...r }) : { ...r });
+
+    const run = async (): Promise<{ data: Row[] | null; error: Failure | null }> => {
+      const failure = failures.get(`${table}.${op}`);
+      if (failure) {
+        failures.delete(`${table}.${op}`);
+        return { data: null, error: failure };
+      }
+      const me = session?.user.id;
+      if (!me) return { data: null, error: DENIED };
+      const rows = (tables[table] ??= []);
+      if (op === 'insert') {
+        const list = Array.isArray(payload) ? payload : [payload ?? {}];
+        if (list.some((r) => r.user_id !== me)) return { data: null, error: DENIED };
+        const added = list.map((r) => ({ id: `${table}-${++seq}`, created_at: new Date(Date.now() + seq).toISOString(), ...r }));
+        rows.push(...added);
+        return { data: returning ? added.map(view) : null, error: null };
+      }
+      let hit = rows.filter((r) => r.user_id === me && filters.every((f) => f(r)));
+      if (op === 'update') hit.forEach((r) => Object.assign(r, payload));
+      if (op === 'delete') tables[table] = rows.filter((r) => !hit.includes(r));
+      if (order) {
+        const { col, asc } = order;
+        hit = [...hit].sort((a, b) => (String(a[col]) < String(b[col]) ? -1 : 1) * (asc ? 1 : -1));
+      }
+      hit = hit.slice(range[0], range[1] + 1);
+      return { data: returning ? hit.map(view) : null, error: null };
+    };
+
+    const b = {
+      eq: (col: string, v: unknown) => (filters.push((r) => r[col] === v), b),
+      in: (col: string, vs: unknown[]) => (filters.push((r) => vs.includes(r[col])), b),
+      order: (col: string, opts?: { ascending?: boolean }) => ((order = { col, asc: opts?.ascending ?? true }), b),
+      range: (fromIdx: number, toIdx: number) => ((range = [fromIdx, toIdx]), b),
+      limit: (n: number) => ((range = [0, n - 1]), b),
+      select: (_cols?: string) => ((returning = true), b),
+      maybeSingle: async () => {
+        const r = await run();
+        return { data: r.data?.[0] ?? null, error: r.error };
+      },
+      then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) => run().then(resolve, reject),
+    };
+    return b;
+  }
+
+  const USER_TABLES = new Set(['favorites']);
+
+  const from = jest.fn((table: string) =>
+    USER_TABLES.has(table)
+      ? {
+          select: (cols?: string) => userQuery(table, 'select').select(cols),
+          insert: (rows: Row | Row[]) => userQuery(table, 'insert', rows),
+          update: (patch: Row) => userQuery(table, 'update', patch),
+          delete: () => userQuery(table, 'delete'),
+        }
+      : catalogFrom(table),
+  );
+
+  const catalogFrom = (table: string) => ({
     select: (_cols?: string) => {
       const eqs: Record<string, unknown> = {};
       const rows = () => {
@@ -120,7 +193,7 @@ export function createFakeSupabase(initial: Session | null = null) {
         },
       }),
     }),
-  }));
+  });
 
   const objects = new Set<string>();
   const bucket = {
@@ -149,6 +222,10 @@ export function createFakeSupabase(initial: Session | null = null) {
     profiles,
     profileOf,
     catalog,
+    tables,
+    decorate,
+    failNext: (table: string, op: 'select' | 'insert' | 'update' | 'delete', error: Failure = { message: 'boom' }) =>
+      failures.set(`${table}.${op}`, error),
     setSession: (s: Session | null, event = 'TOKEN_REFRESHED') => ((session = s), emit(event)),
   };
 }
