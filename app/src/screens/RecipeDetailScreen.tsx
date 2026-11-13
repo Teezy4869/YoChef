@@ -8,7 +8,8 @@ import { Button } from '@/components/Button';
 import { Screen } from '@/components/Screen';
 import { formatSeconds, joinMeta, timeLabel } from '@/features/recipes/format';
 import { coverUrl } from '@/features/recipes/recipeApi';
-import { clampServings, MAX_SERVINGS, MIN_SERVINGS, quantityText } from '@/features/recipes/servings';
+import { IngredientRows } from '@/features/recipes/IngredientRows';
+import { clampServings, MAX_SERVINGS, MIN_SERVINGS } from '@/features/recipes/servings';
 import { DIFFICULTY_LABEL, type RecipeDetail, type ServingBasis } from '@/features/recipes/types';
 import { useRecipeDetail } from '@/features/recipes/useRecipeDetail';
 import { useSupabase } from '@/lib/supabase';
@@ -20,7 +21,7 @@ const SERVING_BASIS_LABEL: Record<ServingBasis, string> = {
   inferred_yield: 'Khẩu phần suy ra từ thành phẩm',
 };
 
-export function RecipeDetailScreen({ route }: RootStackScreenProps<'RecipeDetail'>) {
+export function RecipeDetailScreen({ route, navigation }: RootStackScreenProps<'RecipeDetail'>) {
   const supabase = useSupabase();
   const { loading, error, recipe, notFound, retry } = useRecipeDetail(supabase, route.params.slug);
 
@@ -48,10 +49,24 @@ export function RecipeDetailScreen({ route }: RootStackScreenProps<'RecipeDetail
     );
   }
   // Mounted only once the recipe exists, so servings can start from its default.
-  return <RecipeDetailView recipe={recipe} imageUri={coverUrl(supabase, recipe.coverImagePath)} />;
+  return (
+    <RecipeDetailView
+      recipe={recipe}
+      imageUri={coverUrl(supabase, recipe.coverImagePath)}
+      onCook={(servings) => navigation.navigate('CookingMode', { slug: recipe.slug, servings })}
+    />
+  );
 }
 
-function RecipeDetailView({ recipe, imageUri }: { recipe: RecipeDetail; imageUri: string | null }) {
+function RecipeDetailView({
+  recipe,
+  imageUri,
+  onCook,
+}: {
+  recipe: RecipeDetail;
+  imageUri: string | null;
+  onCook: (servings: number) => void;
+}) {
   const base = recipe.defaultServings;
   const [servings, setServings] = useState(base ?? MIN_SERVINGS);
   const canScale = base !== null;
@@ -111,35 +126,14 @@ function RecipeDetailView({ recipe, imageUri }: { recipe: RecipeDetail; imageUri
           </AppText>
         ) : null}
 
-        {recipe.ingredients.length === 0 ? (
-          <AppText tone="muted">Chưa có danh sách nguyên liệu.</AppText>
-        ) : (
-          recipe.ingredients.map((i) => {
-            const qty = quantityText(i.quantity, i.unit, i.basis, base, servings);
-            return (
-              <View key={i.sortOrder} style={styles.ingredient} testID="ingredient-row">
-                <AppText style={styles.qty} testID="ingredient-qty">
-                  {qty}
-                </AppText>
-                <View style={styles.ingText}>
-                  <AppText>
-                    {i.name}
-                    {i.isOptional ? ' (tùy chọn)' : ''}
-                  </AppText>
-                  {joinMeta([i.preparationNote, i.quantityNote]) ? (
-                    <AppText variant="caption" tone="muted">
-                      {joinMeta([i.preparationNote, i.quantityNote])}
-                    </AppText>
-                  ) : null}
-                </View>
-              </View>
-            );
-          })
-        )}
+        <IngredientRows ingredients={recipe.ingredients} defaultServings={base} servings={servings} />
       </View>
 
       <View style={styles.block}>
         <AppText variant="title">Cách làm</AppText>
+        {recipe.steps.length > 0 ? (
+          <Button title="Bắt đầu nấu" onPress={() => onCook(servings)} />
+        ) : null}
         {recipe.steps.length === 0 ? (
           <AppText tone="muted">Chưa có các bước thực hiện.</AppText>
         ) : (
@@ -196,8 +190,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   stepOff: { opacity: 0.4 },
-  ingredient: { flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.xs },
-  qty: { width: 112, fontWeight: '600' },
   ingText: { flex: 1, gap: spacing.xxs },
   step: { flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.xs },
   badge: {
