@@ -1,0 +1,76 @@
+
+> yochef@0.1.0 test:db
+> node --test supabase/tests/*.test.mjs
+
+▶ global security invariants
+  ✔ RLS is enabled on every table in public (3.9192ms)
+  ✔ anon has no write privilege on any table in public (4.2123ms)
+  ✔ authenticated has no INSERT/DELETE/TRUNCATE on any table in public (2.2822ms)
+  ✔ every SECURITY DEFINER function pins search_path to empty (4.6926ms)
+  ✔ no is_admin() helper exists (1.9584ms)
+  ✔ a table created later is not opened to anon or authenticated (default privileges) (11.5415ms)
+✔ global security invariants (2293.2452ms)
+▶ 0001_catalog
+  ✔ anon reads published recipes only (7.8204ms)
+  ✔ children of a staged recipe are hidden from anon and authenticated (27.283ms)
+  ✔ taxonomy is publicly readable (7.4903ms)
+  ✔ clients cannot write catalog tables (20.3164ms)
+  ✔ "to taste" must be NULL, never 0 (6.7998ms)
+  ✔ a timer needs a duration (2.5226ms)
+  ✔ a published recipe must be complete (3.694ms)
+  ✔ updated_at is maintained by trigger (9.1048ms)
+  ✔ recipe-images bucket exists and is public with limits (2.0875ms)
+✔ 0001_catalog (88.211ms)
+▶ 0002_identity_rbac
+  ✔ sign-up creates a profile with a trimmed display name (3.9074ms)
+  ✔ sign-up never fails on bad metadata (9.7842ms)
+  ✔ profiles has no role column (7.8647ms)
+  ✔ public reads display fields but not bio (10.2327ms)
+  ✔ a user updates only their own profile (11.2209ms)
+  ✔ a user cannot create profiles or change their id (8.5203ms)
+  ✔ avatar_path must live in the owner folder (9.861ms)
+  ✔ users cannot grant themselves a role (8.1137ms)
+  ✔ users read only their own roles, and helpers reflect them (24.3893ms)
+  ✔ super_admin implies editor and moderator (9.5813ms)
+  ✔ anon cannot execute role helpers (4.3884ms)
+  ✔ deleting the auth user cascades to profile and roles (4.9463ms)
+✔ 0002_identity_rbac (113.8272ms)
+▶ avatars bucket
+  ✔ is public, 5 MB, images only (6.0311ms)
+  ✔ a user uploads only inside their own folder (19.6415ms)
+  ✔ anon cannot upload, and a user cannot overwrite or delete another user object (23.6906ms)
+  ✔ a user cannot list another user avatar objects (6.6842ms)
+✔ avatars bucket (2320.935ms)
+▶ get_my_profile
+  ✔ returns the caller row including bio (7.5571ms)
+  ✔ never returns another user row, and anon cannot call it (10.4444ms)
+  ✔ bio is still hidden from the public profiles table (9.4215ms)
+✔ get_my_profile (27.9947ms)
+▶ fold_vi
+  ✔ lower-cases, strips diacritics and maps đ to d (4.8214ms)
+  ✔ handles decomposed (NFD) input and NULL (2.984ms)
+✔ fold_vi (2197.3968ms)
+▶ search_recipes
+  ✔ returns only published recipes, to both anon and authenticated (24.1969ms)
+  ✔ finds Vietnamese names without typing accents (40.3133ms)
+  ✔ matches ingredient names and aliases, ranking name matches first (22.6372ms)
+  ✔ puts a name match before an ingredient-only match (9.9759ms)
+  ✔ requires every term (AND), across name and ingredients (18.6736ms)
+  ✔ never returns staged recipes, even when searched by name (5.7266ms)
+  ✔ treats LIKE wildcards literally (18.1758ms)
+  ✔ filters by category and difficulty (29.7464ms)
+  ✔ filters by total time and excludes unknown times (NULL is not 0) (21.9723ms)
+  ✔ paginates with a stable total_count and clamps limit/offset (34.2331ms)
+  ✔ returns category fields and the cover path (9.5984ms)
+  ✔ is read-only: anon still cannot write recipes (8.1513ms)
+✔ search_recipes (244.7448ms)
+﹣ seed import (1.0107ms) # dataset zip not found at F:\Downloads\YoChef\YoChef_born_again\30_data\recipes_001_250_release_candidate.zip (set YOCHEF_DATASET_ZIP)
+ℹ tests 48
+ℹ suites 8
+ℹ pass 48
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2747.5211
+exit 0
