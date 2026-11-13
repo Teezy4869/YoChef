@@ -58,7 +58,7 @@ Script chỉ ghi vào dữ liệu của chính user test và hoàn tác hết (b
 ## 5. Giới hạn và việc còn mở
 
 - Chưa kiểm trên thiết bị thật hay Expo Go; chỉ có test Jest, bundle Android và live smoke qua REST.
-- Test UI chập chờn khi cache Jest lạnh (mức chờ mặc định 1 s của `findBy…`); cần tăng `asyncUtilTimeout` trong commit riêng.
+- ~~Test UI chập chờn khi cache Jest lạnh.~~ Đã sửa ở bước 2.10 (`asyncUtilTimeout` 5 s; chạy lạnh 122/122).
 - Dịch vụ email mặc định của Supabase chỉ gửi tới thành viên team; người dùng thật cần SMTP riêng trước khi phát hành.
 - Chưa có màn quên mật khẩu, đổi email, xóa tài khoản.
 - Spec Phase 1 gốc chưa được đối chiếu (có ở `YoChef_born_again/20_phase_specs/phase-1/`).

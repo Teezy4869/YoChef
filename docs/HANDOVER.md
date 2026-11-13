@@ -25,7 +25,7 @@ Không có backend Node riêng, không dùng Docker.
 |---|---|
 | 0. Nền móng (repo, schema, dữ liệu 250 công thức, test 3 tầng) | **Xong**, tag `phase-0-complete` |
 | 1. Khung app, theme, Auth, hồ sơ | **Xong**, tag `phase-1-complete`; `smoke:auth` 26/26. Xem `docs/reports/PHASE_1_PROGRESS.md` |
-| 2. Recipe core (tìm kiếm, chi tiết, khẩu phần, chế độ nấu) | Đã merge vào `main`, migration đã lên v2, `smoke:recipes` 26/26. 2.1–2.5 đã chạy trên máy thật; 2.6–2.8 (làm tròn A2, thông báo hẹn giờ, phiên nấu) chờ kiểm trên máy thật. Xem `docs/reports/PHASE_2_CHANGES.md` |
+| 2. Recipe core (tìm kiếm, chi tiết, khẩu phần, chế độ nấu) | Đã merge vào `main`, migration đã lên v2, `smoke:recipes` 26/26. 2.1–2.5 đã chạy trên máy thật; 2.6–2.12 (làm tròn A2, thông báo hẹn giờ, phiên nấu, giữ màn hình sáng) chờ kiểm trên máy thật. Xem `docs/reports/PHASE_2_CHANGES.md` |
 | 3. Yêu thích, mua sắm, đánh giá, bình luận, ảnh | Chưa làm |
 | 4. Admin: RBAC, kiểm duyệt, dinh dưỡng, YouTube, CMS | Chưa làm |
 
@@ -144,7 +144,7 @@ Ba tầng kiểm thử (một bước chỉ xong khi tầng 3 xanh cho phần ch
 | 3. Live, công thức (khách) | `npm run smoke:recipes` | `app/.env`; migration `20261113120000_recipe_search` đã lên v2 |
 | 3. Live, người dùng đăng nhập | `npm run smoke:auth` | Như trên, thêm `.env.smoke` ở gốc repo với `SMOKE_EMAIL`, `SMOKE_PASSWORD` của hộp thư test |
 
-Kết quả mong đợi hiện tại: `check` exit 0 (app 122/122); `test:db` 55/55 (có zip dữ liệu); `smoke:live` 19/19; `smoke:recipes` 26/26; `smoke:auth` 26/26. Log mẫu: `docs/evidence/phase-0/`, `phase-1/`, `phase-2/`.
+Kết quả mong đợi hiện tại: `check` exit 0 (app 123/123); `test:db` 55/55 (có zip dữ liệu); `smoke:live` 19/19; `smoke:recipes` 26/26; `smoke:auth` 26/26. Log mẫu: `docs/evidence/phase-0/`, `phase-1/`, `phase-2/`.
 
 Kiểm tra bổ sung:
 

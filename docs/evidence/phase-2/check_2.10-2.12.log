@@ -1,0 +1,56 @@
+
+> yochef@0.1.0 check
+> npm run typecheck && npm run lint && npm test
+
+
+> yochef@0.1.0 typecheck
+> npm --prefix app run typecheck && npm --prefix admin run typecheck
+
+
+> yochef-app@1.0.0 typecheck
+> tsc --noEmit
+
+
+> yochef-admin@1.0.0 typecheck
+> tsc --noEmit
+
+
+> yochef@0.1.0 lint
+> npm --prefix app run lint && npm --prefix admin run lint
+
+
+> yochef-app@1.0.0 lint
+> eslint .
+
+
+> yochef-admin@1.0.0 lint
+> eslint .
+
+
+> yochef@0.1.0 test
+> npm --prefix app test && npm --prefix admin test
+
+
+> yochef-app@1.0.0 test
+> jest
+
+
+Test Suites: 8 passed, 8 total
+Tests:       123 passed, 123 total
+Snapshots:   0 total
+Time:        10.4 s, estimated 34 s
+Ran all test suites.
+
+> yochef-admin@1.0.0 test
+> vitest run
+
+
+ RUN  v4.1.12 D:/PTIT/Ung_dung/YoChef/admin
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  06:27:52
+   Duration  3.91s (transform 87ms, setup 851ms, import 40ms, tests 89ms, environment 2.32s)
+
+exit 0
