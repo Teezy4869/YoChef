@@ -8,6 +8,7 @@ import { SignInScreen } from '@/features/auth/SignInScreen';
 import { SignUpScreen } from '@/features/auth/SignUpScreen';
 import { AccountScreen } from '@/screens/AccountScreen';
 import { HomeScreen } from '@/screens/HomeScreen';
+import { RecipeDetailScreen } from '@/screens/RecipeDetailScreen';
 import { colors, typography } from '@/theme/tokens';
 
 import type { MainTabParamList, RootStackParamList } from './types';
@@ -68,6 +69,7 @@ export function RootNavigator() {
         }}
       >
         <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
+        <Stack.Screen name="RecipeDetail" component={RecipeDetailScreen} options={{ title: 'Công thức' }} />
         {status === 'signedOut' ? (
           <Stack.Group screenOptions={{ presentation: 'modal' }}>
             <Stack.Screen name="SignIn" component={SignInScreen} options={{ title: 'Đăng nhập' }} />

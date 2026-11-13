@@ -109,7 +109,7 @@ describe('ProfileView', () => {
     fireEvent.changeText(screen.getByLabelText('Giới thiệu'), 'a'.repeat(501));
     fireEvent.press(screen.getByRole('button', { name: 'Lưu' }));
     expect(await screen.findByText('Giới thiệu tối đa 500 ký tự.')).toBeTruthy();
-    expect(fake.from).not.toHaveBeenCalled();
+    expect(fake.from).not.toHaveBeenCalledWith('profiles');
   });
 
   it('changes the avatar from the picker', async () => {
@@ -131,7 +131,18 @@ describe('ProfileView', () => {
 
   it('offers a retry when loading fails', async () => {
     await renderSignedIn(
-      (fake) => fake.rpc.mockResolvedValueOnce({ data: null, error: { message: 'TypeError: Network request failed' } }),
+      (fake) => {
+        // Only the profile call fails once; the home screen search (also an rpc) must still work.
+        const original = fake.rpc.getMockImplementation()!;
+        let failed = false;
+        fake.rpc.mockImplementation(async (fn: string, args?: Record<string, unknown>) => {
+          if (fn === 'get_my_profile' && !failed) {
+            failed = true;
+            return { data: null, error: { message: 'TypeError: Network request failed' } };
+          }
+          return original(fn, args);
+        });
+      },
       { waitForProfile: false },
     );
     expect(await screen.findByTestId('profile-error')).toBeTruthy();

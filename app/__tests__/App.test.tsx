@@ -33,6 +33,6 @@ describe('App env gate', () => {
     );
     expect(createClient).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId('config-error')).toBeNull();
-    expect(await screen.findByText('Món Việt, nấu từng bước.')).toBeTruthy();
+    expect(await screen.findByText('Khám phá món Việt')).toBeTruthy();
   });
 });

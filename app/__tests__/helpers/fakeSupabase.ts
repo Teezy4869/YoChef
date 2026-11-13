@@ -65,12 +65,52 @@ export function createFakeSupabase(initial: Session | null = null) {
     return profiles.get(id)!;
   };
 
-  const rpc = jest.fn(async (fn: string) => {
-    if (fn !== 'get_my_profile') return { data: null, error: { message: `unknown rpc ${fn}` } };
-    return { data: session ? [{ ...profileOf(session.user.id) }] : [], error: null };
+  // Catalog fixtures, mirrored from what public.search_recipes() returns.
+  const catalog = {
+    categories: [] as { slug: string; name: string }[],
+    recipes: [] as Record<string, unknown>[], // search rows (snake_case, as the RPC returns)
+    details: {} as Record<string, unknown>, // slug -> detail row
+  };
+  const fold = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').toLowerCase();
+
+  const rpc = jest.fn(async (fn: string, args: Record<string, unknown> = {}) => {
+    if (fn === 'get_my_profile') {
+      return { data: session ? [{ ...profileOf(session.user.id) }] : [], error: null };
+    }
+    if (fn === 'search_recipes') {
+      const terms = fold(String(args.p_query ?? '')).split(/\s+/).filter(Boolean);
+      const rows = catalog.recipes
+        .filter((r) => terms.every((t) => fold(String(r.name)).includes(t)))
+        .filter((r) => !args.p_category_slug || r.category_slug === args.p_category_slug)
+        .filter((r) => !args.p_difficulty || r.difficulty === args.p_difficulty);
+      const offset = Number(args.p_offset ?? 0);
+      const limit = Number(args.p_limit ?? 20);
+      return { data: rows.slice(offset, offset + limit).map((r) => ({ ...r, total_count: rows.length })), error: null };
+    }
+    return { data: null, error: { message: `unknown rpc ${fn}` } };
   });
 
   const from = jest.fn((table: string) => ({
+    select: (_cols?: string) => {
+      const eqs: Record<string, unknown> = {};
+      const rows = () => {
+        if (table === 'categories') return catalog.categories;
+        if (table === 'recipes') {
+          const d = catalog.details[String(eqs.slug)];
+          return d ? [d] : [];
+        }
+        return [];
+      };
+      const b = {
+        order: () => b,
+        limit: () => b,
+        eq: (col: string, val: unknown) => ((eqs[col] = val), b),
+        maybeSingle: async () => ({ data: rows()[0] ?? null, error: null }),
+        then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+          Promise.resolve({ data: rows(), error: null }).then(resolve, reject),
+      };
+      return b;
+    },
     update: (patch: Record<string, unknown>) => ({
       eq: (_col: string, id: string) => ({
         select: async () => {
@@ -108,6 +148,7 @@ export function createFakeSupabase(initial: Session | null = null) {
     objects,
     profiles,
     profileOf,
+    catalog,
     setSession: (s: Session | null, event = 'TOKEN_REFRESHED') => ((session = s), emit(event)),
   };
 }
