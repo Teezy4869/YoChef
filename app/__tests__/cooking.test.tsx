@@ -339,6 +339,23 @@ describe('cooking mode', () => {
       expect(screen.getByTestId('step-counter')).toHaveTextContent('Bước 1/2');
     });
 
+    it('lets you unmark a completed step to repeat it, and remembers that', async () => {
+      await openCooking();
+      fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu nấu' }));
+      await screen.findByTestId('cooking-mode');
+      expect(screen.queryByTestId('step-done')).toBeNull(); // not done yet
+      fireEvent.press(screen.getByRole('button', { name: 'Bước tiếp' }));
+      expect(screen.queryByTestId('step-done')).toBeNull(); // step 2 is on screen, not done
+
+      fireEvent.press(screen.getByRole('button', { name: 'Bước trước' }));
+      expect(screen.getByText('✓ Bước này đã xong')).toBeTruthy();
+      expect(progressNow()).toBe(1);
+      fireEvent.press(screen.getByRole('button', { name: 'Đánh dấu chưa xong' }));
+      expect(screen.queryByTestId('step-done')).toBeNull();
+      expect(progressNow()).toBe(0);
+      await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenLastCalledWith(SESSION_KEY, expect.stringContaining('"completed":[]')));
+    });
+
     it('starts over on request, dropping the session and its alarms', async () => {
       await openCooking();
       fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu nấu' }));

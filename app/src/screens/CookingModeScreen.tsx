@@ -142,6 +142,9 @@ function CookingRun({
     setCompleted((c) => (c.includes(currentStepNumber) ? c : [...c, currentStepNumber]));
     setIndex((i) => Math.min(steps.length - 1, i + 1));
   };
+  // Spec 21 §2: a completed step can be unmarked to repeat it.
+  const unmark = () => setCompleted((c) => c.filter((n) => n !== currentStepNumber));
+  const stepDone = completed.includes(currentStepNumber);
 
   const step = steps[index];
   const isLast = index === steps.length - 1;
@@ -184,6 +187,15 @@ function CookingRun({
         <AppText style={styles.instruction} testID="step-instruction">
           {step.instruction}
         </AppText>
+
+        {stepDone ? (
+          <View style={styles.stepDone} testID="step-done">
+            <AppText variant="label" tone="success">
+              ✓ Bước này đã xong
+            </AppText>
+            <Button title="Đánh dấu chưa xong" variant="ghost" onPress={unmark} />
+          </View>
+        ) : null}
 
         {hasTimer ? (
           <View style={styles.timer} testID="timer-panel">
@@ -285,6 +297,7 @@ const styles = StyleSheet.create({
   },
   timerButtons: { alignSelf: 'stretch', gap: spacing.sm },
   alarm: { gap: spacing.sm },
+  stepDone: { gap: spacing.xs, alignItems: 'flex-start' },
   running: { gap: spacing.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   nav: { flexDirection: 'row', gap: spacing.md },
