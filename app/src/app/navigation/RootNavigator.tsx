@@ -8,6 +8,7 @@ import { SignInScreen } from '@/features/auth/SignInScreen';
 import { SignUpScreen } from '@/features/auth/SignUpScreen';
 import { AccountScreen } from '@/screens/AccountScreen';
 import { CookingModeScreen } from '@/screens/CookingModeScreen';
+import { FavoritesScreen } from '@/screens/FavoritesScreen';
 import { HomeScreen } from '@/screens/HomeScreen';
 import { RecipeDetailScreen } from '@/screens/RecipeDetailScreen';
 import { colors, typography } from '@/theme/tokens';
@@ -43,6 +44,7 @@ function MainTabs() {
       }}
     >
       <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Khám phá' }} />
+      <Tab.Screen name="Favorites" component={FavoritesScreen} options={{ title: 'Yêu thích' }} />
       <Tab.Screen name="Account" component={AccountScreen} options={{ title: 'Tài khoản' }} />
     </Tab.Navigator>
   );

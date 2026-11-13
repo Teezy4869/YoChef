@@ -104,7 +104,7 @@ const DETAIL_SELECT =
 type Row = Record<string, unknown>;
 
 /** PostgREST returns a to-one embed as an object; tolerate a one-element array too. */
-function one(v: unknown): Row | null {
+export function one(v: unknown): Row | null {
   const x = Array.isArray(v) ? v[0] : v;
   return x && typeof x === 'object' ? (x as Row) : null;
 }

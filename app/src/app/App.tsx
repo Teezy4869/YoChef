@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider } from '@/features/auth/AuthProvider';
+import { FavoritesProvider } from '@/features/favorites/FavoritesProvider';
 import { rawEnvFromProcess, validateEnv, type AppEnv, type RawEnv } from '@/lib/env';
 import { createSupabaseClient, SupabaseContext, type YoChefClient } from '@/lib/supabase';
 import { ConfigErrorScreen } from '@/screens/ConfigErrorScreen';
@@ -26,7 +27,9 @@ export default function App({ rawEnv, createClient = createSupabaseClient }: App
       {envResult.ok && client ? (
         <SupabaseContext.Provider value={client}>
           <AuthProvider>
-            <RootNavigator />
+            <FavoritesProvider>
+              <RootNavigator />
+            </FavoritesProvider>
           </AuthProvider>
         </SupabaseContext.Provider>
       ) : (

@@ -72,14 +72,26 @@ describe('global security invariants', () => {
        where n.nspname = 'public' and c.relkind = 'r' and has_table_privilege('anon', c.oid, p.priv)`,
     );
     assert.deepEqual(rows, []);
+    // has_table_privilege ignores column-level grants; Phase 3 uses those for writes.
+    const columnGrants = await admin(
+      db,
+      `select c.relname, p.priv from pg_class c join pg_namespace n on n.oid = c.relnamespace
+       cross join unnest(array['INSERT','UPDATE']) as p(priv)
+       where n.nspname = 'public' and c.relkind in ('r', 'v') and has_any_column_privilege('anon', c.oid, p.priv)`,
+    );
+    assert.deepEqual(columnGrants, []);
   });
 
-  it('authenticated has no INSERT/DELETE/TRUNCATE on any table in public', async () => {
+  it('authenticated inserts/deletes only on user-owned tables, and never truncates', async () => {
+    // Phase 3 user tables, each guarded by owner RLS (supabase/tests/phase3.test.mjs).
+    const USER_OWNED = ['favorites'];
     const rows = await admin(
       db,
       `select c.relname, p.priv from pg_class c join pg_namespace n on n.oid = c.relnamespace
        cross join unnest(array['INSERT','DELETE','TRUNCATE']) as p(priv)
-       where n.nspname = 'public' and c.relkind = 'r' and has_table_privilege('authenticated', c.oid, p.priv)`,
+       where n.nspname = 'public' and c.relkind = 'r' and has_table_privilege('authenticated', c.oid, p.priv)
+         and (p.priv = 'TRUNCATE' or c.relname <> all($1))`,
+      [USER_OWNED],
     );
     assert.deepEqual(rows, []);
   });

@@ -1,6 +1,6 @@
 # YoChef v2: Schema chuẩn (SCHEMA_V2)
 
-**Trạng thái:** `0001_catalog` = `supabase/migrations/20261108130000_catalog.sql`, `0002_identity_rbac` = `20261108130100_identity_rbac.sql` (bước 0.4). Tên logic `00NN_*` trong tài liệu ứng với file có tiền tố timestamp mà Supabase CLI yêu cầu. Tài liệu này là **nguồn sự thật duy nhất** về schema: migration viết theo nó, và khi migration buộc phải khác, tài liệu được sửa trong cùng commit.
+**Trạng thái:** `0001_catalog` = `supabase/migrations/20261108130000_catalog.sql`, `0002_identity_rbac` = `20261108130100_identity_rbac.sql` (bước 0.4). Phase 3: `favorites` = `20261113234830_phase3_favorites.sql` (3.1). Tên logic `00NN_*` trong tài liệu ứng với file có tiền tố timestamp mà Supabase CLI yêu cầu. Tài liệu này là **nguồn sự thật duy nhất** về schema: migration viết theo nó, và khi migration buộc phải khác, tài liệu được sửa trong cùng commit.
 **Project:** Supabase `bdhphjwhagygbwtfhhxn` (YoChef v2), PostgreSQL 17.
 **Ngày:** 2026-11-08.
 
@@ -249,8 +249,9 @@ Hàm, tất cả nằm trong `private`, đều `STABLE SECURITY DEFINER set sear
 
 Các bảng dưới đây đã chốt về cột chính và quy tắc quyền. Mỗi bảng có một migration riêng, áp tuần tự (L4).
 
-### 5.1 `favorites` (3.1)
-- PK `(user_id, recipe_id)`, cùng `created_at`. FK `profiles` và `recipes`, cả hai cascade.
+### 5.1 `favorites` (3.1, `20261113234830_phase3_favorites.sql`)
+- PK `(user_id, recipe_id)`, cùng `created_at`. FK `profiles` và `recipes`, cả hai cascade; index `recipe_id`.
+- **Grant:** `authenticated` có SELECT, DELETE và INSERT chỉ trên `(user_id, recipe_id)`; không có UPDATE. `anon` không có quyền nào.
 - **RLS:** chủ sở hữu SELECT, INSERT, DELETE. INSERT chỉ được khi công thức đang `published`.
 
 ### 5.2 `shopping_lists` và `shopping_list_items` (3.2)

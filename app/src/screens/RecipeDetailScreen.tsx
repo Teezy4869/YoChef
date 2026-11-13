@@ -6,6 +6,7 @@ import { AppText } from '@/components/AppText';
 import { Banner } from '@/components/Banner';
 import { Button } from '@/components/Button';
 import { Screen } from '@/components/Screen';
+import { FavoriteButton } from '@/features/favorites/FavoriteButton';
 import { formatSeconds, joinMeta, timeLabel } from '@/features/recipes/format';
 import { coverUrl } from '@/features/recipes/recipeApi';
 import { IngredientRows } from '@/features/recipes/IngredientRows';
@@ -86,6 +87,7 @@ function RecipeDetailView({
         <AppText variant="display">{recipe.name}</AppText>
         {meta ? <AppText tone="muted">{meta}</AppText> : null}
         {recipe.description ? <AppText>{recipe.description}</AppText> : null}
+        <FavoriteButton recipeId={recipe.id} />
       </View>
 
       <View style={styles.block}>
