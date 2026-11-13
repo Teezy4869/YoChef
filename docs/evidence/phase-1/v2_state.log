@@ -1,0 +1,16 @@
+YoChef v2 state  2026-11-13  target bdhphjwhagygbwtfhhxn  (Gate Phase 1, read-only CLI checks, Supabase CLI 2.122.0)
+
+$ npx supabase migration list --linked
+{"migrations":[{"local":"20261108130000","remote":"20261108130000","time":"2026-11-08 13:00:00"},{"local":"20261108130100","remote":"20261108130100","time":"2026-11-08 13:01:00"},{"local":"20261111120000","remote":"20261111120000","time":"2026-11-11 12:00:00"},{"local":"20261113120000","remote":"20261113120000","time":"2026-11-13 12:00:00"}],"message":"Migrations listed"}
+exit 0
+=> local and remote match: 4/4.
+
+$ npx supabase db advisors --linked
+1 result:
+WARN  authenticated_security_definer_function_executable  (SECURITY, EXTERNAL)
+      public.get_my_profile() is SECURITY DEFINER and executable by `authenticated`.
+exit 0
+=> Accepted, intentional (SCHEMA_V2 O2): the function only returns the row where
+   p.id = auth.uid(), sets search_path = '', EXECUTE is revoked from public and anon
+   and granted to authenticated only. It exists because profiles.bio is not
+   selectable through the table (column grant), even by its owner.

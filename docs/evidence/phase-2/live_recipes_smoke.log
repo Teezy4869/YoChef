@@ -1,4 +1,4 @@
-YoChef live recipe smoke  2026-11-13T08:32:18.987Z  target bdhphjwhagygbwtfhhxn.supabase.co  role anon
+YoChef live recipe smoke  2026-11-13T09:23:39.233Z  target bdhphjwhagygbwtfhhxn.supabase.co  role anon
 PASS  search_recipes callable by anon  (HTTP 200)
 PASS  empty search counts exactly the published recipes  (total 236, expected 236)
 PASS  limit is clamped to 100  (rows 100)

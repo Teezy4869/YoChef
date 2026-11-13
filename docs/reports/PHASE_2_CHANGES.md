@@ -1,6 +1,6 @@
 # Phase 2: tiến độ, thay đổi, điểm chưa hợp lý
 
-**Ngày:** 2026-11-13 · **Project v2:** `bdhphjwhagygbwtfhhxn` · **Kết luận:** code Phase 2 xong, tầng 1 và tầng 2 xanh. **Chưa đạt DoD**: tầng 3 chưa chạy, migration `20261113120000` chưa lên v2, và Phase 1 (nền của Phase 2) cũng chưa live check.
+**Ngày:** 2026-11-13 · **Project v2:** `bdhphjwhagygbwtfhhxn` · **Kết luận:** code Phase 2 xong, tầng 1 và tầng 2 xanh. Cập nhật 2026-11-13: migration `20261113120000` đã lên v2, `smoke:recipes` 26/26 ALL PASS, Phase 1 đạt DoD (`smoke:auth` 26/26). **Còn thiếu cho DoD:** chạy app trên máy thật (§4 mục 4), và đối chiếu với spec gốc (có ở `YoChef_born_again/20_phase_specs/phase-2/`; đã thấy lệch quy tắc làm tròn ở §5 mục 1 và thông báo hẹn giờ ở §5 mục 5).
 
 Spec gốc (`phase-2/03_recipe_data_contract.md`, `16_serving_calculation_spec.md`, `app-in4`) không có trên máy. Phạm vi lấy từ `PHASE_0_COMPLETION.md` và `HANDOVER.md`: tìm kiếm, chi tiết, khẩu phần, chế độ nấu.
 
@@ -49,7 +49,7 @@ Không thêm dependency nào (mọi thư viện đã có từ Phase 0).
 | 1 | `npm run check` | exit 0; app 95/95, admin 1/1, typecheck và lint sạch |
 | 2 | `npm run test:db` | 48/48 (34 cũ + 14 mới; phần seed bỏ qua vì không có zip dữ liệu) |
 | Bundle | `expo export --platform android` | Thành công |
-| 3 | `npm run smoke:recipes` | **Chưa chạy** (cần migration trên v2) |
+| 3 | `npm run smoke:recipes` | **26/26 ALL PASS** (`docs/evidence/phase-2/live_recipes_smoke.log`) |
 
 Một lỗi thật được test bắt khi làm: nhân chia số thực làm `99.9` thành `99.90000000000002` ở khẩu phần mặc định; đã sửa (`scaleQuantity` trả đúng giá trị gốc khi khẩu phần không đổi).
 

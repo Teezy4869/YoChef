@@ -1,6 +1,6 @@
 # Báo cáo tiến độ Phase 1
 
-**Ngày:** 2026-11-11 · **Project v2:** `bdhphjwhagygbwtfhhxn` · **Kết luận:** code Phase 1 xong, tầng 1 và tầng 2 xanh. **Chưa đạt DoD**: tầng 3 (live trên v2) chưa chạy, migration 1.1 chưa `db push`.
+**Ngày:** 2026-11-11, cập nhật Gate 2026-11-13 · **Project v2:** `bdhphjwhagygbwtfhhxn` · **Kết luận:** **Đạt DoD** (Gate 2026-11-13): migration 1.1 đã lên v2, `smoke:auth` 26/26 ALL PASS với user thật. Tag `phase-1-complete`. Còn mở: chưa chạy app trên máy thật (§5).
 
 Spec gốc `YoChef_born_again/20_phase_specs/` không có trên máy làm việc. Phạm vi lấy từ `PHASE_0_COMPLETION.md` §7: khung app, theme và design system, env fail-closed, Auth (đăng ký, đăng nhập, khôi phục phiên, đăng xuất), hồ sơ; kiểm tra live bắt buộc: đăng ký và đăng nhập thật trên v2, profile được tạo tự động. Khi có spec, cần đối chiếu lại.
 
@@ -15,7 +15,7 @@ Spec gốc `YoChef_born_again/20_phase_specs/` không có trên máy làm việc
 | 1.5 | `phase-1/1.5-profile` | `e20ad7f` | Hồ sơ: xem, sửa tên và giới thiệu (rỗng lưu `NULL`), đổi ảnh đại diện (chọn ảnh, cắt vuông, tải lên, xóa ảnh cũ). |
 | 1.6 | `phase-1/1.6-live-auth-check` | (commit này) | `scripts/live_auth_smoke.mjs` + `npm run smoke:auth`, log tầng 1 và 2, báo cáo này. |
 
-Các nhánh nối tiếp nhau (1.1 → 1.6), **chưa merge vào `main`, chưa push**.
+Các nhánh nối tiếp nhau (1.1 → 1.6), đã merge fast-forward vào `main`. Gate: nhánh `phase-1/1.7-gate` (log tầng 3, cập nhật tài liệu).
 
 ## 2. Kết quả kiểm thử đã chạy
 
@@ -24,11 +24,14 @@ Các nhánh nối tiếp nhau (1.1 → 1.6), **chưa merge vào `main`, chưa pu
 | 1 | `npm run check` | exit 0; app 49/49 test (5 suite), admin 1/1, typecheck và lint sạch | `docs/evidence/phase-1/check.log` |
 | 2 | `npm run test:db` | 34/34 (phần seed bỏ qua vì zip dữ liệu không có trên máy) | `docs/evidence/phase-1/test_db.log` |
 | Bundle | `expo export --platform android` (không nạp `.env`) | Build Hermes thành công | không lưu (chạy thử) |
-| 3 | `npm run smoke:auth` | **Chưa chạy** | `docs/evidence/phase-1/live_auth_smoke.log` (sẽ tạo) |
+| 3 | `npm run smoke:auth` (2026-11-13, chủ dự án chạy) | **26/26 ALL PASS**: đăng nhập thật, trigger tạo profile, `get_my_profile`, `bio` không public, RLS profiles và `user_roles`, bucket `avatars`, đăng xuất thu hồi refresh token | `docs/evidence/phase-1/live_auth_smoke.log` |
+| 3 | `migration list --linked`, `db advisors --linked` | Local và remote khớp 4/4; advisor 1 WARN đã chấp nhận (`get_my_profile` là DEFINER có chủ đích) | `docs/evidence/phase-1/v2_state.log` |
+
+Chạy lại tại Gate trên `main` (gồm cả Phase 2): `npm run check` typecheck và lint sạch, app 95/95 (lần đầu khi cache Jest lạnh có 3 test `findBy…` quá giờ, chạy lại 2 lần đều 95/95); `npm run test:db` 55/55, có cả phần seed.
 
 Test UI dùng Supabase giả trong bộ nhớ (`app/__tests__/helpers/fakeSupabase.ts`). Mock chỉ chứng minh UI nối đúng, không chứng minh tích hợp.
 
-## 3. Việc chủ dự án cần làm để đạt DoD
+## 3. Việc chủ dự án cần làm để đạt DoD (đã làm 1–5 và 7; còn 6)
 
 1. Duyệt và chạy `npx supabase db push --linked` (áp `20261111120000_avatars_owner_profile`), rồi `npx supabase migration list --linked` và `npx supabase db advisors --linked`.
 2. Tạo `.env.smoke` ở gốc repo (git bỏ qua) với `SMOKE_EMAIL` (hộp thư dùng để test, không phải tài khoản staff) và `SMOKE_PASSWORD`.
@@ -54,7 +57,8 @@ Script chỉ ghi vào dữ liệu của chính user test và hoàn tác hết (b
 
 ## 5. Giới hạn và việc còn mở
 
-- Tầng 3 chưa chạy, migration 1.1 chưa lên v2: Phase 1 **chưa** được coi là xong.
-- Chưa kiểm trên thiết bị thật hay Expo Go; chỉ có test Jest và bundle Android.
+- Chưa kiểm trên thiết bị thật hay Expo Go; chỉ có test Jest, bundle Android và live smoke qua REST.
+- Test UI chập chờn khi cache Jest lạnh (mức chờ mặc định 1 s của `findBy…`); cần tăng `asyncUtilTimeout` trong commit riêng.
+- Dịch vụ email mặc định của Supabase chỉ gửi tới thành viên team; người dùng thật cần SMTP riêng trước khi phát hành.
 - Chưa có màn quên mật khẩu, đổi email, xóa tài khoản.
-- Spec Phase 1 gốc chưa được đối chiếu.
+- Spec Phase 1 gốc chưa được đối chiếu (có ở `YoChef_born_again/20_phase_specs/phase-1/`).
