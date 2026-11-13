@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, cleanupAsync, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { useKeepAwake } from 'expo-keep-awake';
 import * as Notifications from 'expo-notifications';
 import { Vibration } from 'react-native';
 
@@ -9,6 +10,8 @@ import { IDLE, pause, remainingSeconds, resume, settle, start } from '@/features
 
 import { createFakeSupabase } from './helpers/fakeSupabase';
 import { detailRow } from './helpers/recipeFixtures';
+
+jest.mock('expo-keep-awake', () => ({ useKeepAwake: jest.fn() }));
 
 const ENV = { url: 'https://bdhphjwhagygbwtfhhxn.supabase.co', key: 'sb_publishable_test' };
 
@@ -112,8 +115,10 @@ describe('cooking mode', () => {
 
   it('walks through the steps in order and finishes', async () => {
     await openCooking();
+    expect(useKeepAwake).not.toHaveBeenCalled(); // the recipe page may sleep
     fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu nấu' }));
     expect(await screen.findByTestId('cooking-mode')).toBeTruthy();
+    expect(useKeepAwake).toHaveBeenCalled(); // cooking keeps the screen on
     expect(screen.getByTestId('step-counter')).toHaveTextContent('Bước 1/2');
     expect(screen.getByTestId('step-instruction')).toHaveTextContent('Ướp thịt.');
     expect(screen.getByRole('button', { name: 'Bước trước' })).toBeDisabled();

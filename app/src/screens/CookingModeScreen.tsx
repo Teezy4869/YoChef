@@ -1,3 +1,4 @@
+import { useKeepAwake } from 'expo-keep-awake';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Vibration, View } from 'react-native';
 
@@ -108,6 +109,7 @@ function CookingRun({
   onExit: () => void;
   from: CookingSession;
 }) {
+  useKeepAwake(); // hands are busy: the screen stays on while cooking, released on leaving
   const steps = recipe.steps;
   const [index, setIndex] = useState(from.stepIndex);
   const [completed, setCompleted] = useState(from.completed);
