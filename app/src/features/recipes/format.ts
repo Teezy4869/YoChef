@@ -20,6 +20,28 @@ export function timeLabel(prep: number | null, cook: number | null): string | nu
   return null;
 }
 
+/** Step duration in words: 90 → "1 phút 30 giây", 900 → "15 phút", 5400 → "1 giờ 30 phút". */
+export function formatSeconds(totalSeconds: number): string {
+  const s = Math.max(0, Math.round(totalSeconds));
+  if (s < 60) return `${s} giây`;
+  if (s < 3600) {
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return r === 0 ? `${m} phút` : `${m} phút ${r} giây`;
+  }
+  return formatMinutes(Math.round(s / 60));
+}
+
+/** Countdown clock: 75 → "01:15", 3725 → "1:02:05". */
+export function formatClock(totalSeconds: number): string {
+  const s = Math.max(0, Math.ceil(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  const two = (n: number) => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${two(m)}:${two(r)}` : `${two(m)}:${two(r)}`;
+}
+
 export function servingsLabel(servings: number | null): string | null {
   return servings !== null ? `${servings} người` : null;
 }

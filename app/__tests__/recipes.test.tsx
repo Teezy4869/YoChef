@@ -171,8 +171,10 @@ describe('recipe list screen', () => {
   });
 
   it('opens the recipe detail for the tapped card', async () => {
-    setup([row(7)]);
+    const fake = setup([row(7)]);
+    fake.catalog.details['007-mon-7'] = { id: 'id-7', slug: '007-mon-7', name: 'Món 7', recipe_ingredients: [], recipe_steps: [] };
     fireEvent.press(await screen.findByRole('button', { name: /^Món 7\./ }));
     expect(await screen.findByTestId('recipe-detail')).toBeTruthy();
+    expect(screen.getByText('Chưa có danh sách nguyên liệu.')).toBeTruthy();
   });
 });
