@@ -27,21 +27,47 @@ describe('servings math', () => {
   });
 
   it.each([
+    // >= 10: whole number (spec 16 §3)
+    [10, '10'],
+    [12.34, '12'],
+    [12.5, '13'],
+    [250.4, '250'],
+    [2500, '2500'],
+    // 1 to 10: kitchen fraction within 0.02, else one decimal
+    [2.5, '2½'],
+    [2.75, '2¾'],
+    [5 / 3, '1⅔'],
+    [2.32, '2⅓'],
+    [2.3, '2,3'],
+    [1.2, '1,2'],
+    [1.125, '1,1'],
+    [3, '3'],
+    [2.999, '3'],
+    [9.97, '10'], // carries into the next range without a trailing ",0"
+    // below 1: kitchen fraction within 0.01, else two decimals
     [0.5, '½'],
     [0.25, '¼'],
     [1 / 3, '⅓'],
-    [2.5, '2½'],
-    [2.75, '2¾'],
-    [3, '3'],
-    [2.999, '3'],
+    [0.66, '⅔'],
+    [0.27, '0,27'],
     [0.1, '0,1'],
-    [1.2, '1,2'],
-    [12.34, '12,3'],
-    [10, '10'],
-    [250.4, '250'],
-    [2500, '2500'],
-  ])('formats %s as %s', (n, text) => {
+    [0.996, '1'],
+    [0.00625, '0,01'], // 0,1 lít for 16 people scaled to 1, the smallest case in the dataset
+    // never prints 0 for a positive amount
+    [0.004, '< 0,01'],
+  ])('formats a scaled %s as %s', (n, text) => {
     expect(formatQuantity(n)).toBe(text);
+  });
+
+  it.each([
+    [12.5, '12,5'],
+    [33.3, '33,3'],
+    [0.33, '⅓'],
+    [0.2, '0,2'],
+    [1.25, '1¼'],
+    [500, '500'],
+  ])('keeps the book value %s exact as %s', (n, text) => {
+    expect(formatQuantity(n, true)).toBe(text);
   });
 
   it('formats a whole line, with estimate and to-taste markers', () => {
@@ -49,6 +75,13 @@ describe('servings math', () => {
     expect(quantityText(300, 'ml', 'editor_estimate', 4, 8)).toBe('≈ 600 ml');
     expect(quantityText(null, null, 'to_taste', 4, 8)).toBe('vừa ăn');
     expect(quantityText(2, null, 'book', 4, 4)).toBe('2');
+  });
+
+  it('rounds only once servings change', () => {
+    expect(quantityText(12.5, 'g', 'book', 4, 4)).toBe('12,5 g');
+    expect(quantityText(12.5, 'g', 'book', null, 9)).toBe('12,5 g'); // no basis to scale from
+    expect(quantityText(12.5, 'g', 'book', 4, 5)).toBe('16 g');
+    expect(quantityText(1, 'quả', 'book', 3, 2)).toBe('⅔ quả');
   });
 
   it('is exact at the default servings (no rounding drift)', () => {
