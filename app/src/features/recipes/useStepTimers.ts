@@ -7,14 +7,14 @@ type Timers = Record<number, TimerState>;
 
 /**
  * One timer per step number. `onDone(step)` fires exactly once when a running
- * timer reaches zero. `now` is injectable for tests.
+ * timer reaches zero. `initial` restores a saved session. `now` is injectable for tests.
  *
  * The ref is the source of truth and state mirrors it for rendering, so side
  * effects (onDone) never run inside a state updater.
  */
-export function useStepTimers(onDone: (stepNumber: number) => void, now: () => number = Date.now) {
-  const ref = useRef<Timers>({});
-  const [timers, setTimers] = useState<Timers>({});
+export function useStepTimers(onDone: (stepNumber: number) => void, now: () => number = Date.now, initial: Timers = {}) {
+  const ref = useRef<Timers>(initial);
+  const [timers, setTimers] = useState<Timers>(initial);
   const [clock, setClock] = useState(() => now());
   const onDoneRef = useRef(onDone);
   useEffect(() => {
@@ -63,6 +63,7 @@ export function useStepTimers(onDone: (stepNumber: number) => void, now: () => n
   );
 
   return {
+    all: timers,
     clock,
     get: (step: number): TimerState => timers[step] ?? IDLE,
     start: (step: number, durationSeconds: number) => update(step, (_s, t) => start(durationSeconds, t)),

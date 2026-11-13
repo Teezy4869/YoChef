@@ -9,6 +9,7 @@ import { Chip } from '@/components/Chip';
 import { Screen } from '@/components/Screen';
 import { formatClock, formatSeconds } from '@/features/recipes/format';
 import { IngredientRows } from '@/features/recipes/IngredientRows';
+import { clearSession, FRESH_SESSION, loadSession, saveSession, type CookingSession } from '@/features/recipes/cookingSession';
 import { clampServings } from '@/features/recipes/servings';
 import { remainingSeconds, type TimerState } from '@/features/recipes/timer';
 import { cancelAlarm, scheduleAlarm } from '@/features/recipes/timerAlarms';
@@ -51,20 +52,68 @@ export function CookingModeScreen({ route, navigation }: RootStackScreenProps<'C
   return <CookingView recipe={recipe} servings={route.params.servings} onExit={() => navigation.goBack()} />;
 }
 
-function CookingView({
+type Phase = { kind: 'loading' } | { kind: 'ask'; saved: CookingSession } | { kind: 'cook'; from: CookingSession };
+
+/** Offers to resume an unfinished session of this recipe (spec 21) before cooking. */
+function CookingView(props: { recipe: RecipeDetail; servings: number | undefined; onExit: () => void }) {
+  const { slug, steps } = props.recipe;
+  const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
+
+  useEffect(() => {
+    let active = true;
+    loadSession(slug, steps.map((s) => s.stepNumber), Date.now()).then((saved) => {
+      if (active) setPhase(saved ? { kind: 'ask', saved } : { kind: 'cook', from: FRESH_SESSION });
+    });
+    return () => {
+      active = false;
+    };
+  }, [slug, steps]);
+
+  if (phase.kind === 'loading') {
+    return (
+      <Screen centered testID="cooking-restoring">
+        <ActivityIndicator color={colors.primary} size="large" accessibilityLabel="Đang mở phiên nấu" />
+      </Screen>
+    );
+  }
+  if (phase.kind === 'ask') {
+    const { saved } = phase;
+    const startOver = () => {
+      steps.forEach((s) => void cancelAlarm(slug, s.stepNumber));
+      clearSession(slug);
+      setPhase({ kind: 'cook', from: FRESH_SESSION });
+    };
+    return (
+      <Screen centered testID="cooking-resume">
+        <AppText variant="title">Bạn đang nấu dở món này</AppText>
+        <AppText tone="muted">
+          {`Đang ở bước ${saved.stepIndex + 1}/${steps.length}, đã xong ${saved.completed.length} bước.`}
+        </AppText>
+        <Button title="Tiếp tục nấu" onPress={() => setPhase({ kind: 'cook', from: saved })} />
+        <Button title="Nấu lại từ đầu" variant="secondary" onPress={startOver} />
+      </Screen>
+    );
+  }
+  return <CookingRun {...props} from={phase.from} />;
+}
+
+function CookingRun({
   recipe,
   servings,
   onExit,
+  from,
 }: {
   recipe: RecipeDetail;
   servings: number | undefined;
   onExit: () => void;
+  from: CookingSession;
 }) {
   const steps = recipe.steps;
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(from.stepIndex);
+  const [completed, setCompleted] = useState(from.completed);
   const [showIngredients, setShowIngredients] = useState(false);
   const alarm = useCallback(() => Vibration.vibrate(ALARM_PATTERN), []);
-  const timers = useStepTimers(alarm);
+  const timers = useStepTimers(alarm, Date.now, from.timers);
   const [alarmsOff, setAlarmsOff] = useState(false);
   const { slug, name } = recipe;
 
@@ -75,8 +124,22 @@ function CookingView({
   const silence = (stepNumber: number, s: TimerState) => {
     if (s.status !== 'running') void cancelAlarm(slug, stepNumber);
   };
-  // Timers live only on this screen for now, so their alarms leave with it.
-  useEffect(() => () => steps.forEach((s) => void cancelAlarm(slug, s.stepNumber)), [slug, steps]);
+
+  // Leaving the screen keeps the session and its alarms; only finishing or starting over ends them.
+  const currentStepNumber = steps[index].stepNumber;
+  useEffect(() => {
+    saveSession(slug, currentStepNumber, completed, timers.all, Date.now());
+  }, [slug, currentStepNumber, completed, timers.all]);
+
+  const finish = () => {
+    steps.forEach((s) => void cancelAlarm(slug, s.stepNumber));
+    clearSession(slug);
+    onExit();
+  };
+  const next = () => {
+    setCompleted((c) => (c.includes(currentStepNumber) ? c : [...c, currentStepNumber]));
+    setIndex((i) => Math.min(steps.length - 1, i + 1));
+  };
 
   const step = steps[index];
   const isLast = index === steps.length - 1;
@@ -87,11 +150,19 @@ function CookingView({
 
   const doneSteps = steps.filter((s) => timers.get(s.stepNumber).status === 'done');
   const otherRunning = steps.filter((s) => s.stepNumber !== step.stepNumber && timers.running.includes(s.stepNumber));
+  // Spec 21 §2: progress counts completed steps, not the step on screen.
+  const progress = completed.length / steps.length;
 
   return (
     <Screen edges={['left', 'right', 'bottom']} testID="cooking-mode">
-      <View style={styles.progress} accessibilityRole="progressbar" accessibilityValue={{ min: 1, max: steps.length, now: index + 1 }}>
-        <View style={[styles.progressFill, { width: `${((index + 1) / steps.length) * 100}%` }]} />
+      <View
+        style={styles.progress}
+        testID="cooking-progress"
+        accessibilityRole="progressbar"
+        accessibilityLabel="Số bước đã xong"
+        accessibilityValue={{ min: 0, max: steps.length, now: completed.length }}
+      >
+        <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
       </View>
       <AppText variant="caption" tone="muted">
         {recipe.name}
@@ -186,9 +257,9 @@ function CookingView({
         </View>
         <View style={styles.navButton}>
           {isLast ? (
-            <Button title="Hoàn thành" onPress={onExit} />
+            <Button title="Hoàn thành" onPress={finish} />
           ) : (
-            <Button title="Bước tiếp" onPress={() => setIndex((i) => Math.min(steps.length - 1, i + 1))} />
+            <Button title="Bước tiếp" onPress={next} />
           )}
         </View>
       </View>

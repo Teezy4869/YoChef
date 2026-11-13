@@ -1,9 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, cleanupAsync, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import * as Notifications from 'expo-notifications';
 import { Vibration } from 'react-native';
 
 import App from '@/app/App';
+import { parseSession, SESSION_TTL_MS, sessionKey } from '@/features/recipes/cookingSession';
 import { IDLE, pause, remainingSeconds, resume, settle, start } from '@/features/recipes/timer';
 
 import { createFakeSupabase } from './helpers/fakeSupabase';
@@ -39,6 +40,57 @@ describe('timer logic', () => {
   });
 });
 
+describe('cooking session parsing', () => {
+  const steps = [1, 2, 3];
+  const now = 1_000_000_000;
+  const raw = (o: Record<string, unknown> = {}) =>
+    JSON.stringify({ v: 1, savedAt: now - 1000, stepNumber: 2, completed: [1], timers: {}, ...o });
+
+  it('restores a recent session', () => {
+    expect(parseSession(raw(), steps, now)).toEqual({ stepIndex: 1, completed: [1], timers: {} });
+  });
+
+  it('drops stale, unreadable, unknown-version and empty sessions', () => {
+    expect(parseSession(raw({ savedAt: now - SESSION_TTL_MS - 1 }), steps, now)).toBeNull();
+    expect(parseSession(raw({ savedAt: now + SESSION_TTL_MS + 1 }), steps, now)).toBeNull(); // clock moved back
+    expect(parseSession('{oops', steps, now)).toBeNull();
+    expect(parseSession(raw({ v: 2 }), steps, now)).toBeNull();
+    expect(parseSession(null, steps, now)).toBeNull();
+    expect(parseSession(raw({ stepNumber: 1, completed: [], timers: { 1: { status: 'idle' } } }), steps, now)).toBeNull();
+  });
+
+  it('fits the session to the recipe as it is now', () => {
+    expect(parseSession(raw({ stepNumber: 9, completed: [1, 1, 7] }), steps, now)).toEqual({
+      stepIndex: 2, // clamped to the last step
+      completed: [1],
+      timers: {},
+    });
+    const s = parseSession(
+      raw({
+        timers: {
+          1: { status: 'running', endsAt: now - 1 },
+          2: { status: 'running', endsAt: now + 5000 },
+          3: { status: 'paused', remainingMs: -1 },
+          7: { status: 'done' },
+        },
+      }),
+      steps,
+      now,
+    );
+    expect(s?.timers).toEqual({ 1: { status: 'done' }, 2: { status: 'running', endsAt: now + 5000 } });
+  });
+});
+
+const SESSION_KEY = sessionKey('001-thit-kho');
+const progressNow = () => screen.getByTestId('cooking-progress').props.accessibilityValue.now;
+
+async function reopenAndResume(row: Record<string, unknown>) {
+  await openCooking(row);
+  fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu nấu' }));
+  fireEvent.press(await screen.findByRole('button', { name: 'Tiếp tục nấu' }));
+  await screen.findByTestId('cooking-mode');
+}
+
 async function openCooking(row: Record<string, unknown> = detailRow()) {
   const fake = createFakeSupabase();
   fake.catalog.recipes = [
@@ -53,6 +105,11 @@ async function openCooking(row: Record<string, unknown> = detailRow()) {
 }
 
 describe('cooking mode', () => {
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    await AsyncStorage.clear(); // no session left over from another test
+  });
+
   it('walks through the steps in order and finishes', async () => {
     await openCooking();
     fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu nấu' }));
@@ -210,13 +267,89 @@ describe('cooking mode', () => {
       expect(notif.scheduleNotificationAsync).not.toHaveBeenCalled();
     });
 
-    it('cancels the alarms when leaving cooking mode', async () => {
+    it('cancels the alarms when the dish is finished', async () => {
       await toTimerStep();
       fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu hẹn giờ' }));
       await waitFor(() => expect(notif.scheduleNotificationAsync).toHaveBeenCalledTimes(1));
       fireEvent.press(screen.getByRole('button', { name: 'Bước tiếp' }));
       fireEvent.press(screen.getByRole('button', { name: 'Hoàn thành' }));
       await waitFor(() => expect(notif.cancelScheduledNotificationAsync).toHaveBeenCalledWith(ALARM_1));
+    });
+
+    it('keeps a timer and its alarm while the app is closed, then shows it on return', async () => {
+      const row = detailRow({
+        recipe_steps: [
+          { step_number: 1, instruction: 'Luộc trứng.', timer_enabled: true, duration_seconds: 90 },
+          { step_number: 2, instruction: 'Bóc vỏ.', timer_enabled: false, duration_seconds: null },
+        ],
+      });
+      await toTimerStep();
+      fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu hẹn giờ' }));
+      await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenLastCalledWith(SESSION_KEY, expect.stringContaining('"running"')));
+      await cleanupAsync(); // app closed
+      expect(notif.cancelScheduledNotificationAsync).not.toHaveBeenCalled(); // the alarm still rings while away
+
+      await act(async () => {
+        jest.advanceTimersByTime(30_000);
+      });
+      await reopenAndResume(row);
+      expect(screen.getByTestId('timer-clock')).toHaveTextContent('01:00');
+      expect(screen.getByRole('button', { name: 'Tạm dừng' })).toBeTruthy();
+
+      await cleanupAsync();
+      await act(async () => {
+        jest.advanceTimersByTime(120_000);
+      });
+      await reopenAndResume(row);
+      expect(screen.getByText('Hết giờ bước 1!')).toBeTruthy(); // ended while away
+      expect(Vibration.vibrate).not.toHaveBeenCalled(); // the notification already rang
+    });
+  });
+
+  describe('saved session', () => {
+    it('offers to resume where you left off; progress counts completed steps', async () => {
+      await openCooking();
+      fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu nấu' }));
+      await screen.findByTestId('cooking-mode');
+      expect(progressNow()).toBe(0);
+      fireEvent.press(screen.getByRole('button', { name: 'Bước tiếp' }));
+      expect(progressNow()).toBe(1); // step 2 reached, but only step 1 is done
+      await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenLastCalledWith(SESSION_KEY, expect.stringContaining('"stepNumber":2')));
+      await cleanupAsync(); // app closed
+
+      await openCooking();
+      fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu nấu' }));
+      expect(await screen.findByText('Bạn đang nấu dở món này')).toBeTruthy();
+      expect(screen.getByText('Đang ở bước 2/2, đã xong 1 bước.')).toBeTruthy();
+      fireEvent.press(screen.getByRole('button', { name: 'Tiếp tục nấu' }));
+      await screen.findByTestId('cooking-mode');
+      expect(screen.getByTestId('step-counter')).toHaveTextContent('Bước 2/2');
+      expect(progressNow()).toBe(1);
+
+      fireEvent.press(screen.getByRole('button', { name: 'Hoàn thành' }));
+      await screen.findByTestId('recipe-detail');
+      await waitFor(() => expect(AsyncStorage.removeItem).toHaveBeenCalledWith(SESSION_KEY));
+      fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu nấu' }));
+      await screen.findByTestId('cooking-mode'); // finished: no prompt next time
+      expect(screen.getByTestId('step-counter')).toHaveTextContent('Bước 1/2');
+    });
+
+    it('starts over on request, dropping the session and its alarms', async () => {
+      await openCooking();
+      fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu nấu' }));
+      await screen.findByTestId('cooking-mode');
+      fireEvent.press(screen.getByRole('button', { name: 'Bước tiếp' }));
+      await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenLastCalledWith(SESSION_KEY, expect.stringContaining('"stepNumber":2')));
+      await cleanupAsync();
+
+      await openCooking();
+      fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu nấu' }));
+      fireEvent.press(await screen.findByRole('button', { name: 'Nấu lại từ đầu' }));
+      await screen.findByTestId('cooking-mode');
+      expect(screen.getByTestId('step-counter')).toHaveTextContent('Bước 1/2');
+      expect(progressNow()).toBe(0);
+      expect(AsyncStorage.removeItem).toHaveBeenCalledWith(SESSION_KEY);
+      await waitFor(() => expect(jest.mocked(Notifications).cancelScheduledNotificationAsync).toHaveBeenCalledWith('cook:001-thit-kho:2'));
     });
   });
 
