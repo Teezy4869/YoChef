@@ -128,6 +128,10 @@ export function createFakeSupabase(initial: Session | null = null) {
       const rows = (tables[table] ??= []);
       if (op === 'insert') {
         const list = Array.isArray(payload) ? payload : [payload ?? {}];
+        const keys = (r: Row) => Object.keys(r).sort().join(',');
+        if (list.some((r) => keys(r) !== keys(list[0]))) {
+          return { data: null, error: { message: 'All object keys must match', code: 'PGRST102' } };
+        }
         if (list.some((r) => ownerOf(table, r) !== me)) return { data: null, error: DENIED };
         const added = list.map((r) => ({
           id: `${table}-${++seq}`,

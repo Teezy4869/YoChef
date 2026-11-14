@@ -209,8 +209,9 @@ const MISSING_RECIPE = '00000000-0000-0000-0000-000000000000';
   check('a list without a name gets the default name', plainList?.name === 'Danh sách mua sắm', detail(plain));
 
   const items = await post('/rest/v1/shopping_list_items', A.token, [
-    { shopping_list_id: list.id, label: 'Thịt bò', quantity: 500, unit: 'g', sort_order: 0 },
-    { shopping_list_id: list.id, label: 'Muối', quantity: null, note: 'vừa ăn', sort_order: 1 },
+    // A bulk insert needs the same keys in every row (PostgREST PGRST102), as the app sends them.
+    { shopping_list_id: list.id, label: 'Thịt bò', quantity: 500, unit: 'g', note: null, sort_order: 0 },
+    { shopping_list_id: list.id, label: 'Muối', quantity: null, unit: null, note: 'vừa ăn', sort_order: 1 },
   ]);
   check('A adds items, NULL quantity allowed', items.status === 201 && rows(items).length === 2, detail(items));
   const item = rows(items)[0];
