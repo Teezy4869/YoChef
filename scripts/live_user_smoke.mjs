@@ -307,4 +307,57 @@ const MISSING_RECIPE = '00000000-0000-0000-0000-000000000000';
   check('A and B remove their scores', rows(delA).length === 1 && rows(delB).length === 1, `${detail(delA)}; ${detail(delB)}`);
 }
 
+// --- 3.4 Comments -------------------------------------------------------------
+{
+  const MARK = 'YoChef smoke'; // every comment the script posts starts with this
+  const byId = (id) => `/rest/v1/comments?id=eq.${id}`;
+  const post = (u, owner, content, extra = {}) =>
+    call('/rest/v1/comments', {
+      method: 'POST',
+      token: u?.token,
+      headers: returning,
+      body: JSON.stringify({ user_id: owner.id, recipe_id: recipe.id, content, ...extra }),
+    });
+  const patch = (u, id, body) => call(byId(id), { method: 'PATCH', token: u?.token, headers: returning, body: JSON.stringify(body) });
+  for (const u of [A, B]) {
+    await call(`/rest/v1/comments?user_id=eq.${u.id}&content=like.${encodeURIComponent(MARK)}*`, { method: 'DELETE', token: u.token }); // leftovers
+  }
+
+  const created = await post(A, A, `${MARK}: ngon`);
+  const c = rows(created)[0];
+  check('A posts a comment and it waits for review', created.status === 201 && c?.status === 'pending', detail(created));
+  if (!c) finish();
+  const readA = await call(`${byId(c.id)}&select=id,status,author:profiles!comments_user_id_fkey(display_name)`, { token: A.token });
+  check('A reads it back with the author embed', readA.status === 200 && rows(readA).length === 1 && 'author' in (rows(readA)[0] ?? {}), detail(readA));
+  const readB = await call(byId(c.id), { token: B.token });
+  check('B does not see A pending comment', readB.status === 200 && rows(readB).length === 0, detail(readB));
+  const readAnon = await call(byId(c.id));
+  check('anon does not see A pending comment', readAnon.status === 200 && rows(readAnon).length === 0, detail(readAnon));
+
+  const forged = await post(A, A, `${MARK}: tự duyệt`, { status: 'approved' });
+  check('a new comment cannot choose its status', refused(forged), detail(forged));
+  const restatus = await patch(A, c.id, { status: 'approved' });
+  check('A cannot change the status', refused(restatus), detail(restatus));
+  const edit = await patch(A, c.id, { content: `${MARK}: hơi mặn` });
+  check('A edits the content, still pending', edit.status === 200 && rows(edit)[0]?.status === 'pending', detail(edit));
+
+  const bEdit = await patch(B, c.id, { content: `${MARK}: B sửa` });
+  check('B cannot edit A comment', bEdit.status === 200 && rows(bEdit).length === 0, detail(bEdit));
+  const bDel = await call(byId(c.id), { method: 'DELETE', token: B.token, headers: returning });
+  check('B cannot remove A comment', bDel.status === 200 && rows(bDel).length === 0, detail(bDel));
+  const asA = await post(B, A, `${MARK}: giả danh`);
+  check('B cannot comment as A', refused(asA), detail(asA));
+  const anonPost = await post(null, A, `${MARK}: khách`);
+  check('anon cannot comment', refused(anonPost), detail(anonPost));
+  const unknown = await post(A, A, `${MARK}: không có món`, { recipe_id: MISSING_RECIPE });
+  check('only a published recipe can be commented on', refused(unknown), detail(unknown));
+  for (const [name, content] of [['a blank comment', '   '], ['a comment over 1000 characters', `${MARK}: ${'a'.repeat(1000)}`]]) {
+    const r = await post(A, A, content);
+    check(`${name} is rejected`, codeOf(r) === '23514', detail(r));
+  }
+
+  const del = await call(byId(c.id), { method: 'DELETE', token: A.token, headers: returning });
+  check('A removes the comment', rows(del).length === 1, detail(del));
+}
+
 finish();

@@ -249,3 +249,94 @@ describe('3.3 ratings', () => {
     assert.deepEqual(rows, [{ rating_count: 1, avg_score: '4.0' }]);
   });
 });
+
+describe('3.4 comments', () => {
+  let commentId;
+  const post = (uid, owner, recipe, content) =>
+    as(db, 'authenticated', uid,
+      `insert into public.comments (user_id, recipe_id, content) values ($1, $2, $3) returning id, status`, [owner, recipe, content]);
+  const visible = (role, uid) =>
+    as(db, role, uid, `select id from public.comments where id = $1`, [commentId]).then((r) => r.rows.length === 1);
+  const setStatus = (status) => admin(db, `update public.comments set status = $1 where id = $2`, [status, commentId]);
+
+  it('a new comment waits for review and only its author sees it', async () => {
+    const ins = await post(alice, alice, publishedId, 'Ngon lắm!');
+    assert.equal(ins.error, null);
+    assert.equal(ins.rows[0].status, 'pending');
+    commentId = ins.rows[0].id;
+    assert.deepEqual(
+      [await visible('authenticated', alice), await visible('authenticated', bob), await visible('anon', null)],
+      [true, false, false],
+    );
+  });
+
+  it('a client can neither choose nor change the status', async () => {
+    const forged = await as(db, 'authenticated', alice,
+      `insert into public.comments (user_id, recipe_id, content, status) values ($1, $2, 'x', 'approved')`, [alice, publishedId]);
+    assert.equal(forged.error?.code, INSUFFICIENT_PRIVILEGE);
+    const upd = await as(db, 'authenticated', alice, `update public.comments set status = 'approved' where id = $1`, [commentId]);
+    assert.equal(upd.error?.code, INSUFFICIENT_PRIVILEGE);
+  });
+
+  it('content is 1 to 1000 characters and not only whitespace', async () => {
+    for (const content of ['', '   ', '\n\t ', 'a'.repeat(1001)]) {
+      assert.equal((await post(alice, alice, publishedId, content)).error?.code, CHECK_VIOLATION, JSON.stringify(content.slice(0, 5)));
+    }
+    const max = await post(alice, alice, publishedId, 'ă'.repeat(1000));
+    assert.equal(max.error, null);
+    await admin(db, `delete from public.comments where id = $1`, [max.rows[0].id]);
+  });
+
+  it('an approved comment is public; editing its content sends it back to review', async () => {
+    await setStatus('approved');
+    assert.deepEqual([await visible('anon', null), await visible('authenticated', bob)], [true, true]);
+    const same = await as(db, 'authenticated', alice, `update public.comments set content = content where id = $1 returning status`, [commentId]);
+    assert.deepEqual(same.rows, [{ status: 'approved' }]);
+    const edit = await as(db, 'authenticated', alice,
+      `update public.comments set content = 'Ngon, hơi mặn' where id = $1 returning status`, [commentId]);
+    assert.deepEqual(edit.rows, [{ status: 'pending' }]);
+    assert.deepEqual([await visible('anon', null), await visible('authenticated', bob)], [false, false]);
+  });
+
+  it('nobody else edits or removes a comment, or comments as someone else or on a staged recipe', async () => {
+    const upd = await as(db, 'authenticated', bob, `update public.comments set content = 'hacked' where id = $1 returning id`, [commentId]);
+    const del = await as(db, 'authenticated', bob, `delete from public.comments where id = $1 returning id`, [commentId]);
+    assert.deepEqual([upd.rows, del.rows], [[], []]);
+    assert.equal((await post(bob, alice, publishedId, 'giả')).error?.code, INSUFFICIENT_PRIVILEGE);
+    assert.equal((await post(alice, alice, stagedId, 'chưa công bố')).error?.code, INSUFFICIENT_PRIVILEGE);
+    const move = await as(db, 'authenticated', alice, `update public.comments set recipe_id = $1 where id = $2`, [stagedId, commentId]);
+    assert.equal(move.error?.code, INSUFFICIENT_PRIVILEGE);
+    const anon = await as(db, 'anon', null, `insert into public.comments (user_id, recipe_id, content) values ($1, $2, 'x')`, [alice, publishedId]);
+    assert.equal(anon.error?.code, INSUFFICIENT_PRIVILEGE);
+  });
+
+  it('an approved comment on a staged recipe stays hidden', async () => {
+    const [{ id }] = await admin(db,
+      `insert into public.comments (user_id, recipe_id, content, status) values ($1, $2, 'x', 'approved') returning id`, [bob, stagedId]);
+    const anon = await as(db, 'anon', null, `select id from public.comments where id = $1`, [id]);
+    assert.deepEqual(anon.rows, []);
+  });
+
+  it('a rejected comment is hidden from its author, who can no longer edit or remove it', async () => {
+    await setStatus('rejected');
+    assert.equal(await visible('authenticated', alice), false);
+    const upd = await as(db, 'authenticated', alice, `update public.comments set content = 'sửa lại' where id = $1 returning id`, [commentId]);
+    const del = await as(db, 'authenticated', alice, `delete from public.comments where id = $1 returning id`, [commentId]);
+    assert.deepEqual([upd.rows, del.rows], [[], []]);
+  });
+
+  it('a moderator reads every comment but cannot edit, remove or re-status it; a super admin may remove it', async () => {
+    const [{ id: mod }] = await admin(db, `insert into auth.users (email) values ('mod@example.test') returning id`);
+    const [{ id: sup }] = await admin(db, `insert into auth.users (email) values ('super@example.test') returning id`);
+    await admin(db, `insert into public.user_roles (user_id, role) values ($1, 'moderator'), ($2, 'super_admin')`, [mod, sup]);
+    const all = await as(db, 'authenticated', mod, `select status from public.comments order by status`);
+    assert.deepEqual(all.rows.map((r) => r.status), ['approved', 'rejected']);
+    const upd = await as(db, 'authenticated', mod, `update public.comments set content = 'x' where id = $1 returning id`, [commentId]);
+    const del = await as(db, 'authenticated', mod, `delete from public.comments where id = $1 returning id`, [commentId]);
+    assert.deepEqual([upd.rows, del.rows], [[], []]);
+    const status = await as(db, 'authenticated', mod, `update public.comments set status = 'approved' where id = $1`, [commentId]);
+    assert.equal(status.error?.code, INSUFFICIENT_PRIVILEGE);
+    const gone = await as(db, 'authenticated', sup, `delete from public.comments where id = $1 returning id`, [commentId]);
+    assert.equal(gone.rows.length, 1);
+  });
+});

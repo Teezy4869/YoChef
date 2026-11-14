@@ -1,6 +1,6 @@
 # YoChef v2: Schema chuẩn (SCHEMA_V2)
 
-**Trạng thái:** `0001_catalog` = `supabase/migrations/20261108130000_catalog.sql`, `0002_identity_rbac` = `20261108130100_identity_rbac.sql` (bước 0.4). Phase 3: `favorites` = `20261113234830_phase3_favorites.sql` (3.1), `shopping_lists` = `20261114041322_phase3_shopping_lists.sql` (3.2), `ratings` = `20261114045322_phase3_ratings.sql` (3.3). Tên logic `00NN_*` trong tài liệu ứng với file có tiền tố timestamp mà Supabase CLI yêu cầu. Tài liệu này là **nguồn sự thật duy nhất** về schema: migration viết theo nó, và khi migration buộc phải khác, tài liệu được sửa trong cùng commit.
+**Trạng thái:** `0001_catalog` = `supabase/migrations/20261108130000_catalog.sql`, `0002_identity_rbac` = `20261108130100_identity_rbac.sql` (bước 0.4). Phase 3: `favorites` = `20261113234830_phase3_favorites.sql` (3.1), `shopping_lists` = `20261114041322_phase3_shopping_lists.sql` (3.2), `ratings` = `20261114045322_phase3_ratings.sql` (3.3), `comments` = `20261114051346_phase3_comments.sql` (3.4). Tên logic `00NN_*` trong tài liệu ứng với file có tiền tố timestamp mà Supabase CLI yêu cầu. Tài liệu này là **nguồn sự thật duy nhất** về schema: migration viết theo nó, và khi migration buộc phải khác, tài liệu được sửa trong cùng commit.
 **Project:** Supabase `bdhphjwhagygbwtfhhxn` (YoChef v2), PostgreSQL 17.
 **Ngày:** 2026-11-08.
 
@@ -290,30 +290,35 @@ Các bảng dưới đây đã chốt về cột chính và quy tắc quyền. M
 - **Grant:** `anon` SELECT; `authenticated` SELECT, INSERT trên `(user_id, recipe_id, score)`, UPDATE chỉ `score`, DELETE. Không đổi được người chấm hay công thức của một điểm.
 - **Điểm trung bình (O3, chốt ở 3.3): view** `public.recipe_rating_summary` (`security_invoker = true`): `recipe_id`, `rating_count`, `avg_score` (làm tròn 1 chữ số). Grant SELECT cho anon và authenticated. Công thức chưa có ai chấm thì **không có dòng**: trung bình là không rõ, không phải 0 (C5). View chạy dưới quyền người gọi nên chỉ tính các điểm người đó được thấy.
 
-### 5.4 `comments` (3.4) và `cooking_photos` (3.5)
-Cột chung: `id`, `user_id`, `recipe_id` (cascade), `status` (`pending`,`approved`,`rejected`, default `pending`), `created_at`, `updated_at`.
+### 5.4 `comments` (3.4, `20261114051346_phase3_comments.sql`) và `cooking_photos` (3.5)
+Cột chung: `id`, `user_id` (FK `profiles` cascade), `recipe_id` (FK `recipes` cascade), `status` (`pending`,`approved`,`rejected`, default `pending`), `created_at`, `updated_at`.
 
 Cột riêng:
-- `comments`: `content` (1–1000 ký tự).
+- `comments`: `content` tối đa 1000 ký tự và phải có ít nhất một ký tự không phải khoảng trắng (`content ~ '\S'`). Index `(recipe_id, created_at desc)` và `user_id`.
 - `cooking_photos`:
   - `storage_path` unique, phải bắt đầu bằng `<user_id>/`;
   - `caption` (≤ 250 ký tự).
 
-Trigger (INVOKER, `search_path=''`):
-- client luôn tạo nội dung ở trạng thái `pending`;
-- chủ sở hữu không được đổi `status`;
-- sửa nội dung đã `approved` sẽ đưa nó về lại `pending`.
+Ba quy tắc về `status`:
+- client luôn tạo nội dung ở trạng thái `pending`, và chủ sở hữu không đổi được `status`: **grant theo cột**, client không có quyền INSERT hay UPDATE trên `status` (PostgREST trả `42501`);
+- sửa nội dung đã `approved` sẽ đưa nó về lại `pending`: trigger chung `private.reset_status_on_edit()` (INVOKER, `search_path=''`), tham số là tên cột nội dung (`content`, bước 3.5 dùng `caption`). Cập nhật không đổi nội dung thì giữ nguyên `approved`.
+
+**Grant (`comments`):** `anon` SELECT; `authenticated` SELECT, INSERT trên `(user_id, recipe_id, content)`, UPDATE chỉ `content`, DELETE. Không đổi được tác giả hay công thức của một bình luận.
 
 RLS theo `phase4_03`:
 
 | Role | Được đọc |
 |---|---|
-| `anon` | `approved` của công thức `published` |
+| `anon` | `approved` của công thức `published` (policy không gọi hàm trợ giúp nào) |
 | `authenticated` | như trên, cộng nội dung của chính mình chưa bị `rejected`, cộng mọi nội dung nếu là `is_moderator()` |
 
-Chủ sở hữu được sửa hoặc xóa nội dung của mình khi nó chưa bị `rejected`.
+- INSERT: của chính mình, với công thức `published`.
+- UPDATE: chủ sở hữu, khi nội dung chưa bị `rejected`. Moderator không sửa được nội dung của người khác.
+- DELETE: chủ sở hữu khi chưa bị `rejected`, hoặc `is_super_admin()`.
 
-Cột duyệt (`moderated_by`, `moderated_at`) và RPC `moderate_community_content` thêm ở 4.2.
+**Cách app dùng:** trang chi tiết hiện bình luận mới nhất trước, mỗi lần 20 (đọc thêm một dòng để biết còn trang sau). Tên tác giả lấy qua embed `author:profiles!comments_user_id_fkey(display_name, avatar_path)`. Ghi rõ tên FK để embed không bị nhập nhằng khi `moderated_by` (3.6) cũng trỏ tới `profiles`. Bình luận của mình đang chờ có nhãn "Đang chờ duyệt".
+
+Cột duyệt (`moderated_by`, `moderated_at`) và RPC `moderate_community_content` thêm ở 3.6 (đưa sớm một phần 4.2, quyết định D6 của kế hoạch Phase 3).
 
 ### 5.5 `recipe_videos` (4.4)
 - `id`, `recipe_id` (cascade).
