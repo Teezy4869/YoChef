@@ -100,3 +100,29 @@ ALL PASS 78/78 (accounts 4, favorites 10, shopping 16, ratings 17, comments 15, 
 Storage answers seen live: upload outside own folder / by anon -> 400 AccessDenied; text/plain -> 400 InvalidMimeType;
 signing a pending photo as B / anon -> 400 NoSuchKey; author deleting the file while its row exists -> 400 AccessDenied
 (file still signable); after the row is gone the author deletes the file (200) and signing it fails (400).
+
+== 3.6 moderation  2026-11-14T13:35:52Z ==
+$ npm run db:push   (approved by the project owner; --linked --project-ref bdhphjwhagygbwtfhhxn)
+Applying migration 20261114060039_phase3_moderation.sql...
+{"upToDate":false,"dryRun":false,"migrations":["20261114060039_phase3_moderation.sql"],"seeds":[],"roles":[],"message":"Finished supabase db push."}
+
+$ npm run db:list
+=> local and remote match: 10/10 (last: 20261114060039).
+
+$ npm run db:advisors
+5 results; one NEW:
+WARN  authenticated_security_definer_function_executable: public.moderate_community_content(text, uuid, text, text)
+      -> accepted, same reason as get_my_profile (O2): it must be DEFINER because clients have no UPDATE privilege on
+         status, it is executable by authenticated only (not anon), and it raises 42501 unless private.is_moderator().
+Unchanged: get_my_profile (accepted), auth_leaked_password_protection (Auth setting),
+multiple_permissive_policies on comments and cooking_photos (accepted at 3.4 / 3.5).
+No finding about public.moderation_actions.
+
+$ npm run db:verify
+SCHEMA MATCHES: 10 migrations, 18 tables, 47 policies, 14 functions, 74 column grants (docs/evidence/phase-3/db_verify.log)
+
+$ npm run smoke:user
+78 PASS, 1 FAIL (docs/evidence/phase-3/live_user_smoke.log):
+- every check of 3.1-3.5 still passes after comments / cooking_photos moved to column-level SELECT;
+- FAIL "moderator M is configured and signs in": SMOKE_EMAIL_MOD / SMOKE_PASSWORD_MOD are not in .env.smoke yet.
+=> 3.6 live checks (23) NOT RUN. Blocked on the project owner creating test account M with the moderator role.

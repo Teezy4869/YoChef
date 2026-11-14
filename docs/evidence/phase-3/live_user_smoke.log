@@ -1,4 +1,4 @@
-YoChef live user smoke  2026-11-14T05:58:39.990Z  target bdhphjwhagygbwtfhhxn.supabase.co  A t***@gmail.com  B t***@gmail.com
+YoChef live user smoke  2026-11-14T13:36:46.011Z  target bdhphjwhagygbwtfhhxn.supabase.co  A t***@gmail.com  B t***@gmail.com
 PASS  user A signs in  (HTTP 200)
 PASS  user B signs in  (HTTP 200)
 PASS  A and B are different users  (A af4e8b26…, B 0867dac9…)
@@ -78,4 +78,5 @@ PASS  A cannot remove the file while its row exists  (HTTP 400, code AccessDenie
 PASS  B cannot remove A photo row  (HTTP 200, code -)
 PASS  A removes the row first  (HTTP 200, code -)
 PASS  then the file, which is gone  (HTTP 200, code -; sign HTTP 400)
-ALL PASS
+FAIL  moderator M is configured and signs in  (SMOKE_EMAIL_MOD / SMOKE_PASSWORD_MOD missing)
+1 FAILED
