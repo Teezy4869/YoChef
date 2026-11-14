@@ -13,6 +13,8 @@ export type RootStackParamList = {
   Main: NavigatorScreenParams<MainTabParamList> | undefined;
   RecipeDetail: { slug: string };
   CookingMode: { slug: string; servings?: number };
+  // Signed-in only; the screen itself checks the role, the database enforces it.
+  Moderation: undefined;
   // Auth screens exist only while signed out; signing in removes them, which
   // closes the modal automatically.
   SignIn: undefined;

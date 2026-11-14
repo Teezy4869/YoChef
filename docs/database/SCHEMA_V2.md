@@ -1,6 +1,6 @@
 # YoChef v2: Schema chuẩn (SCHEMA_V2)
 
-**Trạng thái:** `0001_catalog` = `supabase/migrations/20261108130000_catalog.sql`, `0002_identity_rbac` = `20261108130100_identity_rbac.sql` (bước 0.4). Phase 3: `favorites` = `20261113234830_phase3_favorites.sql` (3.1), `shopping_lists` = `20261114041322_phase3_shopping_lists.sql` (3.2), `ratings` = `20261114045322_phase3_ratings.sql` (3.3), `comments` = `20261114051346_phase3_comments.sql` (3.4), `cooking_photos` = `20261114054707_phase3_cooking_photos.sql` (3.5). Tên logic `00NN_*` trong tài liệu ứng với file có tiền tố timestamp mà Supabase CLI yêu cầu. Tài liệu này là **nguồn sự thật duy nhất** về schema: migration viết theo nó, và khi migration buộc phải khác, tài liệu được sửa trong cùng commit.
+**Trạng thái:** `0001_catalog` = `supabase/migrations/20261108130000_catalog.sql`, `0002_identity_rbac` = `20261108130100_identity_rbac.sql` (bước 0.4). Phase 3: `favorites` = `20261113234830_phase3_favorites.sql` (3.1), `shopping_lists` = `20261114041322_phase3_shopping_lists.sql` (3.2), `ratings` = `20261114045322_phase3_ratings.sql` (3.3), `comments` = `20261114051346_phase3_comments.sql` (3.4), `cooking_photos` = `20261114054707_phase3_cooking_photos.sql` (3.5), duyệt nội dung = `20261114060039_phase3_moderation.sql` (3.6). Tên logic `00NN_*` trong tài liệu ứng với file có tiền tố timestamp mà Supabase CLI yêu cầu. Tài liệu này là **nguồn sự thật duy nhất** về schema: migration viết theo nó, và khi migration buộc phải khác, tài liệu được sửa trong cùng commit.
 **Project:** Supabase `bdhphjwhagygbwtfhhxn` (YoChef v2), PostgreSQL 17.
 **Ngày:** 2026-11-08.
 
@@ -72,7 +72,7 @@ auth.users ── profiles ──< shopping_lists ──< shopping_list_items >�
 | 19 | `nutrition_unit_conversions` | 4.3 | 4 | Không |
 | 20 | `recipe_nutrition` | 4.3 | 4 | Chỉ `VERIFIED` của công thức `published` |
 | 21 | `admin_audit_logs` | 4.1 | 4 | Không |
-| 22 | `content_reports`, `moderation_actions` | 4.2 | 4 | Không |
+| 22 | `content_reports` (4.2), `moderation_actions` (3.6, đưa sớm từ 4.2) | 4.2 / 3.6 | 4 / 3 | Không |
 
 Bảng 1–17 và 10 khớp danh sách "17 bảng nghiệp vụ + `user_roles`" của kế hoạch. Thực thể `Nutrition` của `app-in4` được tách thành bảng 18–20 theo hợp đồng dinh dưỡng Phase 4. Bảng 18–22 ở §5 chỉ là **phác thảo**; chi tiết sẽ chốt khi bắt đầu lát cắt tương ứng, và tài liệu này được cập nhật trong cùng commit.
 
@@ -325,7 +325,12 @@ RLS theo `phase4_03`:
 
 **Cách app dùng (bình luận):** trang chi tiết hiện bình luận mới nhất trước, mỗi lần 20 (đọc thêm một dòng để biết còn trang sau). Tên tác giả lấy qua embed `author:profiles!comments_user_id_fkey(display_name, avatar_path)`. Ghi rõ tên FK để embed không bị nhập nhằng khi `moderated_by` (3.6) cũng trỏ tới `profiles`. Bình luận của mình đang chờ có nhãn "Đang chờ duyệt".
 
-Cột duyệt (`moderated_by`, `moderated_at`) và RPC `moderate_community_content` thêm ở 3.6 (đưa sớm một phần 4.2, quyết định D6 của kế hoạch Phase 3).
+**Duyệt (3.6, `20261114060039_phase3_moderation.sql`, đưa sớm một phần 4.2, quyết định D6 của kế hoạch Phase 3):**
+- Cột `moderated_by` (FK `profiles`, `on delete set null`, có index) và `moderated_at` trên cả hai bảng. **Client không đọc được hai cột này:** SELECT của `anon` và `authenticated` chuyển sang grant theo cột, không gồm `moderated_by`, `moderated_at`. Lộ chúng ra sẽ cho biết tài khoản nào là moderator, trong khi `user_roles` là riêng tư. Hệ quả: client phải nêu rõ cột cần đọc, vì `select=*` sẽ bị từ chối (`42501`).
+- RPC `public.moderate_community_content(p_table, p_id, p_status, p_reason)`: DEFINER, `search_path=''`, chỉ `authenticated` được gọi. Không phải `is_moderator()` thì báo `42501`. `p_table` là `comments` hoặc `cooking_photos`, `p_status` là một trong ba trạng thái (sai thì `22023`), không thấy nội dung thì `P0002`. Mọi chuyển trạng thái đều được phép; đưa về `approved` là khôi phục. RPC khóa dòng, đổi `status`, `moderated_by`, `moderated_at` và ghi một dòng `moderation_actions` trong cùng giao dịch. Lý do trống thành NULL; lý do quá 500 ký tự làm cả giao dịch thất bại.
+- Phải là DEFINER vì client không có quyền UPDATE trên `status`. Advisor `authenticated_security_definer_function_executable` báo hàm này: **chấp nhận**, cùng lý do như `get_my_profile()` (O2), và hàm tự kiểm `is_moderator()` trước mọi thay đổi.
+- Trigger `reset_status_on_edit` không đụng tới quyết định của moderator, vì RPC không đổi nội dung.
+- Màn "Duyệt nội dung" trong app (chỉ hiện với moderator và super_admin) liệt kê bình luận và ảnh `pending`, cũ nhất trước, tối đa 50 mục mỗi loại. Đây là giải pháp tạm; 4.2 chuyển việc duyệt sang admin web kèm báo cáo vi phạm.
 
 ### 5.5 `recipe_videos` (4.4)
 - `id`, `recipe_id` (cascade).
@@ -360,7 +365,7 @@ Quy tắc chi tiết nằm trong `phase4_08_nutrition_data_contract.md`. Public 
 ### 5.7 Quản trị (4.1, 4.2), phác thảo
 - `admin_audit_logs`: chỉ được thêm, không sửa; ghi `actor_id`, `action`, `target_table`, `target_id`, `reason`, `details jsonb`, `created_at`. Chỉ đọc qua RPC của super_admin.
 - `content_reports`: người dùng báo cáo comment hoặc photo.
-- `moderation_actions`: lịch sử duyệt, không sửa được.
+- `moderation_actions` (**đã làm ở 3.6**): `id`, `actor_id` (không FK, để lịch sử còn nguyên khi tài khoản bị xóa và không bị cascade sửa), `target_table` (`comments`, `cooking_photos`), `target_id` (không FK, để lịch sử còn sau khi nội dung bị xóa), `from_status`, `to_status`, `reason` (NULL hoặc 1–500 ký tự), `created_at`. Chỉ được thêm: client không có quyền ghi, và trigger `private.forbid_change()` chặn UPDATE và DELETE với mọi vai trò, kể cả owner. Chỉ `is_moderator()` đọc được (RLS). Chỉ RPC `moderate_community_content` ghi vào bảng.
 
 ## 6. Storage
 

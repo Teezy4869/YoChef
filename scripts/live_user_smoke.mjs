@@ -6,10 +6,13 @@
 //
 // Needs app/.env (URL + publishable key) and, in .env.smoke at the repo root
 // (git-ignored): SMOKE_EMAIL / SMOKE_PASSWORD (user A, the smoke:auth user) and
-// SMOKE_EMAIL_B / SMOKE_PASSWORD_B (user B). Use test accounts, never staff.
+// SMOKE_EMAIL_B / SMOKE_PASSWORD_B (user B). Use test accounts, never real staff.
+// From step 3.6 also SMOKE_EMAIL_MOD / SMOKE_PASSWORD_MOD: user M, a test account
+// whose only role is moderator; without it the moderation part fails.
 //
 // Every row the script creates belongs to A or B and is removed again, also
-// leftovers from an earlier failed run. Never prints the key, a password or a
+// leftovers from an earlier failed run. M only changes statuses of those rows;
+// the moderation history it leaves behind is append-only by design. Never prints the key, a password or a
 // full email.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -47,6 +50,7 @@ const credentials = (suffix) => ({
 });
 const credA = credentials('');
 const credB = credentials('_B');
+const credM = credentials('_MOD');
 if (!credA.email || !credA.password) refuse('SMOKE_EMAIL and SMOKE_PASSWORD (user A) are required in .env.smoke');
 if (!credB.email || !credB.password) refuse('SMOKE_EMAIL_B and SMOKE_PASSWORD_B (user B) are required in .env.smoke');
 if (credA.email === credB.email) refuse('user A and user B must be different accounts');
@@ -310,9 +314,10 @@ const MISSING_RECIPE = '00000000-0000-0000-0000-000000000000';
 // --- 3.4 Comments -------------------------------------------------------------
 {
   const MARK = 'YoChef smoke'; // every comment the script posts starts with this
-  const byId = (id) => `/rest/v1/comments?id=eq.${id}`;
+  // comments has column-level SELECT (3.6), so every read names its columns.
+  const byId = (id) => `/rest/v1/comments?id=eq.${id}&select=id,status`;
   const post = (u, owner, content, extra = {}) =>
-    call('/rest/v1/comments', {
+    call('/rest/v1/comments?select=id,status', {
       method: 'POST',
       token: u?.token,
       headers: returning,
@@ -327,7 +332,7 @@ const MISSING_RECIPE = '00000000-0000-0000-0000-000000000000';
   const c = rows(created)[0];
   check('A posts a comment and it waits for review', created.status === 201 && c?.status === 'pending', detail(created));
   if (!c) finish();
-  const readA = await call(`${byId(c.id)}&select=id,status,author:profiles!comments_user_id_fkey(display_name)`, { token: A.token });
+  const readA = await call(`/rest/v1/comments?id=eq.${c.id}&select=id,status,author:profiles!comments_user_id_fkey(display_name)`, { token: A.token });
   check('A reads it back with the author embed', readA.status === 200 && rows(readA).length === 1 && 'author' in (rows(readA)[0] ?? {}), detail(readA));
   const readB = await call(byId(c.id), { token: B.token });
   check('B does not see A pending comment', readB.status === 200 && rows(readB).length === 0, detail(readB));
@@ -376,9 +381,9 @@ const MISSING_RECIPE = '00000000-0000-0000-0000-000000000000';
       headers: JSON_HEADERS,
       body: JSON.stringify({ expiresIn: 60 }),
     });
-  const rowOf = (path) => `/rest/v1/cooking_photos?storage_path=eq.${encodeURIComponent(path)}`;
+  const rowOf = (path) => `/rest/v1/cooking_photos?storage_path=eq.${encodeURIComponent(path)}&select=id,status`;
   const addRow = (u, owner, path, extra = {}) =>
-    call('/rest/v1/cooking_photos', {
+    call('/rest/v1/cooking_photos?select=id,status', {
       method: 'POST',
       token: u?.token,
       headers: returning,
@@ -445,6 +450,147 @@ const MISSING_RECIPE = '00000000-0000-0000-0000-000000000000';
   const delFile = await call(`${BUCKET}/${path}`, { method: 'DELETE', token: A.token });
   const gone = await sign(A, path);
   check('then the file, which is gone', delFile.status === 200 && gone.status >= 400, `${detail(delFile)}; sign HTTP ${gone.status}`);
+}
+
+// --- 3.6 Moderation ------------------------------------------------------------
+{
+  const M = credM.email && credM.password ? await signIn(credM) : null;
+  check('moderator M is configured and signs in', M?.status === 200 && !!M?.token, M ? `HTTP ${M.status}` : 'SMOKE_EMAIL_MOD / SMOKE_PASSWORD_MOD missing');
+  if (!M?.token) finish();
+  check('M is neither A nor B', M.id !== A.id && M.id !== B.id, `M ${short(M.id)}`);
+  const roles = await call(`/rest/v1/user_roles?select=role&user_id=eq.${M.id}`, { token: M.token });
+  check('M has the moderator role', rows(roles).some((r) => r.role === 'moderator'), detail(roles));
+
+  const MARK = 'YoChef smoke moderation';
+  const PNG = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  const moderate = (u, table, id, status, reason = null) =>
+    call('/rest/v1/rpc/moderate_community_content', {
+      method: 'POST',
+      token: u?.token,
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ p_table: table, p_id: id, p_status: status, p_reason: reason }),
+    });
+  const commentPath = (id) => `/rest/v1/comments?id=eq.${id}&select=id,status`;
+  const photoPath = (id) => `/rest/v1/cooking_photos?id=eq.${id}&select=id,status`;
+  const filePath = (path) => `/storage/v1/object/cooking-photos/${path}`;
+  const sign = (u, path) =>
+    call(`/storage/v1/object/sign/cooking-photos/${path}`, {
+      method: 'POST',
+      token: u?.token,
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ expiresIn: 60 }),
+    });
+
+  // Leftovers of an earlier failed run: M reopens rejected ones so A can remove them.
+  const like = encodeURIComponent(MARK);
+  const oldC = await call(`/rest/v1/comments?select=id,status&user_id=eq.${A.id}&content=like.${like}*`, { token: M.token });
+  for (const c of rows(oldC)) {
+    if (c.status === 'rejected') await moderate(M, 'comments', c.id, 'pending');
+    await call(`/rest/v1/comments?id=eq.${c.id}`, { method: 'DELETE', token: A.token });
+  }
+  const oldP = await call(`/rest/v1/cooking_photos?select=id,status,storage_path&user_id=eq.${A.id}&caption=like.${like}*`, { token: M.token });
+  for (const p of rows(oldP)) {
+    if (p.status === 'rejected') await moderate(M, 'cooking_photos', p.id, 'pending');
+    await call(`/rest/v1/cooking_photos?id=eq.${p.id}`, { method: 'DELETE', token: A.token });
+    await call(filePath(p.storage_path), { method: 'DELETE', token: A.token });
+  }
+
+  // A posts one comment and one photo; both wait for review.
+  const posted = await call('/rest/v1/comments?select=id,status', {
+    method: 'POST',
+    token: A.token,
+    headers: returning,
+    body: JSON.stringify({ user_id: A.id, recipe_id: recipe.id, content: `${MARK}: ngon` }),
+  });
+  const comment = rows(posted)[0];
+  const path = `${A.id}/smoke-mod-${Date.now()}.png`;
+  const up = await call(filePath(path), { method: 'POST', token: A.token, headers: { 'Content-Type': 'image/png', 'x-upsert': 'false' }, body: PNG });
+  const added = await call('/rest/v1/cooking_photos?select=id,status', {
+    method: 'POST',
+    token: A.token,
+    headers: returning,
+    body: JSON.stringify({ user_id: A.id, recipe_id: recipe.id, storage_path: path, caption: `${MARK}: ảnh` }),
+  });
+  const photo = rows(added)[0];
+  check(
+    'A posts a comment and a photo for review',
+    comment?.status === 'pending' && up.status === 200 && photo?.status === 'pending',
+    `${detail(posted)}; upload HTTP ${up.status}; ${detail(added)}`,
+  );
+  if (!comment || !photo) finish();
+
+  const queue = await call(`/rest/v1/comments?select=id&status=eq.pending&id=eq.${comment.id}`, { token: M.token });
+  check('M sees the pending comment in the queue', rows(queue).length === 1, detail(queue));
+  const byA = await moderate(A, 'comments', comment.id, 'approved');
+  check('A cannot moderate', refused(byA), detail(byA));
+  const byAnon = await moderate(null, 'comments', comment.id, 'approved');
+  check('anon cannot moderate', refused(byAnon), detail(byAnon));
+  const bad = await moderate(M, 'comments', comment.id, 'deleted');
+  check('an unknown status is rejected', codeOf(bad) === '22023', detail(bad));
+
+  const okC = await moderate(M, 'comments', comment.id, 'approved');
+  const okP = await moderate(M, 'cooking_photos', photo.id, 'approved', 'Ảnh rõ, đúng món');
+  check('M approves the comment and the photo', okC.status === 200 && okC.body === 'approved' && okP.status === 200, `${detail(okC)}; ${detail(okP)}`);
+  const anonC = await call(commentPath(comment.id));
+  const bC = await call(commentPath(comment.id), { token: B.token });
+  check('anon and B now see the comment', rows(anonC).length === 1 && rows(bC).length === 1, `${detail(anonC)}; ${detail(bC)}`);
+  const anonSign = await sign(null, path);
+  const bSign = await sign(B, path);
+  check('anon and B can now sign the photo', anonSign.status === 200 && bSign.status === 200, `anon HTTP ${anonSign.status}, B HTTP ${bSign.status}`);
+  const hidden = await call(`/rest/v1/comments?select=moderated_by&id=eq.${comment.id}`);
+  check('nobody reads who moderated', refused(hidden), detail(hidden));
+
+  const rejC = await moderate(M, 'comments', comment.id, 'rejected', 'Thử từ chối');
+  const rejP = await moderate(M, 'cooking_photos', photo.id, 'rejected');
+  check('M rejects both', rejC.status === 200 && rejP.status === 200, `${detail(rejC)}; ${detail(rejP)}`);
+  const aC = await call(commentPath(comment.id), { token: A.token });
+  const anonC2 = await call(commentPath(comment.id));
+  check('A and anon no longer see the rejected comment', rows(aC).length === 0 && rows(anonC2).length === 0, `${detail(aC)}; ${detail(anonC2)}`);
+  const aEdit = await call(commentPath(comment.id), { method: 'PATCH', token: A.token, headers: returning, body: JSON.stringify({ content: `${MARK}: sửa` }) });
+  const aDel = await call(commentPath(comment.id), { method: 'DELETE', token: A.token, headers: returning });
+  check('A can neither edit nor remove it', rows(aEdit).length === 0 && rows(aDel).length === 0, `${detail(aEdit)}; ${detail(aDel)}`);
+  const aSign = await sign(A, path);
+  const aFile = await call(filePath(path), { method: 'DELETE', token: A.token });
+  check('A can neither open nor remove the rejected photo file', aSign.status >= 400 && aFile.status >= 400, `sign HTTP ${aSign.status}; delete HTTP ${aFile.status}`);
+
+  const historyM = await call(
+    `/rest/v1/moderation_actions?select=actor_id,from_status,to_status&target_id=eq.${comment.id}&order=created_at`,
+    { token: M.token },
+  );
+  const steps = rows(historyM).map((h) => `${h.from_status}>${h.to_status}`).join(',');
+  check(
+    'every decision on the comment is recorded, by M',
+    steps === 'pending>approved,approved>rejected' && rows(historyM).every((h) => h.actor_id === M.id),
+    `${detail(historyM)}; ${steps}`,
+  );
+  const historyA = await call(`/rest/v1/moderation_actions?select=id&target_id=eq.${comment.id}`, { token: A.token });
+  check('A reads no moderation history', historyA.status === 200 && rows(historyA).length === 0, detail(historyA));
+  const forge = await call('/rest/v1/moderation_actions', {
+    method: 'POST',
+    token: M.token,
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ actor_id: M.id, target_table: 'comments', target_id: comment.id, from_status: 'rejected', to_status: 'approved' }),
+  });
+  check('nobody writes the history directly, not even M', refused(forge), detail(forge));
+
+  const back = await moderate(M, 'comments', comment.id, 'approved');
+  const backP = await moderate(M, 'cooking_photos', photo.id, 'approved');
+  const aBack = await call(commentPath(comment.id), { token: A.token });
+  check('M restores both, and A sees the comment again', back.status === 200 && backP.status === 200 && rows(aBack).length === 1, `${detail(back)}; ${detail(aBack)}`);
+  const edited = await call(commentPath(comment.id), { method: 'PATCH', token: A.token, headers: returning, body: JSON.stringify({ content: `${MARK}: sửa lại` }) });
+  check('A edits the approved comment and it waits for review again', rows(edited)[0]?.status === 'pending', detail(edited));
+
+  const cleanC = await call(commentPath(comment.id), { method: 'DELETE', token: A.token, headers: returning });
+  const cleanP = await call(photoPath(photo.id), { method: 'DELETE', token: A.token, headers: returning });
+  const cleanF = await call(filePath(path), { method: 'DELETE', token: A.token });
+  check(
+    'A removes the comment, the photo row and its file',
+    rows(cleanC).length === 1 && rows(cleanP).length === 1 && cleanF.status === 200,
+    `${detail(cleanC)}; ${detail(cleanP)}; file HTTP ${cleanF.status}`,
+  );
 }
 
 finish();

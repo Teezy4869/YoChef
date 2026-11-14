@@ -3,7 +3,7 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { admin, as, createDatabase } from './harness.mjs';
+import { admin, adminError, as, createDatabase } from './harness.mjs';
 
 const INSUFFICIENT_PRIVILEGE = '42501';
 const UNIQUE_VIOLATION = '23505';
@@ -459,5 +459,104 @@ describe('3.5 cooking photos', () => {
     const del = await as(db, 'authenticated', bob, `delete from public.cooking_photos where storage_path = $1 returning id`, [path]);
     assert.equal(del.rows.length, 1);
     assert.equal((await removeFile(bob, path)).rows.length, 1);
+  });
+});
+
+describe('3.6 moderation', () => {
+  let mod;
+  let commentId;
+  let photoId;
+  const moderate = (role, uid, table, id, status, reason = null) =>
+    as(db, role, uid, `select public.moderate_community_content($1, $2, $3, $4) as status`, [table, id, status, reason]);
+  const visible = (role, uid, table, id) =>
+    as(db, role, uid, `select id from public.${table} where id = $1`, [id]).then((r) => r.rows.length === 1);
+  const history = (role, uid, id) =>
+    as(db, role, uid, `select actor_id, from_status, to_status, reason from public.moderation_actions where target_id = $1 order by created_at, to_status`, [id]);
+
+  before(async () => {
+    [{ id: mod }] = await admin(db, `insert into auth.users (email) values ('mod3@example.test') returning id`);
+    await admin(db, `insert into public.user_roles (user_id, role) values ($1, 'moderator')`, [mod]);
+    [{ id: commentId }] = (await as(db, 'authenticated', alice,
+      `insert into public.comments (user_id, recipe_id, content) values ($1, $2, 'Chờ duyệt') returning id`, [alice, publishedId])).rows;
+    await admin(db, `insert into storage.objects (bucket_id, name) values ('cooking-photos', $1)`, [`${alice}/m1.jpg`]);
+    [{ id: photoId }] = (await as(db, 'authenticated', alice,
+      `insert into public.cooking_photos (user_id, recipe_id, storage_path) values ($1, $2, $3) returning id`,
+      [alice, publishedId, `${alice}/m1.jpg`])).rows;
+  });
+
+  it('only a moderator may moderate; anon cannot even call the RPC', async () => {
+    for (const uid of [alice, bob]) {
+      assert.equal((await moderate('authenticated', uid, 'comments', commentId, 'approved')).error?.code, INSUFFICIENT_PRIVILEGE);
+    }
+    assert.equal((await moderate('anon', null, 'comments', commentId, 'approved')).error?.code, INSUFFICIENT_PRIVILEGE);
+    const [{ status }] = await admin(db, `select status from public.comments where id = $1`, [commentId]);
+    assert.equal(status, 'pending');
+  });
+
+  it('approving makes a comment and a photo public, with their file', async () => {
+    assert.deepEqual((await moderate('authenticated', mod, 'comments', commentId, 'approved')).rows, [{ status: 'approved' }]);
+    assert.deepEqual((await moderate('authenticated', mod, 'cooking_photos', photoId, 'approved', 'Ảnh rõ')).rows, [{ status: 'approved' }]);
+    assert.deepEqual(
+      [await visible('anon', null, 'comments', commentId), await visible('authenticated', bob, 'cooking_photos', photoId)],
+      [true, true],
+    );
+    const file = await as(db, 'anon', null, `select name from storage.objects where name = $1`, [`${alice}/m1.jpg`]);
+    assert.equal(file.rows.length, 1);
+    const [row] = await admin(db, `select moderated_by, moderated_at is not null as stamped from public.comments where id = $1`, [commentId]);
+    assert.deepEqual(row, { moderated_by: mod, stamped: true });
+  });
+
+  it('clients never read who moderated', async () => {
+    for (const [role, uid] of [['anon', null], ['authenticated', alice], ['authenticated', mod]]) {
+      for (const table of ['comments', 'cooking_photos']) {
+        const r = await as(db, role, uid, `select moderated_by, moderated_at from public.${table}`);
+        assert.equal(r.error?.code, INSUFFICIENT_PRIVILEGE, `${role} ${table}`);
+      }
+    }
+  });
+
+  it('rejecting hides the comment from its author, who can no longer edit it; restoring brings it back', async () => {
+    assert.equal((await moderate('authenticated', mod, 'comments', commentId, 'rejected', '  Spam  ')).error, null);
+    assert.deepEqual([await visible('anon', null, 'comments', commentId), await visible('authenticated', alice, 'comments', commentId)], [false, false]);
+    const edit = await as(db, 'authenticated', alice, `update public.comments set content = 'x' where id = $1 returning id`, [commentId]);
+    assert.deepEqual(edit.rows, []);
+    assert.equal((await moderate('authenticated', mod, 'comments', commentId, 'approved')).error, null);
+    assert.equal(await visible('anon', null, 'comments', commentId), true);
+  });
+
+  it('editing an approved comment after moderation sends it back to review', async () => {
+    const edit = await as(db, 'authenticated', alice, `update public.comments set content = 'Đã sửa' where id = $1 returning status`, [commentId]);
+    assert.deepEqual(edit.rows, [{ status: 'pending' }]);
+    assert.equal(await visible('anon', null, 'comments', commentId), false);
+  });
+
+  it('every decision is recorded; only moderators read the history and nobody writes it', async () => {
+    const { rows } = await history('authenticated', mod, commentId);
+    assert.deepEqual(rows, [
+      { actor_id: mod, from_status: 'pending', to_status: 'approved', reason: null },
+      { actor_id: mod, from_status: 'approved', to_status: 'rejected', reason: 'Spam' },
+      { actor_id: mod, from_status: 'rejected', to_status: 'approved', reason: null },
+    ]);
+    assert.deepEqual((await history('authenticated', alice, commentId)).rows, []);
+    assert.equal((await history('anon', null, commentId)).error?.code, INSUFFICIENT_PRIVILEGE);
+    const forge = await as(db, 'authenticated', mod,
+      `insert into public.moderation_actions (actor_id, target_table, target_id, from_status, to_status) values ($1, 'comments', $2, 'pending', 'approved')`,
+      [mod, commentId]);
+    assert.equal(forge.error?.code, INSUFFICIENT_PRIVILEGE);
+    for (const sql of [`update public.moderation_actions set reason = 'x'`, `delete from public.moderation_actions`]) {
+      assert.equal((await as(db, 'authenticated', mod, sql)).error?.code, INSUFFICIENT_PRIVILEGE, sql);
+      assert.equal(await adminError(db, sql).then((e) => e?.code), INSUFFICIENT_PRIVILEGE, `owner: ${sql}`);
+    }
+  });
+
+  it('refuses an unknown status, table or item, and a reason over 500 characters, changing nothing', async () => {
+    assert.equal((await moderate('authenticated', mod, 'comments', commentId, 'deleted')).error?.code, '22023');
+    assert.equal((await moderate('authenticated', mod, 'comments', commentId, null)).error?.code, '22023');
+    assert.equal((await moderate('authenticated', mod, 'recipes', publishedId, 'approved')).error?.code, '22023');
+    assert.equal((await moderate('authenticated', mod, 'comments', publishedId, 'approved')).error?.code, 'P0002');
+    const long = await moderate('authenticated', mod, 'cooking_photos', photoId, 'rejected', 'a'.repeat(501));
+    assert.equal(long.error?.code, CHECK_VIOLATION);
+    const [{ status }] = await admin(db, `select status from public.cooking_photos where id = $1`, [photoId]);
+    assert.equal(status, 'approved');
   });
 });

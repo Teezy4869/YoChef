@@ -10,6 +10,7 @@ import { Screen } from '@/components/Screen';
 import { TextField } from '@/components/TextField';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { DISPLAY_NAME_MAX, validateDisplayName } from '@/features/auth/validation';
+import { ModerationEntry } from '@/features/moderation/ModerationEntry';
 import { useSupabase } from '@/lib/supabase';
 import { colors, spacing } from '@/theme/tokens';
 
@@ -199,6 +200,7 @@ export function ProfileView({ session }: { session: Session }) {
             loading={busy === 'avatar'}
             disabled={busy !== null && busy !== 'avatar'}
           />
+          <ModerationEntry userId={userId} />
           <Button
             title="Đăng xuất"
             variant="ghost"

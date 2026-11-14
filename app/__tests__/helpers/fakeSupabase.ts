@@ -77,6 +77,18 @@ export function createFakeSupabase(initial: Session | null = null) {
     if (fn === 'get_my_profile') {
       return { data: session ? [{ ...profileOf(session.user.id) }] : [], error: null };
     }
+    if (fn === 'moderate_community_content') {
+      // The RPC: moderators only, any status, one history row per decision.
+      if (!session || !isModerator(session.user.id)) return { data: null, error: { message: 'only moderators', code: '42501' } };
+      const row = (tables[String(args.p_table)] ?? []).find((r) => r.id === args.p_id);
+      if (!row) return { data: null, error: { message: 'not found', code: 'P0002' } };
+      (tables.moderation_actions ??= []).push({
+        actor_id: session.user.id, target_table: args.p_table, target_id: args.p_id,
+        from_status: row.status, to_status: args.p_status, reason: args.p_reason ?? null,
+      });
+      row.status = args.p_status;
+      return { data: args.p_status, error: null };
+    }
     if (fn === 'search_recipes') {
       const terms = fold(String(args.p_query ?? '')).split(/\s+/).filter(Boolean);
       const rows = catalog.recipes
@@ -128,9 +140,12 @@ export function createFakeSupabase(initial: Session | null = null) {
   // authors also their own unless rejected, and only authors change a row that is
   // not rejected. Editing the text of an approved row sends it back to review.
   const REVIEWED: Record<string, string> = { comments: 'content', cooking_photos: 'caption' };
+  // is_moderator(): moderators and super admins, from the user's role rows.
+  const isModerator = (me: string | undefined) =>
+    (tables.user_roles ?? []).some((r) => r.user_id === me && (r.role === 'moderator' || r.role === 'super_admin'));
   const canSee = (table: string, r: Row, me: string | undefined) =>
     table in REVIEWED
-      ? r.status === 'approved' || (r.user_id === me && r.status !== 'rejected')
+      ? r.status === 'approved' || (r.user_id === me && r.status !== 'rejected') || isModerator(me)
       : PUBLIC_READ.has(table) || ownerOf(table, r) === me;
   const canWrite = (table: string, r: Row, me: string | undefined) =>
     ownerOf(table, r) === me && !(table in REVIEWED && r.status === 'rejected');
@@ -138,7 +153,8 @@ export function createFakeSupabase(initial: Session | null = null) {
   const STATUS_DENIED: Failure = { message: 'permission denied for table', code: '42501' };
   const withAuthor = (r: Row) => {
     const p = profileOf(String(r.user_id));
-    return { ...r, author: { display_name: p.display_name, avatar_path: p.avatar_path } };
+    const recipe = catalog.recipes.find((x) => x.id === r.recipe_id);
+    return { ...r, author: { display_name: p.display_name, avatar_path: p.avatar_path }, recipe: recipe ? { name: recipe.name } : null };
   };
   decorate.comments = withAuthor;
   decorate.cooking_photos = withAuthor;
@@ -229,6 +245,7 @@ export function createFakeSupabase(initial: Session | null = null) {
 
   const USER_TABLES = new Set([
     'favorites', 'shopping_lists', 'shopping_list_items', 'ratings', 'recipe_rating_summary', 'comments', 'cooking_photos',
+    'user_roles',
   ]);
 
   const from = jest.fn((table: string) =>
