@@ -1,0 +1,17 @@
+YoChef live user smoke  2026-11-14T03:26:51.380Z  target bdhphjwhagygbwtfhhxn.supabase.co  A t***@gmail.com  B t***@gmail.com
+PASS  user A signs in  (HTTP 200)
+PASS  user B signs in  (HTTP 200)
+PASS  A and B are different users  (A af4e8b26…, B 0867dac9…)
+PASS  a published recipe to work with  (HTTP 200)
+INFO  recipe 001-thit-lon-kho-cot-dua
+PASS  anon cannot read favorites  (HTTP 401, code 42501)
+PASS  A adds a favorite  (HTTP 201, code -)
+PASS  A lists it with the recipe embedded  (HTTP 200, code -)
+PASS  a duplicate favorite is rejected  (HTTP 409, code 23505)
+PASS  B cannot see A favorites  (HTTP 200, code -)
+PASS  B cannot delete A favorite  (HTTP 200, code -)
+PASS  B cannot add a favorite as A  (HTTP 403, code 42501)
+PASS  only a published recipe can be a favorite  (HTTP 403, code 42501)
+PASS  anon cannot add favorites  (HTTP 401, code 42501)
+PASS  A removes the favorite  (HTTP 200, code -)
+ALL PASS
