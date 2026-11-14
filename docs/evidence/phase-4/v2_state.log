@@ -1,0 +1,26 @@
+YoChef v2 state after each Phase 4 push (project bdhphjwhagygbwtfhhxn). Commands are the pinned npm scripts.
+
+== 4.1 staff roles and audit log  2026-11-14T15:48:33Z ==
+$ npm run db:push   (approved by the project owner; --linked --project-ref bdhphjwhagygbwtfhhxn)
+Applying migration 20261114153457_phase4_rbac_audit.sql...
+{"upToDate":false,"dryRun":false,"migrations":["20261114153457_phase4_rbac_audit.sql"],"seeds":[],"roles":[],"message":"Finished supabase db push."}
+
+$ npm run db:list
+=> local and remote match: 11/11 (last: 20261114153457).
+
+$ npm run db:advisors
+9 results, 4 NEW, all the same accepted kind:
+WARN  authenticated_security_definer_function_executable: manage_user_role, list_staff, find_user_by_email,
+      list_admin_audit_logs -> accepted like get_my_profile (O2): each is executable by authenticated only (not
+      anon) and raises 42501 unless private.is_super_admin() before doing anything.
+Unchanged: get_my_profile, moderate_community_content (accepted), auth_leaked_password_protection (Auth setting),
+multiple_permissive_policies on comments and cooking_photos (accepted at 3.4 / 3.5).
+No finding about public.admin_audit_logs (RLS on, no policy, no client privilege).
+
+$ npm run db:verify
+SCHEMA MATCHES: 11 migrations (docs/evidence/phase-4/db_verify.log; the npm script now logs under phase-4)
+
+$ npm run smoke:admin
+NOT RUN: "credentials for S are missing in .env.smoke". Blocked on the project owner creating test accounts
+S (super_admin, bootstrapped by SQL) and E, and adding SMOKE_EMAIL_SUPER / SMOKE_PASSWORD_SUPER and
+SMOKE_EMAIL_EDITOR / SMOKE_PASSWORD_EDITOR.

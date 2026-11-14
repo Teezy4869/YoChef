@@ -14,7 +14,7 @@
     "db:push": "node scripts/sb.mjs db push",
     "db:list": "node scripts/sb.mjs migration list",
     "db:advisors": "node scripts/sb.mjs db advisors",
-    "db:verify": "node scripts/db_verify.mjs --log docs/evidence/phase-3/db_verify.log",
+    "db:verify": "node scripts/db_verify.mjs --log docs/evidence/phase-4/db_verify.log",
     "seed:build": "node supabase/seed/import_recipes.mjs",
     "smoke:live": "node --env-file=app/.env scripts/live_smoke.mjs --log docs/evidence/phase-0/live_smoke.log",
     "smoke:auth": "node --env-file=app/.env --env-file-if-exists=.env.smoke scripts/live_auth_smoke.mjs --log docs/evidence/phase-1/live_auth_smoke.log",
