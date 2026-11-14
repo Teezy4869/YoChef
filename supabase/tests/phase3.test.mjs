@@ -340,3 +340,124 @@ describe('3.4 comments', () => {
     assert.equal(gone.rows.length, 1);
   });
 });
+
+describe('3.5 cooking photos', () => {
+  let mod;
+  let sup;
+  const upload = (uid, name) =>
+    as(db, 'authenticated', uid, `insert into storage.objects (bucket_id, name) values ('cooking-photos', $1) returning name`, [name]);
+  const addRow = (uid, owner, recipe, path, caption = null) =>
+    as(db, 'authenticated', uid,
+      `insert into public.cooking_photos (user_id, recipe_id, storage_path, caption) values ($1, $2, $3, $4) returning id, status`,
+      [owner, recipe, path, caption]);
+  const sees = (role, uid, name) =>
+    as(db, role, uid, `select name from storage.objects where bucket_id = 'cooking-photos' and name = $1`, [name])
+      .then((r) => r.rows.length === 1);
+  const removeFile = (uid, name) =>
+    as(db, 'authenticated', uid, `delete from storage.objects where bucket_id = 'cooking-photos' and name = $1 returning name`, [name]);
+  const setStatus = (status, path) => admin(db, `update public.cooking_photos set status = $1 where storage_path = $2`, [status, path]);
+
+  before(async () => {
+    [{ id: mod }] = await admin(db, `insert into auth.users (email) values ('mod2@example.test') returning id`);
+    [{ id: sup }] = await admin(db, `insert into auth.users (email) values ('super2@example.test') returning id`);
+    await admin(db, `insert into public.user_roles (user_id, role) values ($1, 'moderator'), ($2, 'super_admin')`, [mod, sup]);
+  });
+
+  it('the bucket is private, at most 5 MB, images only', async () => {
+    const [b] = await admin(db, `select public, file_size_limit, allowed_mime_types from storage.buckets where id = 'cooking-photos'`);
+    assert.deepEqual(
+      { ...b, file_size_limit: Number(b.file_size_limit) },
+      { public: false, file_size_limit: 5242880, allowed_mime_types: ['image/jpeg', 'image/png', 'image/webp'] },
+    );
+  });
+
+  it('a new photo waits for review and only its author reads the file', async () => {
+    const path = `${alice}/p1.jpg`;
+    assert.equal((await upload(alice, path)).error, null);
+    const row = await addRow(alice, alice, publishedId, path, 'Lần đầu nấu');
+    assert.equal(row.error, null);
+    assert.equal(row.rows[0].status, 'pending');
+    assert.deepEqual(
+      [await sees('authenticated', alice, path), await sees('authenticated', bob, path), await sees('anon', null, path)],
+      [true, false, false],
+    );
+    const rowB = await as(db, 'authenticated', bob, `select id from public.cooking_photos where storage_path = $1`, [path]);
+    assert.deepEqual(rowB.rows, []);
+  });
+
+  it('files and rows stay inside the author folder, with a safe file name', async () => {
+    assert.equal((await upload(alice, `${bob}/x.jpg`)).error?.code, INSUFFICIENT_PRIVILEGE);
+    for (const path of [`${bob}/x.jpg`, `${alice}/a/b.jpg`, `${alice}/x.gif`, `${alice}/../x.jpg`, `${alice}/`]) {
+      assert.equal((await addRow(alice, alice, publishedId, path)).error?.code, CHECK_VIOLATION, path);
+    }
+    assert.equal((await addRow(bob, alice, publishedId, `${alice}/forged.jpg`)).error?.code, INSUFFICIENT_PRIVILEGE);
+    assert.equal((await addRow(alice, alice, stagedId, `${alice}/staged.jpg`)).error?.code, INSUFFICIENT_PRIVILEGE);
+    const anon = await as(db, 'anon', null, `insert into storage.objects (bucket_id, name) values ('cooking-photos', $1)`, [`${alice}/anon.jpg`]);
+    assert.equal(anon.error?.code, INSUFFICIENT_PRIVILEGE);
+  });
+
+  it('captions are NULL or 1 to 250 characters; a client never writes status or the path', async () => {
+    for (const caption of ['   ', 'a'.repeat(251)]) {
+      assert.equal((await addRow(alice, alice, publishedId, `${alice}/c.jpg`, caption)).error?.code, CHECK_VIOLATION);
+    }
+    const forged = await as(db, 'authenticated', alice,
+      `insert into public.cooking_photos (user_id, recipe_id, storage_path, status) values ($1, $2, $3, 'approved')`,
+      [alice, publishedId, `${alice}/c.jpg`]);
+    assert.equal(forged.error?.code, INSUFFICIENT_PRIVILEGE);
+    const restatus = await as(db, 'authenticated', alice, `update public.cooking_photos set status = 'approved' where user_id = $1`, [alice]);
+    assert.equal(restatus.error?.code, INSUFFICIENT_PRIVILEGE);
+    const repath = await as(db, 'authenticated', alice,
+      `update public.cooking_photos set storage_path = $1 where user_id = $2`, [`${alice}/z.jpg`, alice]);
+    assert.equal(repath.error?.code, INSUFFICIENT_PRIVILEGE);
+  });
+
+  it('an approved photo is public; editing its caption sends it back to review', async () => {
+    const path = `${alice}/p1.jpg`;
+    await setStatus('approved', path);
+    assert.deepEqual([await sees('anon', null, path), await sees('authenticated', bob, path)], [true, true]);
+    const edit = await as(db, 'authenticated', alice,
+      `update public.cooking_photos set caption = 'Lần hai' where storage_path = $1 returning status`, [path]);
+    assert.deepEqual(edit.rows, [{ status: 'pending' }]);
+    assert.deepEqual([await sees('anon', null, path), await sees('authenticated', bob, path)], [false, false]);
+  });
+
+  it('nobody overwrites a file, and nobody removes it while its row exists', async () => {
+    const path = `${alice}/p1.jpg`;
+    const swap = await as(db, 'authenticated', alice,
+      `update storage.objects set name = $1 where bucket_id = 'cooking-photos' and name = $2 returning name`, [`${alice}/p9.jpg`, path]);
+    assert.deepEqual(swap.rows, []);
+    assert.deepEqual((await removeFile(alice, path)).rows, []);
+    assert.deepEqual((await removeFile(bob, path)).rows, []);
+  });
+
+  it('an upload in flight is read and removed by its owner only', async () => {
+    const path = `${alice}/inflight.jpg`;
+    await upload(alice, path);
+    assert.deepEqual([await sees('authenticated', alice, path), await sees('authenticated', bob, path)], [true, false]);
+    assert.deepEqual((await removeFile(bob, path)).rows, []);
+    assert.equal((await removeFile(alice, path)).rows.length, 1);
+  });
+
+  it('a rejected photo is hidden from its author, who cannot remove it; moderators read it, a super admin removes it', async () => {
+    const path = `${alice}/p1.jpg`;
+    await setStatus('rejected', path);
+    assert.equal(await sees('authenticated', alice, path), false);
+    const rowA = await as(db, 'authenticated', alice, `select id from public.cooking_photos where storage_path = $1`, [path]);
+    const delRow = await as(db, 'authenticated', alice, `delete from public.cooking_photos where storage_path = $1 returning id`, [path]);
+    assert.deepEqual([rowA.rows, delRow.rows, (await removeFile(alice, path)).rows], [[], [], []]);
+    assert.equal(await sees('authenticated', mod, path), true);
+    assert.deepEqual((await removeFile(mod, path)).rows, []);
+    const gone = await as(db, 'authenticated', sup, `delete from public.cooking_photos where storage_path = $1 returning id`, [path]);
+    assert.equal(gone.rows.length, 1);
+    assert.equal((await removeFile(sup, path)).rows.length, 1);
+  });
+
+  it('the author removes a photo: the row first, then the file', async () => {
+    const path = `${bob}/p2.webp`;
+    await upload(bob, path);
+    assert.equal((await addRow(bob, bob, publishedId, path)).error, null);
+    const del = await as(db, 'authenticated', bob, `delete from public.cooking_photos where storage_path = $1 returning id`, [path]);
+    assert.equal(del.rows.length, 1);
+    assert.equal((await removeFile(bob, path)).rows.length, 1);
+  });
+});

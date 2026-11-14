@@ -104,9 +104,10 @@ export function createFakeSupabase(initial: Session | null = null) {
     shopping_lists: { name: 'Danh sách mua sắm', source_recipe_id: null },
     shopping_list_items: { is_checked: false, sort_order: 0, ingredient_id: null, quantity: null, unit: null, note: null },
     comments: { status: 'pending' },
+    cooking_photos: { status: 'pending', caption: null },
   };
   // Readable by everyone (published recipes only, in the real policies); writes stay owner-only.
-  const PUBLIC_READ = new Set(['ratings', 'recipe_rating_summary', 'comments']);
+  const PUBLIC_READ = new Set(['ratings', 'recipe_rating_summary', 'comments', 'cooking_photos']);
   const UNIQUE: Record<string, string[]> = { favorites: ['user_id', 'recipe_id'], ratings: ['user_id', 'recipe_id'] };
   // public.recipe_rating_summary: no row for a recipe without ratings.
   const ratingSummary = (): Row[] => {
@@ -123,20 +124,24 @@ export function createFakeSupabase(initial: Session | null = null) {
     table === 'shopping_list_items'
       ? (tables.shopping_lists ?? []).find((l) => l.id === r.shopping_list_id)?.user_id
       : r.user_id;
-  // Comments: everyone reads approved ones, authors also their own unless rejected,
-  // and only authors change a comment that is not rejected.
+  // Reviewed content (comments, cooking photos): everyone reads approved rows,
+  // authors also their own unless rejected, and only authors change a row that is
+  // not rejected. Editing the text of an approved row sends it back to review.
+  const REVIEWED: Record<string, string> = { comments: 'content', cooking_photos: 'caption' };
   const canSee = (table: string, r: Row, me: string | undefined) =>
-    table === 'comments'
+    table in REVIEWED
       ? r.status === 'approved' || (r.user_id === me && r.status !== 'rejected')
       : PUBLIC_READ.has(table) || ownerOf(table, r) === me;
   const canWrite = (table: string, r: Row, me: string | undefined) =>
-    ownerOf(table, r) === me && !(table === 'comments' && r.status === 'rejected');
-  // Clients have no privilege on comments.status.
-  const STATUS_DENIED: Failure = { message: 'permission denied for table comments', code: '42501' };
-  decorate.comments = (r) => {
+    ownerOf(table, r) === me && !(table in REVIEWED && r.status === 'rejected');
+  // Clients have no privilege on status.
+  const STATUS_DENIED: Failure = { message: 'permission denied for table', code: '42501' };
+  const withAuthor = (r: Row) => {
     const p = profileOf(String(r.user_id));
     return { ...r, author: { display_name: p.display_name, avatar_path: p.avatar_path } };
   };
+  decorate.comments = withAuthor;
+  decorate.cooking_photos = withAuthor;
 
   function userQuery(table: string, op: 'select' | 'insert' | 'update' | 'delete', payload?: Row | Row[]) {
     const filters: ((r: Row) => boolean)[] = [];
@@ -155,7 +160,7 @@ export function createFakeSupabase(initial: Session | null = null) {
       const publicRead = op === 'select' && PUBLIC_READ.has(table);
       if (!me && !publicRead) return { data: null, error: DENIED };
       const rows = table === 'recipe_rating_summary' ? ratingSummary() : (tables[table] ??= []);
-      const sendsStatus = (r: Row | undefined) => table === 'comments' && r !== undefined && 'status' in r;
+      const sendsStatus = (r: Row | undefined) => table in REVIEWED && r !== undefined && 'status' in r;
       if ((op === 'insert' || op === 'update') && [payload].flat().some(sendsStatus)) return { data: null, error: STATUS_DENIED };
       if (op === 'insert') {
         const list = Array.isArray(payload) ? payload : [payload ?? {}];
@@ -181,7 +186,8 @@ export function createFakeSupabase(initial: Session | null = null) {
       if (op === 'update') {
         hit.forEach((r) => {
           // The reset_status_on_edit trigger.
-          if (table === 'comments' && r.status === 'approved' && (payload as Row).content !== r.content) r.status = 'pending';
+          const text = REVIEWED[table];
+          if (text && r.status === 'approved' && text in (payload as Row) && (payload as Row)[text] !== r[text]) r.status = 'pending';
           Object.assign(r, payload);
         });
       }
@@ -221,7 +227,9 @@ export function createFakeSupabase(initial: Session | null = null) {
     return b;
   }
 
-  const USER_TABLES = new Set(['favorites', 'shopping_lists', 'shopping_list_items', 'ratings', 'recipe_rating_summary', 'comments']);
+  const USER_TABLES = new Set([
+    'favorites', 'shopping_lists', 'shopping_list_items', 'ratings', 'recipe_rating_summary', 'comments', 'cooking_photos',
+  ]);
 
   const from = jest.fn((table: string) =>
     USER_TABLES.has(table)
@@ -267,6 +275,7 @@ export function createFakeSupabase(initial: Session | null = null) {
   });
 
   const objects = new Set<string>();
+  const unsigned = new Set<string>();
   const bucket = {
     upload: jest.fn(async (path: string, _body: unknown, _opts?: unknown) => {
       objects.add(path);
@@ -276,6 +285,15 @@ export function createFakeSupabase(initial: Session | null = null) {
       paths.forEach((p) => objects.delete(p));
       return { data: [], error: null };
     }),
+    // Signs every path it is given, except those a test adds to `unsigned`.
+    createSignedUrls: jest.fn(async (paths: string[], _expiresIn: number) => ({
+      data: paths.map((p) =>
+        unsigned.has(p)
+          ? { path: p, signedUrl: null, error: 'Object not found' }
+          : { path: p, signedUrl: `https://bdhphjwhagygbwtfhhxn.supabase.co/storage/v1/object/sign/cooking-photos/${p}?token=t`, error: null },
+      ),
+      error: null,
+    })),
     getPublicUrl: jest.fn((path: string) => ({
       data: { publicUrl: `https://bdhphjwhagygbwtfhhxn.supabase.co/storage/v1/object/public/avatars/${path}` },
     })),
@@ -290,6 +308,7 @@ export function createFakeSupabase(initial: Session | null = null) {
     from,
     bucket,
     objects,
+    unsigned,
     profiles,
     profileOf,
     catalog,

@@ -7,6 +7,7 @@ import { Banner } from '@/components/Banner';
 import { Button } from '@/components/Button';
 import { Screen } from '@/components/Screen';
 import { CommentSection } from '@/features/community/CommentSection';
+import { CookingPhotoSection } from '@/features/community/CookingPhotoSection';
 import { FavoriteButton } from '@/features/favorites/FavoriteButton';
 import { RatingSection } from '@/features/ratings/RatingSection';
 import { AddToShoppingButton } from '@/features/shopping/AddToShoppingButton';
@@ -165,6 +166,10 @@ function RecipeDetailView({
 
       <View style={styles.block}>
         <RatingSection recipeId={recipe.id} />
+      </View>
+
+      <View style={styles.block}>
+        <CookingPhotoSection recipeId={recipe.id} />
       </View>
 
       <View style={styles.block}>

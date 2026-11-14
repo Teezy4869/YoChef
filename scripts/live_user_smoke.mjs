@@ -360,4 +360,91 @@ const MISSING_RECIPE = '00000000-0000-0000-0000-000000000000';
   check('A removes the comment', rows(del).length === 1, detail(del));
 }
 
+// --- 3.5 Cooking photos ---------------------------------------------------------
+{
+  const PNG = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  const BUCKET = '/storage/v1/object/cooking-photos';
+  const upload = (u, path, type = 'image/png', body = PNG) =>
+    call(`${BUCKET}/${path}`, { method: 'POST', token: u?.token, headers: { 'Content-Type': type, 'x-upsert': 'false' }, body });
+  const sign = (u, path) =>
+    call(`/storage/v1/object/sign/cooking-photos/${path}`, {
+      method: 'POST',
+      token: u?.token,
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ expiresIn: 60 }),
+    });
+  const rowOf = (path) => `/rest/v1/cooking_photos?storage_path=eq.${encodeURIComponent(path)}`;
+  const addRow = (u, owner, path, extra = {}) =>
+    call('/rest/v1/cooking_photos', {
+      method: 'POST',
+      token: u?.token,
+      headers: returning,
+      body: JSON.stringify({ user_id: owner.id, recipe_id: recipe.id, storage_path: path, ...extra }),
+    });
+  // Leftovers of an earlier run: rows first, then files.
+  await call(`/rest/v1/cooking_photos?user_id=eq.${A.id}&storage_path=like.${encodeURIComponent(`${A.id}/smoke-`)}*`, {
+    method: 'DELETE',
+    token: A.token,
+  });
+  const old = await call('/storage/v1/object/list/cooking-photos', {
+    method: 'POST',
+    token: A.token,
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ prefix: `${A.id}/`, search: 'smoke-' }),
+  });
+  const leftovers = rows(old).map((o) => `${A.id}/${o.name}`);
+  if (leftovers.length) {
+    await call(BUCKET, { method: 'DELETE', token: A.token, headers: JSON_HEADERS, body: JSON.stringify({ prefixes: leftovers }) });
+  }
+
+  const path = `${A.id}/smoke-${Date.now()}.png`;
+  const up = await upload(A, path);
+  check('A uploads a photo into own folder', up.status === 200, detail(up));
+  const foreign = await upload(A, `${B.id}/smoke-${Date.now()}.png`);
+  check('A cannot upload into B folder', foreign.status >= 400, detail(foreign));
+  const anonUp = await upload(null, `${A.id}/smoke-anon.png`);
+  check('anon cannot upload a photo', anonUp.status >= 400, detail(anonUp));
+  const text = await upload(A, `${A.id}/smoke-${Date.now()}.txt`, 'text/plain', 'not an image');
+  check('the bucket rejects a non-image file', text.status >= 400, detail(text));
+
+  const row = await addRow(A, A, path);
+  check('A adds the photo row and it waits for review', row.status === 201 && rows(row)[0]?.status === 'pending', detail(row));
+  const signedA = await sign(A, path);
+  const file = signedA.body?.signedURL ? await fetch(`${url}/storage/v1${signedA.body.signedURL}`) : null;
+  if (file) await file.arrayBuffer();
+  check(
+    'A gets a signed URL that serves the file',
+    signedA.status === 200 && file?.status === 200 && file.headers.get('content-type') === 'image/png',
+    `sign HTTP ${signedA.status}, file HTTP ${file?.status} ${file?.headers.get('content-type')}`,
+  );
+  const signedB = await sign(B, path);
+  check('B cannot sign A pending photo', signedB.status >= 400 && !signedB.body?.signedURL, detail(signedB));
+  const signedAnon = await sign(null, path);
+  check('anon cannot sign A pending photo', signedAnon.status >= 400 && !signedAnon.body?.signedURL, detail(signedAnon));
+  const readB = await call(rowOf(path), { token: B.token });
+  check('B does not see A pending photo row', readB.status === 200 && rows(readB).length === 0, detail(readB));
+
+  const outside = await addRow(A, A, `${B.id}/smoke-x.png`);
+  check('a row pointing outside own folder is rejected', codeOf(outside) === '23514', detail(outside));
+  const forged = await addRow(A, A, `${A.id}/smoke-forged.png`, { status: 'approved' });
+  check('a new photo cannot choose its status', refused(forged), detail(forged));
+  const restatus = await call(rowOf(path), { method: 'PATCH', token: A.token, headers: returning, body: JSON.stringify({ status: 'approved' }) });
+  check('A cannot change the status', refused(restatus), detail(restatus));
+
+  const early = await call(`${BUCKET}/${path}`, { method: 'DELETE', token: A.token });
+  const stillThere = await sign(A, path);
+  check('A cannot remove the file while its row exists', early.status >= 400 && stillThere.status === 200, `${detail(early)}; sign HTTP ${stillThere.status}`);
+  const bDel = await call(rowOf(path), { method: 'DELETE', token: B.token, headers: returning });
+  check('B cannot remove A photo row', bDel.status === 200 && rows(bDel).length === 0, detail(bDel));
+
+  const delRow = await call(rowOf(path), { method: 'DELETE', token: A.token, headers: returning });
+  check('A removes the row first', rows(delRow).length === 1, detail(delRow));
+  const delFile = await call(`${BUCKET}/${path}`, { method: 'DELETE', token: A.token });
+  const gone = await sign(A, path);
+  check('then the file, which is gone', delFile.status === 200 && gone.status >= 400, `${detail(delFile)}; sign HTTP ${gone.status}`);
+}
+
 finish();

@@ -28,8 +28,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "YoChef cần quyền truy cập ảnh để bạn chọn ảnh đại diện.",
-          "cameraPermission": false,
+          "photosPermission": "YoChef cần quyền truy cập ảnh để bạn chọn ảnh đại diện và ảnh món đã nấu.",
+          "cameraPermission": "YoChef cần quyền dùng camera để bạn chụp ảnh món đã nấu.",
           "microphonePermission": false
         }
       ]

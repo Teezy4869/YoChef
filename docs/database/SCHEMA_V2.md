@@ -1,6 +1,6 @@
 # YoChef v2: Schema chuẩn (SCHEMA_V2)
 
-**Trạng thái:** `0001_catalog` = `supabase/migrations/20261108130000_catalog.sql`, `0002_identity_rbac` = `20261108130100_identity_rbac.sql` (bước 0.4). Phase 3: `favorites` = `20261113234830_phase3_favorites.sql` (3.1), `shopping_lists` = `20261114041322_phase3_shopping_lists.sql` (3.2), `ratings` = `20261114045322_phase3_ratings.sql` (3.3), `comments` = `20261114051346_phase3_comments.sql` (3.4). Tên logic `00NN_*` trong tài liệu ứng với file có tiền tố timestamp mà Supabase CLI yêu cầu. Tài liệu này là **nguồn sự thật duy nhất** về schema: migration viết theo nó, và khi migration buộc phải khác, tài liệu được sửa trong cùng commit.
+**Trạng thái:** `0001_catalog` = `supabase/migrations/20261108130000_catalog.sql`, `0002_identity_rbac` = `20261108130100_identity_rbac.sql` (bước 0.4). Phase 3: `favorites` = `20261113234830_phase3_favorites.sql` (3.1), `shopping_lists` = `20261114041322_phase3_shopping_lists.sql` (3.2), `ratings` = `20261114045322_phase3_ratings.sql` (3.3), `comments` = `20261114051346_phase3_comments.sql` (3.4), `cooking_photos` = `20261114054707_phase3_cooking_photos.sql` (3.5). Tên logic `00NN_*` trong tài liệu ứng với file có tiền tố timestamp mà Supabase CLI yêu cầu. Tài liệu này là **nguồn sự thật duy nhất** về schema: migration viết theo nó, và khi migration buộc phải khác, tài liệu được sửa trong cùng commit.
 **Project:** Supabase `bdhphjwhagygbwtfhhxn` (YoChef v2), PostgreSQL 17.
 **Ngày:** 2026-11-08.
 
@@ -290,20 +290,23 @@ Các bảng dưới đây đã chốt về cột chính và quy tắc quyền. M
 - **Grant:** `anon` SELECT; `authenticated` SELECT, INSERT trên `(user_id, recipe_id, score)`, UPDATE chỉ `score`, DELETE. Không đổi được người chấm hay công thức của một điểm.
 - **Điểm trung bình (O3, chốt ở 3.3): view** `public.recipe_rating_summary` (`security_invoker = true`): `recipe_id`, `rating_count`, `avg_score` (làm tròn 1 chữ số). Grant SELECT cho anon và authenticated. Công thức chưa có ai chấm thì **không có dòng**: trung bình là không rõ, không phải 0 (C5). View chạy dưới quyền người gọi nên chỉ tính các điểm người đó được thấy.
 
-### 5.4 `comments` (3.4, `20261114051346_phase3_comments.sql`) và `cooking_photos` (3.5)
+### 5.4 `comments` (3.4, `20261114051346_phase3_comments.sql`) và `cooking_photos` (3.5, `20261114054707_phase3_cooking_photos.sql`)
 Cột chung: `id`, `user_id` (FK `profiles` cascade), `recipe_id` (FK `recipes` cascade), `status` (`pending`,`approved`,`rejected`, default `pending`), `created_at`, `updated_at`.
 
 Cột riêng:
 - `comments`: `content` tối đa 1000 ký tự và phải có ít nhất một ký tự không phải khoảng trắng (`content ~ '\S'`). Index `(recipe_id, created_at desc)` và `user_id`.
 - `cooking_photos`:
-  - `storage_path` unique, phải bắt đầu bằng `<user_id>/`;
-  - `caption` (≤ 250 ký tự).
+  - `storage_path` unique, phải nằm trong thư mục của tác giả và có tên file an toàn: `split_part(storage_path, '/', 1) = user_id::text` và `storage_path ~ '^[^/]+/[A-Za-z0-9_-]+\.(jpg|png|webp)$'`. Client không sửa được cột này sau khi tạo;
+  - `caption` là NULL, hoặc tối đa 250 ký tự và không chỉ có khoảng trắng;
+  - index `(recipe_id, created_at desc)` và `user_id`.
 
 Ba quy tắc về `status`:
 - client luôn tạo nội dung ở trạng thái `pending`, và chủ sở hữu không đổi được `status`: **grant theo cột**, client không có quyền INSERT hay UPDATE trên `status` (PostgREST trả `42501`);
 - sửa nội dung đã `approved` sẽ đưa nó về lại `pending`: trigger chung `private.reset_status_on_edit()` (INVOKER, `search_path=''`), tham số là tên cột nội dung (`content`, bước 3.5 dùng `caption`). Cập nhật không đổi nội dung thì giữ nguyên `approved`.
 
 **Grant (`comments`):** `anon` SELECT; `authenticated` SELECT, INSERT trên `(user_id, recipe_id, content)`, UPDATE chỉ `content`, DELETE. Không đổi được tác giả hay công thức của một bình luận.
+
+**Grant (`cooking_photos`):** giống `comments`, với INSERT trên `(user_id, recipe_id, storage_path, caption)` và UPDATE chỉ `caption`.
 
 RLS theo `phase4_03`:
 
@@ -315,9 +318,12 @@ RLS theo `phase4_03`:
 - INSERT: của chính mình, với công thức `published`.
 - UPDATE: chủ sở hữu, khi nội dung chưa bị `rejected`. Moderator không sửa được nội dung của người khác.
 - DELETE: chủ sở hữu khi chưa bị `rejected`, hoặc `is_super_admin()`.
-- Advisor `multiple_permissive_policies` (hiệu năng) báo 3 policy SELECT cho `authenticated`: **chấp nhận**. PostgreSQL gộp các policy permissive bằng OR thành một điều kiện, nên gộp tay cũng chạy cùng biểu thức; policy công khai phải tách riêng vì `anon` không có quyền trên schema `private` (`docs/evidence/phase-3/v2_state.log`, mục 3.4).
+- RLS của `cooking_photos` giống hệt bảng trên. Quyền với file ở §6.
+- Advisor `multiple_permissive_policies` (hiệu năng) báo 3 policy SELECT cho `authenticated` (mỗi bảng): **chấp nhận**. PostgreSQL gộp các policy permissive bằng OR thành một điều kiện, nên gộp tay cũng chạy cùng biểu thức; policy công khai phải tách riêng vì `anon` không có quyền trên schema `private` (`docs/evidence/phase-3/v2_state.log`, mục 3.4).
 
-**Cách app dùng:** trang chi tiết hiện bình luận mới nhất trước, mỗi lần 20 (đọc thêm một dòng để biết còn trang sau). Tên tác giả lấy qua embed `author:profiles!comments_user_id_fkey(display_name, avatar_path)`. Ghi rõ tên FK để embed không bị nhập nhằng khi `moderated_by` (3.6) cũng trỏ tới `profiles`. Bình luận của mình đang chờ có nhãn "Đang chờ duyệt".
+**Cách app dùng (ảnh):** chụp hoặc chọn ảnh, mã hóa lại bằng `expo-image-manipulator` (cạnh dài tối đa 1600 px, JPEG 0,8; ảnh mã hóa mới không mang EXIF), tải lên `<user id>/<thời điểm>-<chuỗi ngẫu nhiên>.jpg` với `upsert: false`, rồi thêm dòng; nếu thêm dòng lỗi thì xóa file vừa tải. Xóa ảnh: xóa dòng trước, rồi xóa file. Lưới ảnh dùng `createSignedUrls` (hạn 1 giờ), mỗi lần 12 ảnh.
+
+**Cách app dùng (bình luận):** trang chi tiết hiện bình luận mới nhất trước, mỗi lần 20 (đọc thêm một dòng để biết còn trang sau). Tên tác giả lấy qua embed `author:profiles!comments_user_id_fkey(display_name, avatar_path)`. Ghi rõ tên FK để embed không bị nhập nhằng khi `moderated_by` (3.6) cũng trỏ tới `profiles`. Bình luận của mình đang chờ có nhãn "Đang chờ duyệt".
 
 Cột duyệt (`moderated_by`, `moderated_at`) và RPC `moderate_community_content` thêm ở 3.6 (đưa sớm một phần 4.2, quyết định D6 của kế hoạch Phase 3).
 
@@ -362,10 +368,16 @@ Quy tắc chi tiết nằm trong `phase4_08_nutrition_data_contract.md`. Public 
 |---|---|---|---|---|
 | `recipe-images` | Có | `<recipe slug>/cover.webp` | Phase 0: chỉ script seed (secret key). 4.5: editor | 0001 |
 | `avatars` | Có | `<user id>/<file>` | Chủ sở hữu, trong thư mục của mình (policy trên `storage.objects`) | 1.1 (`20261111120000`) |
-| `cooking-photos` | Không (signed URL) | `<user id>/<uuid>.<ext>` | Chủ sở hữu; quyền đọc file đi theo `status` của dòng | 3.5 |
+| `cooking-photos` | Không (signed URL) | `<user id>/<tên file>.<jpg\|png\|webp>` | Chủ sở hữu, trong thư mục của mình; không ai ghi đè file. Quyền đọc file đi theo `status` của dòng | 3.5 (`20261114054707`) |
 
 - Giới hạn: tối đa 5 MB; chỉ nhận `image/jpeg`, `image/png`, `image/webp` (`app-in4` §7.2).
 - Bucket được tạo bằng migration (insert vào `storage.buckets`), không tạo trên Dashboard (L1).
+- **Policy của `cooking-photos`** (trên `storage.objects`):
+  - INSERT: `authenticated`, chỉ trong thư mục `<auth.uid()>/`. Không có policy UPDATE, nên không ai thay được file phía sau một ảnh đã duyệt.
+  - SELECT cho `anon`: viết thẳng trong policy, qua `exists` một dòng `approved` của công thức `published` (chạy dưới RLS của anon, không gọi hàm trợ giúp).
+  - SELECT cho `authenticated`: `private.can_read_cooking_photo_object(name)` (DEFINER, `search_path=''`). Moderator đọc mọi file; chưa có dòng (đang tải lên) thì chỉ chủ thư mục; `rejected` thì không ai khác; chủ sở hữu đọc file của mình; còn lại chỉ file `approved` của công thức `published`. Hàm phải là DEFINER vì dưới RLS của tác giả, dòng `rejected` là vô hình và sẽ bị hiểu nhầm thành "đang tải lên".
+  - DELETE: `private.can_delete_cooking_photo_object(name)`. Chủ thư mục chỉ xóa được file khi không còn dòng nào trỏ tới (nên tác giả không xóa được bằng chứng của ảnh bị từ chối); `is_super_admin()` xóa được mọi file.
+  - Giới hạn đã biết: xóa người dùng hay công thức sẽ xóa dòng theo cascade nhưng không xóa file; file mồ côi cần một tác vụ dọn ở Phase 4.
 - **Ảnh bị cách ly không được upload.** Vì `recipe-images` là public, upload một file đồng nghĩa với công khai nó. 8 ảnh bị gắn cờ `IMAGE_PENDING` (công thức #112, #125, #134, #141, #149, #208, #217, #248: watermark, ảnh chân dung người dẫn, chữ in trên bát) **không được upload**, và `cover_image_path` của các công thức đó để `NULL`. Bước 0.5 chốt danh sách từ dữ liệu và ghi log.
 
 ## 7. Ánh xạ import (`recipes_working.json` → schema)
