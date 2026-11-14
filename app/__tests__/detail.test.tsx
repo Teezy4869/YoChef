@@ -3,7 +3,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react-native
 import App from '@/app/App';
 import { formatClock, formatSeconds } from '@/features/recipes/format';
 import { parseRecipeDetail } from '@/features/recipes/recipeApi';
-import { clampServings, formatQuantity, quantityText, scaleQuantity } from '@/features/recipes/servings';
+import { clampServings, formatQuantity, quantityText, roundQuantity, scaleQuantity } from '@/features/recipes/servings';
 
 import { createFakeSupabase } from './helpers/fakeSupabase';
 import { detailRow } from './helpers/recipeFixtures';
@@ -75,6 +75,13 @@ describe('servings math', () => {
     expect(quantityText(300, 'ml', 'editor_estimate', 4, 8)).toBe('≈ 600 ml');
     expect(quantityText(null, null, 'to_taste', 4, 8)).toBe('vừa ăn');
     expect(quantityText(2, null, 'book', 4, 4)).toBe('2');
+  });
+
+  it('stores exactly what it shows: roundQuantity agrees with formatQuantity', () => {
+    const scaled = [10, 12.34, 12.5, 250.4, 2.5, 2.75, 5 / 3, 2.32, 2.3, 1.2, 1.125, 3, 2.999, 9.97, 0.5, 0.25, 1 / 3, 0.66, 0.27, 0.1, 0.996, 0.00625, 0.004];
+    for (const n of scaled) expect(formatQuantity(roundQuantity(n), true)).toBe(formatQuantity(n));
+    expect(roundQuantity(12.5, true)).toBe(12.5); // a book value is stored as printed
+    expect(roundQuantity(2.32)).toBeCloseTo(7 / 3);
   });
 
   it('rounds only once servings change', () => {

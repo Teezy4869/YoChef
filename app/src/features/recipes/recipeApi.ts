@@ -98,7 +98,7 @@ export function coverUrl(client: YoChefClient, path: string | null): string | nu
 const DETAIL_SELECT =
   'id,slug,name,description,difficulty,default_servings,serving_basis,serving_note,prep_time_minutes,cook_time_minutes,' +
   'cover_image_path,category:categories(slug,name),source:recipe_sources(title,compiler,publication_year,usage_note),' +
-  'recipe_ingredients(sort_order,quantity,unit,quantity_basis,preparation_note,quantity_note,is_optional,ingredient:ingredients(name)),' +
+  'recipe_ingredients(sort_order,quantity,unit,quantity_basis,preparation_note,quantity_note,is_optional,ingredient:ingredients(id,name)),' +
   'recipe_steps(step_number,instruction,timer_enabled,duration_seconds)';
 
 type Row = Record<string, unknown>;
@@ -117,13 +117,15 @@ const QUANTITY_BASIS: readonly string[] = ['book', 'editor_estimate', 'to_taste'
 const SERVING_BASIS: readonly string[] = ['book', 'editor_estimate', 'inferred_yield'];
 
 function toIngredient(r: Row): IngredientLine | null {
-  const name = asText(one(r.ingredient)?.name);
+  const ingredient = one(r.ingredient);
+  const name = asText(ingredient?.name);
   const sortOrder = asNumber(r.sort_order);
   if (!name || sortOrder === null) return null;
   const basis = (QUANTITY_BASIS.includes(String(r.quantity_basis)) ? r.quantity_basis : 'book') as QuantityBasis;
   const q = asNumber(r.quantity);
   return {
     sortOrder,
+    ingredientId: asText(ingredient?.id),
     name,
     // "To taste" is always null; a stray 0 from bad data is unknown too.
     quantity: basis === 'to_taste' || q === null || q <= 0 ? null : q,

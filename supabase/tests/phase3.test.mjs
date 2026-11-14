@@ -7,6 +7,7 @@ import { admin, as, createDatabase } from './harness.mjs';
 
 const INSUFFICIENT_PRIVILEGE = '42501';
 const UNIQUE_VIOLATION = '23505';
+const CHECK_VIOLATION = '23514';
 
 let db;
 let alice;
@@ -97,5 +98,88 @@ describe('3.1 favorites', () => {
   it('the owner removes their own favorite', async () => {
     const del = await as(db, 'authenticated', alice, `delete from public.favorites where recipe_id = $1 returning recipe_id`, [publishedId]);
     assert.deepEqual(del.rows, [{ recipe_id: publishedId }]);
+  });
+});
+
+describe('3.2 shopping lists', () => {
+  let listA;
+  const newList = (uid, owner, extra = {}) =>
+    as(db, 'authenticated', uid,
+      `insert into public.shopping_lists (user_id, source_recipe_id) values ($1, $2) returning id, name`,
+      [owner, extra.source ?? null]);
+  const addItem = (uid, list, fields = {}) =>
+    as(db, 'authenticated', uid,
+      `insert into public.shopping_list_items (shopping_list_id, label, quantity, unit, note)
+       values ($1, $2, $3, $4, $5) returning id`,
+      [list, fields.label ?? 'Thịt bò', fields.quantity ?? null, fields.unit ?? null, fields.note ?? null]);
+
+  it('the owner creates a list with the default name and fills it', async () => {
+    const { rows, error } = await newList(alice, alice);
+    assert.equal(error, null);
+    assert.equal(rows[0].name, 'Danh sách mua sắm');
+    listA = rows[0].id;
+    assert.equal((await addItem(alice, listA, { quantity: 500, unit: 'g' })).error, null);
+    assert.equal((await addItem(alice, listA, { label: 'Muối', note: 'vừa ăn' })).error, null); // NULL quantity
+    const read = await as(db, 'authenticated', alice,
+      `select label, quantity, is_checked from public.shopping_list_items where shopping_list_id = $1 order by label`, [listA]);
+    assert.deepEqual(read.rows, [
+      { label: 'Muối', quantity: null, is_checked: false },
+      { label: 'Thịt bò', quantity: '500', is_checked: false },
+    ]);
+    const tick = await as(db, 'authenticated', alice,
+      `update public.shopping_list_items set is_checked = true where shopping_list_id = $1 and label = 'Muối' returning id`, [listA]);
+    assert.equal(tick.rows.length, 1);
+  });
+
+  it('another user reads, edits, deletes and adds nothing on the owner list', async () => {
+    const lists = await as(db, 'authenticated', bob, `select id from public.shopping_lists`);
+    const items = await as(db, 'authenticated', bob, `select id from public.shopping_list_items`);
+    assert.deepEqual([lists.rows, items.rows], [[], []]);
+    const rename = await as(db, 'authenticated', bob, `update public.shopping_lists set name = 'x' where id = $1 returning id`, [listA]);
+    const tick = await as(db, 'authenticated', bob, `update public.shopping_list_items set is_checked = true returning id`);
+    const delItems = await as(db, 'authenticated', bob, `delete from public.shopping_list_items returning id`);
+    const delList = await as(db, 'authenticated', bob, `delete from public.shopping_lists where id = $1 returning id`, [listA]);
+    assert.deepEqual([rename.rows, tick.rows, delItems.rows, delList.rows], [[], [], [], []]);
+    assert.equal((await addItem(bob, listA)).error?.code, INSUFFICIENT_PRIVILEGE);
+    assert.equal((await newList(bob, alice)).error?.code, INSUFFICIENT_PRIVILEGE);
+    const [n] = await admin(db, `select count(*)::int n from public.shopping_list_items where shopping_list_id = $1`, [listA]);
+    assert.equal(n.n, 2);
+  });
+
+  it('an item cannot move to another list, and a list cannot change owner', async () => {
+    const { rows: [{ id: listB }] } = await newList(bob, bob);
+    const move = await as(db, 'authenticated', alice,
+      `update public.shopping_list_items set shopping_list_id = $1 where shopping_list_id = $2`, [listB, listA]);
+    assert.equal(move.error?.code, INSUFFICIENT_PRIVILEGE);
+    const give = await as(db, 'authenticated', alice, `update public.shopping_lists set user_id = $1 where id = $2`, [bob, listA]);
+    assert.equal(give.error?.code, INSUFFICIENT_PRIVILEGE);
+  });
+
+  it('rejects 0, blank labels and empty strings: unknown is NULL', async () => {
+    assert.equal((await addItem(alice, listA, { quantity: 0 })).error?.code, CHECK_VIOLATION);
+    assert.equal((await addItem(alice, listA, { label: '   ' })).error?.code, CHECK_VIOLATION);
+    assert.equal((await addItem(alice, listA, { unit: '' })).error?.code, CHECK_VIOLATION);
+    assert.equal((await addItem(alice, listA, { note: ' ' })).error?.code, CHECK_VIOLATION);
+    assert.equal((await addItem(alice, listA, { label: 'x'.repeat(101) })).error?.code, CHECK_VIOLATION);
+  });
+
+  it('a list can come from a published recipe only', async () => {
+    assert.equal((await newList(alice, alice, { source: stagedId })).error?.code, INSUFFICIENT_PRIVILEGE);
+    const ok = await newList(alice, alice, { source: publishedId });
+    assert.equal(ok.error, null);
+  });
+
+  it('anon has no access', async () => {
+    const read = await as(db, 'anon', null, `select id from public.shopping_list_items`);
+    assert.equal(read.error?.code, INSUFFICIENT_PRIVILEGE);
+    const ins = await as(db, 'anon', null, `insert into public.shopping_lists (user_id) values ($1)`, [alice]);
+    assert.equal(ins.error?.code, INSUFFICIENT_PRIVILEGE);
+  });
+
+  it('deleting a list removes its items', async () => {
+    const del = await as(db, 'authenticated', alice, `delete from public.shopping_lists where id = $1 returning id`, [listA]);
+    assert.equal(del.rows.length, 1);
+    const [n] = await admin(db, `select count(*)::int n from public.shopping_list_items where shopping_list_id = $1`, [listA]);
+    assert.equal(n.n, 0);
   });
 });

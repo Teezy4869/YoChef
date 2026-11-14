@@ -42,6 +42,8 @@ export type ServingBasis = 'book' | 'editor_estimate' | 'inferred_yield';
 
 export type IngredientLine = {
   sortOrder: number;
+  /** Catalog ingredient; null when the detail row came without it. */
+  ingredientId: string | null;
   name: string;
   /** null for "to taste" (vừa ăn); never 0. */
   quantity: number | null;

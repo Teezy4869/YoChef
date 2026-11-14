@@ -11,6 +11,7 @@ import { CookingModeScreen } from '@/screens/CookingModeScreen';
 import { FavoritesScreen } from '@/screens/FavoritesScreen';
 import { HomeScreen } from '@/screens/HomeScreen';
 import { RecipeDetailScreen } from '@/screens/RecipeDetailScreen';
+import { ShoppingScreen } from '@/screens/ShoppingScreen';
 import { colors, typography } from '@/theme/tokens';
 
 import type { MainTabParamList, RootStackParamList } from './types';
@@ -45,6 +46,7 @@ function MainTabs() {
     >
       <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Khám phá' }} />
       <Tab.Screen name="Favorites" component={FavoritesScreen} options={{ title: 'Yêu thích' }} />
+      <Tab.Screen name="Shopping" component={ShoppingScreen} options={{ title: 'Đi chợ' }} />
       <Tab.Screen name="Account" component={AccountScreen} options={{ title: 'Tài khoản' }} />
     </Tab.Navigator>
   );

@@ -40,12 +40,24 @@ function decimals(n: number, digits: number): string {
   return String(Number(n.toFixed(digits))).replace('.', ',');
 }
 
-/** "2⅓" when n is within `tolerance` of whole + a kitchen fraction. */
-function asFraction(n: number, tolerance: number): string | null {
+/** whole + a kitchen fraction within `tolerance` of n, as a number and as "2⅓". */
+function nearestFraction(n: number, tolerance: number): { value: number; text: string } | null {
   const whole = Math.floor(n);
   const hit = FRACTIONS.find(([v]) => Math.abs(n - whole - v) <= tolerance + EPS);
   if (!hit) return null;
-  return whole > 0 ? `${whole}${hit[1]}` : hit[1];
+  return { value: whole + hit[0], text: whole > 0 ? `${whole}${hit[1]}` : hit[1] };
+}
+const asFraction = (n: number, tolerance: number) => nearestFraction(n, tolerance)?.text ?? null;
+
+/**
+ * The number `formatQuantity` shows, for storing a quantity the user has just
+ * seen (shopping list export): formatQuantity(roundQuantity(n), true) === formatQuantity(n).
+ */
+export function roundQuantity(n: number, exact = false): number {
+  if (exact || !Number.isFinite(n) || n < 0.005) return n;
+  if (n >= 10) return Math.round(n);
+  const fraction = nearestFraction(n, n >= 1 ? 0.02 : 0.01);
+  return fraction ? fraction.value : Number(n.toFixed(n >= 1 ? 1 : 2));
 }
 
 /**
@@ -78,4 +90,15 @@ export function quantityText(
   if (!q) return '';
   const text = unit ? `${q} ${unit}` : q;
   return basis === 'editor_estimate' ? `≈ ${text}` : text;
+}
+
+/** The quantity a line shows at `servings`, as a number (null for to-taste or unknown). */
+export function shownQuantity(
+  quantity: number | null,
+  basis: QuantityBasis,
+  defaultServings: number | null,
+  servings: number,
+): number | null {
+  const scaled = scaleQuantity(quantity, basis, defaultServings, servings);
+  return scaled === null ? null : roundQuantity(scaled, isBookServings(defaultServings, servings));
 }

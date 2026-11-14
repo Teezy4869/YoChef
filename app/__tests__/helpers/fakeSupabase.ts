@@ -99,10 +99,20 @@ export function createFakeSupabase(initial: Session | null = null) {
   const failures = new Map<string, Failure>();
   let seq = 0;
   const DENIED: Failure = { message: 'new row violates row-level security policy', code: '42501' };
+  // Column defaults the database would fill in.
+  const DEFAULTS: Record<string, Row> = {
+    shopping_lists: { name: 'Danh sách mua sắm', source_recipe_id: null },
+    shopping_list_items: { is_checked: false, sort_order: 0, ingredient_id: null, quantity: null, unit: null, note: null },
+  };
+  // Items belong to whoever owns their list, as the RLS policies check.
+  const ownerOf = (table: string, r: Row) =>
+    table === 'shopping_list_items'
+      ? (tables.shopping_lists ?? []).find((l) => l.id === r.shopping_list_id)?.user_id
+      : r.user_id;
 
   function userQuery(table: string, op: 'select' | 'insert' | 'update' | 'delete', payload?: Row | Row[]) {
     const filters: ((r: Row) => boolean)[] = [];
-    let order: { col: string; asc: boolean } | null = null;
+    const orders: { col: string; asc: boolean }[] = [];
     let range: [number, number] = [0, Number.MAX_SAFE_INTEGER];
     let returning = op === 'select';
     const view = (r: Row) => (decorate[table] ? decorate[table]({ ...r }) : { ...r });
@@ -118,18 +128,34 @@ export function createFakeSupabase(initial: Session | null = null) {
       const rows = (tables[table] ??= []);
       if (op === 'insert') {
         const list = Array.isArray(payload) ? payload : [payload ?? {}];
-        if (list.some((r) => r.user_id !== me)) return { data: null, error: DENIED };
-        const added = list.map((r) => ({ id: `${table}-${++seq}`, created_at: new Date(Date.now() + seq).toISOString(), ...r }));
+        if (list.some((r) => ownerOf(table, r) !== me)) return { data: null, error: DENIED };
+        const added = list.map((r) => ({
+          id: `${table}-${++seq}`,
+          created_at: new Date(Date.now() + seq).toISOString(),
+          ...DEFAULTS[table],
+          ...r,
+        }));
         rows.push(...added);
         return { data: returning ? added.map(view) : null, error: null };
       }
-      let hit = rows.filter((r) => r.user_id === me && filters.every((f) => f(r)));
+      let hit = rows.filter((r) => ownerOf(table, r) === me && filters.every((f) => f(r)));
       if (op === 'update') hit.forEach((r) => Object.assign(r, payload));
-      if (op === 'delete') tables[table] = rows.filter((r) => !hit.includes(r));
-      if (order) {
-        const { col, asc } = order;
-        hit = [...hit].sort((a, b) => (String(a[col]) < String(b[col]) ? -1 : 1) * (asc ? 1 : -1));
+      if (op === 'delete') {
+        tables[table] = rows.filter((r) => !hit.includes(r));
+        if (table === 'shopping_lists') {
+          const gone = new Set(hit.map((r) => r.id));
+          tables.shopping_list_items = (tables.shopping_list_items ?? []).filter((i) => !gone.has(i.shopping_list_id));
+        }
       }
+      const cmp = (a: unknown, b: unknown) =>
+        typeof a === 'number' && typeof b === 'number' ? a - b : String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0;
+      hit = [...hit].sort((a, b) => {
+        for (const { col, asc } of orders) {
+          const c = cmp(a[col], b[col]);
+          if (c !== 0) return asc ? c : -c;
+        }
+        return 0;
+      });
       hit = hit.slice(range[0], range[1] + 1);
       return { data: returning ? hit.map(view) : null, error: null };
     };
@@ -137,7 +163,7 @@ export function createFakeSupabase(initial: Session | null = null) {
     const b = {
       eq: (col: string, v: unknown) => (filters.push((r) => r[col] === v), b),
       in: (col: string, vs: unknown[]) => (filters.push((r) => vs.includes(r[col])), b),
-      order: (col: string, opts?: { ascending?: boolean }) => ((order = { col, asc: opts?.ascending ?? true }), b),
+      order: (col: string, opts?: { ascending?: boolean }) => (orders.push({ col, asc: opts?.ascending ?? true }), b),
       range: (fromIdx: number, toIdx: number) => ((range = [fromIdx, toIdx]), b),
       limit: (n: number) => ((range = [0, n - 1]), b),
       select: (_cols?: string) => ((returning = true), b),
@@ -150,7 +176,7 @@ export function createFakeSupabase(initial: Session | null = null) {
     return b;
   }
 
-  const USER_TABLES = new Set(['favorites']);
+  const USER_TABLES = new Set(['favorites', 'shopping_lists', 'shopping_list_items']);
 
   const from = jest.fn((table: string) =>
     USER_TABLES.has(table)

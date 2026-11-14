@@ -1,0 +1,100 @@
+
+> yochef@0.1.0 test:db
+> node --test supabase/tests/*.test.mjs
+
+▶ global security invariants
+  ✔ RLS is enabled on every table in public (4.6115ms)
+  ✔ anon has no write privilege on any table in public (11.7962ms)
+  ✔ authenticated inserts/deletes only on user-owned tables, and never truncates (2.9358ms)
+  ✔ every SECURITY DEFINER function pins search_path to empty (3.5137ms)
+  ✔ no is_admin() helper exists (1.5625ms)
+  ✔ a table created later is not opened to anon or authenticated (default privileges) (34.0991ms)
+✔ global security invariants (6346.3273ms)
+▶ 0001_catalog
+  ✔ anon reads published recipes only (18.1412ms)
+  ✔ children of a staged recipe are hidden from anon and authenticated (85.2543ms)
+  ✔ taxonomy is publicly readable (4.1714ms)
+  ✔ clients cannot write catalog tables (36.996ms)
+  ✔ "to taste" must be NULL, never 0 (15.4178ms)
+  ✔ a timer needs a duration (2.4397ms)
+  ✔ a published recipe must be complete (7.9456ms)
+  ✔ updated_at is maintained by trigger (22.1103ms)
+  ✔ recipe-images bucket exists and is public with limits (2.2324ms)
+✔ 0001_catalog (196.6238ms)
+▶ 0002_identity_rbac
+  ✔ sign-up creates a profile with a trimmed display name (2.1951ms)
+  ✔ sign-up never fails on bad metadata (9.4065ms)
+  ✔ profiles has no role column (13.0094ms)
+  ✔ public reads display fields but not bio (17.9065ms)
+  ✔ a user updates only their own profile (17.7381ms)
+  ✔ a user cannot create profiles or change their id (30.139ms)
+  ✔ avatar_path must live in the owner folder (27.4985ms)
+  ✔ users cannot grant themselves a role (14.4779ms)
+  ✔ users read only their own roles, and helpers reflect them (34.6772ms)
+  ✔ super_admin implies editor and moderator (14.8976ms)
+  ✔ anon cannot execute role helpers (3.7822ms)
+  ✔ deleting the auth user cascades to profile and roles (5.9122ms)
+✔ 0002_identity_rbac (193.5595ms)
+▶ avatars bucket
+  ✔ is public, 5 MB, images only (13.465ms)
+  ✔ a user uploads only inside their own folder (27.6026ms)
+  ✔ anon cannot upload, and a user cannot overwrite or delete another user object (23.5883ms)
+  ✔ a user cannot list another user avatar objects (4.5418ms)
+✔ avatars bucket (5891.8239ms)
+▶ get_my_profile
+  ✔ returns the caller row including bio (19.1848ms)
+  ✔ never returns another user row, and anon cannot call it (18.7447ms)
+  ✔ bio is still hidden from the public profiles table (8.6643ms)
+✔ get_my_profile (47.2498ms)
+▶ fold_vi
+  ✔ lower-cases, strips diacritics and maps đ to d (21.446ms)
+  ✔ handles decomposed (NFD) input and NULL (9.8671ms)
+✔ fold_vi (6074.8083ms)
+▶ search_recipes
+  ✔ returns only published recipes, to both anon and authenticated (40.6027ms)
+  ✔ finds Vietnamese names without typing accents (78.3134ms)
+  ✔ matches ingredient names and aliases, ranking name matches first (60.8243ms)
+  ✔ puts a name match before an ingredient-only match (14.272ms)
+  ✔ requires every term (AND), across name and ingredients (31.2912ms)
+  ✔ never returns staged recipes, even when searched by name (11.9202ms)
+  ✔ treats LIKE wildcards literally (41.3311ms)
+  ✔ filters by category and difficulty (36.0403ms)
+  ✔ filters by total time and excludes unknown times (NULL is not 0) (55.8787ms)
+  ✔ paginates with a stable total_count and clamps limit/offset (75.8625ms)
+  ✔ returns category fields and the cover path (11.8325ms)
+  ✔ is read-only: anon still cannot write recipes (13.3363ms)
+✔ search_recipes (473.8486ms)
+▶ 3.1 favorites
+  ✔ the owner adds, reads and removes a favorite (46.8763ms)
+  ✔ another user sees, removes and adds nothing for the owner (14.4981ms)
+  ✔ only a published recipe can be added (4.1011ms)
+  ✔ anon has no access, and nobody can update a favorite (18.7468ms)
+  ✔ goes away with its recipe and with its user (36.4241ms)
+  ✔ the owner removes their own favorite (4.0192ms)
+✔ 3.1 favorites (4172.5762ms)
+▶ 3.2 shopping lists
+  ✔ the owner creates a list with the default name and fills it (36.9865ms)
+  ✔ another user reads, edits, deletes and adds nothing on the owner list (88.135ms)
+  ✔ an item cannot move to another list, and a list cannot change owner (24.9264ms)
+  ✔ rejects 0, blank labels and empty strings: unknown is NULL (59.8611ms)
+  ✔ a list can come from a published recipe only (18.3397ms)
+  ✔ anon has no access (7.7896ms)
+  ✔ deleting a list removes its items (5.5725ms)
+✔ 3.2 shopping lists (242.3507ms)
+▶ seed import
+  ✔ loads the expected row counts (3.3713ms)
+  ✔ is idempotent: a second run leaves every row identical (ids and timestamps included) (365.0064ms)
+  ✔ repairs drift: an edited child row and an extra step are restored on re-run (366.5401ms)
+  ✔ stores "to taste" as NULL quantity and unit (2.093ms)
+  ✔ quarantined covers have no image path; every other recipe points at <slug>/cover.webp (1.4535ms)
+  ✔ anon sees exactly the published recipes and their children (27.7646ms)
+  ✔ a count mismatch aborts the whole import (614.3503ms)
+✔ seed import (6917.6157ms)
+ℹ tests 68
+ℹ suites 10
+ℹ pass 68
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14299.025

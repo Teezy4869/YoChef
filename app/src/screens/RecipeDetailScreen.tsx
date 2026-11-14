@@ -7,6 +7,7 @@ import { Banner } from '@/components/Banner';
 import { Button } from '@/components/Button';
 import { Screen } from '@/components/Screen';
 import { FavoriteButton } from '@/features/favorites/FavoriteButton';
+import { AddToShoppingButton } from '@/features/shopping/AddToShoppingButton';
 import { formatSeconds, joinMeta, timeLabel } from '@/features/recipes/format';
 import { coverUrl } from '@/features/recipes/recipeApi';
 import { IngredientRows } from '@/features/recipes/IngredientRows';
@@ -129,6 +130,7 @@ function RecipeDetailView({
         ) : null}
 
         <IngredientRows ingredients={recipe.ingredients} defaultServings={base} servings={servings} />
+        <AddToShoppingButton recipe={recipe} servings={servings} />
       </View>
 
       <View style={styles.block}>

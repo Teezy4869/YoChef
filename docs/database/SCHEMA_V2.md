@@ -1,6 +1,6 @@
 # YoChef v2: Schema chuẩn (SCHEMA_V2)
 
-**Trạng thái:** `0001_catalog` = `supabase/migrations/20261108130000_catalog.sql`, `0002_identity_rbac` = `20261108130100_identity_rbac.sql` (bước 0.4). Phase 3: `favorites` = `20261113234830_phase3_favorites.sql` (3.1). Tên logic `00NN_*` trong tài liệu ứng với file có tiền tố timestamp mà Supabase CLI yêu cầu. Tài liệu này là **nguồn sự thật duy nhất** về schema: migration viết theo nó, và khi migration buộc phải khác, tài liệu được sửa trong cùng commit.
+**Trạng thái:** `0001_catalog` = `supabase/migrations/20261108130000_catalog.sql`, `0002_identity_rbac` = `20261108130100_identity_rbac.sql` (bước 0.4). Phase 3: `favorites` = `20261113234830_phase3_favorites.sql` (3.1), `shopping_lists` = `20261114041322_phase3_shopping_lists.sql` (3.2). Tên logic `00NN_*` trong tài liệu ứng với file có tiền tố timestamp mà Supabase CLI yêu cầu. Tài liệu này là **nguồn sự thật duy nhất** về schema: migration viết theo nó, và khi migration buộc phải khác, tài liệu được sửa trong cùng commit.
 **Project:** Supabase `bdhphjwhagygbwtfhhxn` (YoChef v2), PostgreSQL 17.
 **Ngày:** 2026-11-08.
 
@@ -254,7 +254,7 @@ Các bảng dưới đây đã chốt về cột chính và quy tắc quyền. M
 - **Grant:** `authenticated` có SELECT, DELETE và INSERT chỉ trên `(user_id, recipe_id)`; không có UPDATE. `anon` không có quyền nào.
 - **RLS:** chủ sở hữu SELECT, INSERT, DELETE. INSERT chỉ được khi công thức đang `published`.
 
-### 5.2 `shopping_lists` và `shopping_list_items` (3.2)
+### 5.2 `shopping_lists` và `shopping_list_items` (3.2, `20261114041322_phase3_shopping_lists.sql`)
 `shopping_lists`:
 - `id`, `user_id` (FK `profiles` cascade).
 - `name` (not null, default `'Danh sách mua sắm'`, 1–100 ký tự).
@@ -265,10 +265,14 @@ Các bảng dưới đây đã chốt về cột chính và quy tắc quyền. M
 - `id`, `shopping_list_id` (FK cascade, có index).
 - `ingredient_id`: nullable, FK `ingredients` on delete set null. Nullable vì người dùng có thể tự nhập món.
 - `label`: not null, 1–100 ký tự, là bản chụp tên lúc thêm.
-- `quantity` (numeric > 0, null nghĩa là "vừa ăn"), `unit`, `note`.
+- `quantity` (numeric > 0, null nghĩa là "vừa ăn" hoặc không rõ), `unit` (1–50 ký tự hoặc null), `note` (1–200 ký tự hoặc null). Chuỗi rỗng bị từ chối (C5).
 - `is_checked` (default false), `sort_order` (default 0), `created_at`, `updated_at`.
 
-**RLS:** danh sách thuộc chủ sở hữu (`user_id = auth.uid()`); item kiểm tra qua `exists` danh sách cha.
+**Grant:** `authenticated` có SELECT, DELETE; INSERT danh sách trên `(user_id, name, source_recipe_id)`, UPDATE chỉ `name`; INSERT item trên các cột nội dung cùng `shopping_list_id`, UPDATE chỉ `label, quantity, unit, note, is_checked, sort_order`. Không đổi được chủ của danh sách hay danh sách của item. `anon` không có quyền.
+
+**RLS:** danh sách thuộc chủ sở hữu (`user_id = auth.uid()`); item kiểm tra qua `exists` danh sách cha. `source_recipe_id` được kiểm dưới RLS của người gọi, nên chỉ công thức `published` hợp lệ.
+
+**Cách app dùng:** mỗi người một danh sách mặc định (danh sách cũ nhất, tạo khi thêm món đầu tiên). "Thêm vào đi chợ" nối thêm dòng và **không gộp dòng trùng** (spec 12 §2); số lượng lưu đúng số trang công thức đang hiện (quy tắc A2).
 
 **Sửa đúng các lỗi của DB cũ:**
 - `name` có default, vì app tạo danh sách mà không gửi tên.

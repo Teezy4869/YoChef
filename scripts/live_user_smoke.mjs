@@ -186,4 +186,69 @@ const MISSING_RECIPE = '00000000-0000-0000-0000-000000000000';
   check('A removes the favorite', remove.status === 200 && rows(remove).length === 1, detail(remove));
 }
 
+// --- 3.2 Shopping lists ---------------------------------------------------------
+{
+  const NAME = 'YoChef smoke list';
+  const post = (path, token, body) =>
+    call(path, { method: 'POST', token, headers: returning, body: JSON.stringify(body) });
+  const patch = (path, token, body) =>
+    call(path, { method: 'PATCH', token, headers: returning, body: JSON.stringify(body) });
+  // Leftover from an earlier run (its items go with it).
+  await call(`/rest/v1/shopping_lists?user_id=eq.${A.id}&name=eq.${encodeURIComponent(NAME)}`, { method: 'DELETE', token: A.token });
+
+  const anonRead = await call('/rest/v1/shopping_lists?select=id');
+  check('anon cannot read shopping lists', refused(anonRead), detail(anonRead));
+
+  const created = await post('/rest/v1/shopping_lists', A.token, { user_id: A.id, name: NAME, source_recipe_id: recipe.id });
+  const list = rows(created)[0];
+  check('A creates a list from a published recipe', created.status === 201 && !!list?.id, detail(created));
+  if (!list) finish();
+
+  const plain = await post('/rest/v1/shopping_lists', A.token, { user_id: A.id });
+  const plainList = rows(plain)[0];
+  check('a list without a name gets the default name', plainList?.name === 'Danh sách mua sắm', detail(plain));
+
+  const items = await post('/rest/v1/shopping_list_items', A.token, [
+    { shopping_list_id: list.id, label: 'Thịt bò', quantity: 500, unit: 'g', sort_order: 0 },
+    { shopping_list_id: list.id, label: 'Muối', quantity: null, note: 'vừa ăn', sort_order: 1 },
+  ]);
+  check('A adds items, NULL quantity allowed', items.status === 201 && rows(items).length === 2, detail(items));
+  const item = rows(items)[0];
+
+  const zero = await post('/rest/v1/shopping_list_items', A.token, { shopping_list_id: list.id, label: 'x', quantity: 0 });
+  check('quantity 0 is rejected', codeOf(zero) === '23514', detail(zero));
+  const blank = await post('/rest/v1/shopping_list_items', A.token, { shopping_list_id: list.id, label: '  ' });
+  check('a blank label is rejected', codeOf(blank) === '23514', detail(blank));
+
+  const tick = await patch(`/rest/v1/shopping_list_items?id=eq.${item?.id}`, A.token, { is_checked: true });
+  check('A ticks an item', tick.status === 200 && rows(tick)[0]?.is_checked === true, detail(tick));
+
+  if (plainList) {
+    const move = await patch(`/rest/v1/shopping_list_items?id=eq.${item?.id}`, A.token, { shopping_list_id: plainList.id });
+    check('an item cannot move to another list', refused(move), detail(move));
+    await call(`/rest/v1/shopping_lists?id=eq.${plainList.id}`, { method: 'DELETE', token: A.token });
+  }
+  const give = await patch(`/rest/v1/shopping_lists?id=eq.${list.id}`, A.token, { user_id: B.id });
+  check('a list cannot be given to another user', refused(give), detail(give));
+
+  const bLists = await call(`/rest/v1/shopping_lists?select=id&id=eq.${list.id}`, { token: B.token });
+  const bItems = await call(`/rest/v1/shopping_list_items?select=id&shopping_list_id=eq.${list.id}`, { token: B.token });
+  check('B cannot see A list or its items', rows(bLists).length === 0 && rows(bItems).length === 0 && bItems.status === 200, detail(bItems));
+
+  const bTick = await patch(`/rest/v1/shopping_list_items?shopping_list_id=eq.${list.id}`, B.token, { is_checked: false });
+  check('B cannot edit A items', bTick.status === 200 && rows(bTick).length === 0, detail(bTick));
+  const bAdd = await post('/rest/v1/shopping_list_items', B.token, { shopping_list_id: list.id, label: 'Lén' });
+  check('B cannot add items to A list', refused(bAdd), detail(bAdd));
+  const bDelete = await call(`/rest/v1/shopping_list_items?shopping_list_id=eq.${list.id}`, { method: 'DELETE', token: B.token, headers: returning });
+  check('B cannot delete A items', bDelete.status === 200 && rows(bDelete).length === 0, detail(bDelete));
+  const bForge = await post('/rest/v1/shopping_lists', B.token, { user_id: A.id, name: NAME });
+  check('B cannot create a list as A', refused(bForge), detail(bForge));
+  const anonAdd = await post('/rest/v1/shopping_lists', null, { user_id: A.id, name: NAME });
+  check('anon cannot create lists', refused(anonAdd), detail(anonAdd));
+
+  const del = await call(`/rest/v1/shopping_lists?id=eq.${list.id}`, { method: 'DELETE', token: A.token, headers: returning });
+  const after = await call(`/rest/v1/shopping_list_items?select=id&shopping_list_id=eq.${list.id}`, { token: A.token });
+  check('A deletes the list and its items go with it', rows(del).length === 1 && after.status === 200 && rows(after).length === 0, detail(del));
+}
+
 finish();
