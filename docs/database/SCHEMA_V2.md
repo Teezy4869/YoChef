@@ -315,6 +315,7 @@ RLS theo `phase4_03`:
 - INSERT: của chính mình, với công thức `published`.
 - UPDATE: chủ sở hữu, khi nội dung chưa bị `rejected`. Moderator không sửa được nội dung của người khác.
 - DELETE: chủ sở hữu khi chưa bị `rejected`, hoặc `is_super_admin()`.
+- Advisor `multiple_permissive_policies` (hiệu năng) báo 3 policy SELECT cho `authenticated`: **chấp nhận**. PostgreSQL gộp các policy permissive bằng OR thành một điều kiện, nên gộp tay cũng chạy cùng biểu thức; policy công khai phải tách riêng vì `anon` không có quyền trên schema `private` (`docs/evidence/phase-3/v2_state.log`, mục 3.4).
 
 **Cách app dùng:** trang chi tiết hiện bình luận mới nhất trước, mỗi lần 20 (đọc thêm một dòng để biết còn trang sau). Tên tác giả lấy qua embed `author:profiles!comments_user_id_fkey(display_name, avatar_path)`. Ghi rõ tên FK để embed không bị nhập nhằng khi `moderated_by` (3.6) cũng trỏ tới `profiles`. Bình luận của mình đang chờ có nhãn "Đang chờ duyệt".
 

@@ -48,3 +48,29 @@ No advisor result about ratings or the view recipe_rating_summary (security_invo
 
 $ npm run db:verify
 SCHEMA MATCHES (docs/evidence/phase-3/db_verify.log)
+
+== 3.4 comments  2026-11-14T05:43:50Z ==
+$ npm run db:push   (approved by the project owner; --linked --project-ref bdhphjwhagygbwtfhhxn)
+Applying migration 20261114051346_phase3_comments.sql...
+{"upToDate":false,"dryRun":false,"migrations":["20261114051346_phase3_comments.sql"],"seeds":[],"roles":[],"message":"Finished supabase db push."}
+
+$ npm run db:list
+{"migrations":[{"local":"20261108130000","remote":"20261108130000","time":"2026-11-08 13:00:00"},{"local":"20261108130100","remote":"20261108130100","time":"2026-11-08 13:01:00"},{"local":"20261111120000","remote":"20261111120000","time":"2026-11-11 12:00:00"},{"local":"20261113120000","remote":"20261113120000","time":"2026-11-13 12:00:00"},{"local":"20261113234830","remote":"20261113234830","time":"2026-11-13 23:48:30"},{"local":"20261114041322","remote":"20261114041322","time":"2026-11-14 04:13:22"},{"local":"20261114045322","remote":"20261114045322","time":"2026-11-14 04:53:22"},{"local":"20261114051346","remote":"20261114051346","time":"2026-11-14 05:13:46"}],"message":"Migrations listed"}
+=> local and remote match: 8/8.
+
+$ npm run db:advisors
+3 results: get_my_profile (accepted), auth_leaked_password_protection (Auth setting), and one NEW:
+WARN  multiple_permissive_policies (PERFORMANCE): public.comments has 3 permissive SELECT policies for authenticated
+      ("Public reads approved comments of published recipes", "Authors read their own comments unless rejected",
+       "Moderators read every comment")
+      -> accepted. PostgreSQL ORs permissive policies into one filter, so a merged policy would run the same
+         expression; is_moderator() is an initplan evaluated once per statement. The public policy has to stay
+         separate for anon, which has no USAGE on schema private. Each policy states one reading rule of
+         SCHEMA_V2 §5.4. cooking_photos (3.5) will show the same finding for the same reason.
+No security finding about public.comments or private.reset_status_on_edit().
+
+$ npm run db:verify
+SCHEMA MATCHES (docs/evidence/phase-3/db_verify.log)
+
+$ npm run smoke:user
+ALL PASS 62/62 (accounts 4, favorites 10, shopping 16, ratings 17, comments 15) (docs/evidence/phase-3/live_user_smoke.log)
