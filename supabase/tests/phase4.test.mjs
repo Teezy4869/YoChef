@@ -134,3 +134,93 @@ describe('4.1 staff roles and audit log', () => {
     }
   });
 });
+
+describe('4.2 content reports', () => {
+  let recipeId;
+  let approvedComment; // by user, approved
+  let pendingComment; // by user, pending
+  let ownComment; // by editor, approved
+  let photoId; // by user, approved
+  const report = (uid, table, target, reason = 'spam', details = null) =>
+    rpc(uid, `insert into public.content_reports (reporter_id, target_table, target_id, reason, details) values ($1, $2, $3, $4, $5)`,
+      [uid, table, target, reason, details]);
+  const workflow = (uid, id, status, note = null) => rpc(uid, `select public.update_report_workflow($1, $2, $3) as status`, [id, status, note]);
+  const comment = (uid, content, status) =>
+    admin(db, `insert into public.comments (user_id, recipe_id, content, status) values ($1, $2, $3, $4) returning id`, [uid, recipeId, content, status])
+      .then((r) => r[0].id);
+
+  before(async () => {
+    const [{ id: cat }] = await admin(db, `insert into public.categories (slug, name) values ('mon_chinh', 'Món chính') returning id`);
+    [{ id: recipeId }] = await admin(db,
+      `insert into public.recipes (slug, name, category_id, default_servings, status, published_at)
+       values ('001-pub', 'Published', $1, 4, 'published', now()) returning id`, [cat]);
+    approvedComment = await comment(user, 'Mua hàng giá rẻ tại…', 'approved');
+    pendingComment = await comment(user, 'Chờ duyệt', 'pending');
+    ownComment = await comment(editor, 'Của editor', 'approved');
+    [{ id: photoId }] = await admin(db,
+      `insert into public.cooking_photos (user_id, recipe_id, storage_path, status) values ($1, $2, $3, 'approved') returning id`,
+      [user, recipeId, `${user}/r1.jpg`]);
+  });
+
+  it('a user reports a comment and a photo of someone else once, and cannot read the report back', async () => {
+    assert.equal((await report(editor, 'comments', approvedComment)).error, null);
+    assert.equal((await report(editor, 'cooking_photos', photoId, 'inappropriate_image')).error, null);
+    assert.equal((await report(editor, 'comments', approvedComment, 'offensive')).error?.code, '23505');
+    const back = await rpc(editor, `select id from public.content_reports`);
+    assert.deepEqual(back.rows, []);
+    const [{ status }] = await admin(db, `select status from public.content_reports where target_id = $1`, [approvedComment]);
+    assert.equal(status, 'open');
+  });
+
+  it('nobody reports their own content, content they cannot see, or as someone else; anon cannot report', async () => {
+    assert.equal((await report(editor, 'comments', ownComment)).error?.code, INSUFFICIENT_PRIVILEGE);
+    assert.equal((await report(editor, 'comments', pendingComment)).error?.code, INSUFFICIENT_PRIVILEGE);
+    assert.equal((await report(editor, 'comments', recipeId)).error?.code, INSUFFICIENT_PRIVILEGE); // no such comment
+    const forged = await rpc(editor, `insert into public.content_reports (reporter_id, target_table, target_id, reason) values ($1, 'comments', $2, 'spam')`,
+      [moderator, ownComment]);
+    assert.equal(forged.error?.code, INSUFFICIENT_PRIVILEGE);
+    assert.equal((await report(null, 'comments', approvedComment)).error?.code, INSUFFICIENT_PRIVILEGE);
+  });
+
+  it('a reporter never sets the workflow; "other" needs a description of at most 500 characters', async () => {
+    const status = await rpc(moderator,
+      `insert into public.content_reports (reporter_id, target_table, target_id, reason, status) values ($1, 'comments', $2, 'spam', 'resolved')`,
+      [moderator, ownComment]);
+    assert.equal(status.error?.code, INSUFFICIENT_PRIVILEGE);
+    assert.equal((await report(moderator, 'comments', ownComment, 'other')).error?.code, '23514');
+    assert.equal((await report(moderator, 'comments', ownComment, 'other', 'a'.repeat(501))).error?.code, '23514');
+    assert.equal((await report(moderator, 'comments', ownComment, 'other', '  Sao chép từ trang khác  ')).error, null);
+    const [{ details }] = await admin(db, `select details from public.content_reports where reporter_id = $1`, [moderator]);
+    assert.equal(details, '  Sao chép từ trang khác  ');
+  });
+
+  it('moderators read every report and move it through the workflow, audited; nobody else can', async () => {
+    const all = await rpc(moderator, `select reason from public.content_reports order by reason`);
+    assert.deepEqual(all.rows.map((r) => r.reason), ['inappropriate_image', 'other', 'spam']);
+    const [{ id }] = await admin(db, `select id from public.content_reports where target_id = $1`, [approvedComment]);
+    assert.deepEqual((await workflow(moderator, id, 'reviewing')).rows, [{ status: 'reviewing' }]);
+    assert.deepEqual((await workflow(moderator, id, 'resolved', '  Đã ẩn bình luận  ')).rows, [{ status: 'resolved' }]);
+    const [row] = await admin(db, `select status, internal_note, handled_by, handled_at is not null as stamped from public.content_reports where id = $1`, [id]);
+    assert.deepEqual(row, { status: 'resolved', internal_note: 'Đã ẩn bình luận', handled_by: moderator, stamped: true });
+    const audit = await admin(db, `select actor_id, action, reason, details from public.admin_audit_logs where target_id = $1 order by created_at, id`, [id]);
+    assert.deepEqual(audit, [
+      { actor_id: moderator, action: 'report.reviewing', reason: null, details: { from: 'open', to: 'reviewing' } },
+      { actor_id: moderator, action: 'report.resolved', reason: 'Đã ẩn bình luận', details: { from: 'reviewing', to: 'resolved' } },
+    ]);
+    for (const uid of [editor, user, null]) {
+      assert.equal((await workflow(uid, id, 'dismissed')).error?.code, INSUFFICIENT_PRIVILEGE);
+    }
+    const direct = await rpc(moderator, `update public.content_reports set status = 'dismissed' where id = $1`, [id]);
+    assert.equal(direct.error?.code, INSUFFICIENT_PRIVILEGE);
+    assert.equal((await workflow(moderator, id, 'closed')).error?.code, INVALID_PARAMETER);
+    assert.equal((await workflow(moderator, recipeId, 'resolved')).error?.code, NO_DATA);
+  });
+
+  it('editors and users do not see reports; super admins do', async () => {
+    for (const uid of [editor, user]) {
+      assert.deepEqual((await rpc(uid, `select id from public.content_reports`)).rows, []);
+    }
+    assert.equal((await rpc(null, `select id from public.content_reports`)).error?.code, INSUFFICIENT_PRIVILEGE);
+    assert.equal((await rpc(sup, `select id from public.content_reports`)).rows.length, 3);
+  });
+});

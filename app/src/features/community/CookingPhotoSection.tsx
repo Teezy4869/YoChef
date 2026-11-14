@@ -21,6 +21,7 @@ import {
   type CookingPhoto,
 } from './cookingPhotosApi';
 import { pickCookingPhoto, type PhotoSource, type PickedPhoto } from './pickCookingPhoto';
+import { ReportButton } from './ReportButton';
 
 type Loaded = { key: string; photos: CookingPhoto[]; hasMore: boolean; error: string | null };
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : 'Có lỗi xảy ra. Vui lòng thử lại.');
@@ -182,6 +183,8 @@ export function CookingPhotoSection({ recipeId }: { recipeId: string }) {
                     disabled={busy}
                     onPress={() => setConfirming(p.id)}
                   />
+                ) : userId ? (
+                  <ReportButton userId={userId} table="cooking_photos" targetId={p.id} />
                 ) : null}
               </View>
             );

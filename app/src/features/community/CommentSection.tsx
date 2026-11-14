@@ -14,6 +14,7 @@ import { avatarPublicUrl } from '@/features/profile/profileApi';
 import { useSupabase } from '@/lib/supabase';
 import { colors, spacing } from '@/theme/tokens';
 
+import { ReportButton } from './ReportButton';
 import {
   COMMENT_MAX,
   COMMENTS_PAGE,
@@ -203,6 +204,8 @@ export function CommentSection({ recipeId }: { recipeId: string }) {
                     onPress={() => setMode({ id: c.id, kind: 'delete' })}
                   />
                 </View>
+              ) : userId && !mine ? (
+                <ReportButton userId={userId} table="comments" targetId={c.id} />
               ) : null}
             </View>
           );

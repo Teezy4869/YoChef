@@ -593,4 +593,76 @@ const MISSING_RECIPE = '00000000-0000-0000-0000-000000000000';
   );
 }
 
+// --- 4.2 Reports -------------------------------------------------------------------
+// Report rows stay after the run: reporters cannot delete them and nobody else may,
+// so each run leaves one resolved report pointing at a deleted comment.
+{
+  const M = await signIn(credM);
+  const MARK = 'YoChef smoke report';
+  const moderate = (u, id, status) =>
+    call('/rest/v1/rpc/moderate_community_content', {
+      method: 'POST',
+      token: u?.token,
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ p_table: 'comments', p_id: id, p_status: status, p_reason: null }),
+    });
+  const report = (u, body) =>
+    call('/rest/v1/content_reports', { method: 'POST', token: u?.token, headers: JSON_HEADERS, body: JSON.stringify(body) });
+  const workflow = (u, id, status, note) =>
+    call('/rest/v1/rpc/update_report_workflow', {
+      method: 'POST',
+      token: u?.token,
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ p_id: id, p_status: status, p_note: note }),
+    });
+  await call(`/rest/v1/comments?user_id=eq.${A.id}&content=like.${encodeURIComponent(MARK)}*`, { method: 'DELETE', token: A.token }); // leftovers
+
+  const posted = await call('/rest/v1/comments?select=id', {
+    method: 'POST',
+    token: A.token,
+    headers: returning,
+    body: JSON.stringify({ user_id: A.id, recipe_id: recipe.id, content: `${MARK}: mua hàng giá rẻ tại…` }),
+  });
+  const c = rows(posted)[0];
+  const approved = c ? await moderate(M, c.id, 'approved') : null;
+  check('A posts a comment and M approves it', !!c && approved?.status === 200, `${detail(posted)}; ${approved ? detail(approved) : '-'}`);
+  if (!c) finish();
+
+  const target = { target_table: 'comments', target_id: c.id };
+  const first = await report(B, { reporter_id: B.id, ...target, reason: 'spam', details: 'Quảng cáo' });
+  check('B reports the comment', first.status === 201, detail(first));
+  const again = await report(B, { reporter_id: B.id, ...target, reason: 'offensive' });
+  check('a second report by B is rejected', codeOf(again) === '23505', detail(again));
+  const readBack = await call(`/rest/v1/content_reports?select=id&target_id=eq.${c.id}`, { token: B.token });
+  check('B cannot read the report back', readBack.status === 200 && rows(readBack).length === 0, detail(readBack));
+  const own = await report(A, { reporter_id: A.id, ...target, reason: 'spam' });
+  check('A cannot report their own comment', refused(own), detail(own));
+  const anonReport = await report(null, { reporter_id: A.id, ...target, reason: 'spam' });
+  check('anon cannot report', refused(anonReport), detail(anonReport));
+  const forged = await report(M, { reporter_id: M.id, ...target, reason: 'spam', status: 'resolved' });
+  check('a reporter cannot set the workflow status', refused(forged), detail(forged));
+  const noDetails = await report(M, { reporter_id: M.id, ...target, reason: 'other' });
+  check('"other" needs a description', codeOf(noDetails) === '23514', detail(noDetails));
+
+  const seen = await call(`/rest/v1/content_reports?select=id,status,reason&target_id=eq.${c.id}`, { token: M.token });
+  const r = rows(seen)[0];
+  check('M reads the open report', r?.status === 'open' && r?.reason === 'spam', detail(seen));
+  if (!r) finish();
+  const byB = await workflow(B, r.id, 'dismissed', null);
+  check('B cannot work on reports', refused(byB), detail(byB));
+  const direct = await call(`/rest/v1/content_reports?id=eq.${r.id}`, { method: 'PATCH', token: M.token, headers: JSON_HEADERS, body: JSON.stringify({ status: 'dismissed' }) });
+  check('nobody updates a report directly, not even M', refused(direct), detail(direct));
+  const done = await workflow(M, r.id, 'resolved', 'smoke: đã xử lý');
+  const after = await call(`/rest/v1/content_reports?select=status,internal_note,handled_by&id=eq.${r.id}`, { token: M.token });
+  const a = rows(after)[0];
+  check(
+    'M resolves it with a note, stamped as handler',
+    done.status === 200 && a?.status === 'resolved' && a?.internal_note === 'smoke: đã xử lý' && a?.handled_by === M.id,
+    `${detail(done)}; ${detail(after)}`,
+  );
+
+  const del = await call(`/rest/v1/comments?id=eq.${c.id}&select=id`, { method: 'DELETE', token: A.token, headers: returning });
+  check('A removes the comment', rows(del).length === 1, detail(del));
+}
+
 finish();

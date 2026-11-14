@@ -61,8 +61,8 @@ describe('routes and guards', () => {
 
   it.each<[StaffRole, string[]]>([
     ['editor', ['Tổng quan']],
-    ['moderator', ['Tổng quan']],
-    ['super_admin', ['Tổng quan', 'Nhân sự', 'Nhật ký quản trị']],
+    ['moderator', ['Tổng quan', 'Kiểm duyệt']],
+    ['super_admin', ['Tổng quan', 'Kiểm duyệt', 'Nhân sự', 'Nhật ký quản trị']],
   ])('the sidebar of a %s lists exactly the routes that role may open', async (role, labels) => {
     const fake = signedIn([role]);
     renderAt('/dashboard', fake);
@@ -178,5 +178,59 @@ describe('audit log page', () => {
     expect(await screen.findByText('Lý do 50')).toBeInTheDocument();
     expect(fake.rpc).toHaveBeenLastCalledWith('list_admin_audit_logs', { p_limit: 50, p_before: row(49).created_at });
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Tải thêm' })).toBeNull());
+  });
+});
+
+describe('moderation page', () => {
+  function setup(roles: StaffRole[] = ['moderator']) {
+    const fake = signedIn(roles);
+    fake.tables.comments = [
+      { id: 'c1', content: 'Ngon quá', status: 'pending', created_at: '2026-11-14T00:00:02Z', author: { display_name: 'Bà Ba' } },
+      { id: 'c9', content: 'Mua hàng giá rẻ', status: 'approved', created_at: '2026-11-14T00:00:00Z', author: null },
+    ];
+    fake.tables.cooking_photos = [
+      { id: 'p1', storage_path: 'u-9/p1.jpg', caption: 'Lần đầu', status: 'pending', created_at: '2026-11-14T00:00:01Z', author: null },
+    ];
+    fake.tables.content_reports = [
+      { id: 'r1', target_table: 'comments', target_id: 'c9', reason: 'spam', details: 'Quảng cáo', status: 'open', internal_note: null, created_at: '2026-11-14T01:00:00Z', reporter: { display_name: 'An' } },
+    ];
+    const setStatus = (table: string, id: unknown, status: unknown) => {
+      const row = fake.tables[table].find((r) => r.id === id);
+      if (row) row.status = status;
+    };
+    fake.rpcHandlers.moderate_community_content = ({ p_table, p_id, p_status }) => (setStatus(String(p_table), p_id, p_status), { data: p_status, error: null });
+    fake.rpcHandlers.update_report_workflow = ({ p_id, p_status }) => (setStatus('content_reports', p_id, p_status), { data: p_status, error: null });
+    renderAt('/moderation', fake);
+    return fake;
+  }
+
+  it('lists the pending queue oldest first, with signed photo URLs, and approves through the RPC', async () => {
+    const fake = setup();
+    const items = await screen.findAllByRole('listitem');
+    expect(items.map((li) => li.getAttribute('aria-label'))).toEqual(['Ảnh chờ duyệt', 'Bình luận chờ duyệt']);
+    expect(within(items[0]).getByRole('img', { name: 'Lần đầu' })).toHaveAttribute('src', 'https://example.test/sign/u-9/p1.jpg');
+    fireEvent.click(within(items[1]).getByRole('button', { name: 'Duyệt' }));
+    expect(await screen.findByText('Đã duyệt bình luận.')).toBeInTheDocument();
+    expect(fake.rpc).toHaveBeenCalledWith('moderate_community_content', { p_table: 'comments', p_id: 'c1', p_status: 'approved', p_reason: null });
+    await waitFor(() => expect(screen.getAllByRole('listitem').length).toBe(1));
+  });
+
+  it('hides reported content and closes the report in one step', async () => {
+    const fake = setup();
+    fireEvent.click(await screen.findByRole('tab', { name: 'Báo cáo vi phạm' }));
+    const report = await screen.findByRole('listitem', { name: 'Báo cáo: Spam / Quảng cáo' });
+    expect(within(report).getByText('Mua hàng giá rẻ')).toBeInTheDocument();
+    expect(within(report).getByText('“Quảng cáo”')).toBeInTheDocument();
+    fireEvent.change(within(report).getByLabelText('Ghi chú nội bộ (không bắt buộc)'), { target: { value: 'Link lừa đảo' } });
+    fireEvent.click(within(report).getByRole('button', { name: 'Ẩn nội dung' }));
+    expect(await screen.findByText('Đã ẩn nội dung và đóng báo cáo.')).toBeInTheDocument();
+    expect(fake.rpc).toHaveBeenCalledWith('moderate_community_content', { p_table: 'comments', p_id: 'c9', p_status: 'rejected', p_reason: 'Link lừa đảo' });
+    expect(fake.rpc).toHaveBeenCalledWith('update_report_workflow', { p_id: 'r1', p_status: 'resolved', p_note: 'Link lừa đảo' });
+    expect(await screen.findByText('Không có báo cáo nào đang mở.')).toBeInTheDocument();
+  });
+
+  it('is closed to editors', async () => {
+    setup(['editor']);
+    expect(await screen.findByRole('heading', { name: 'Không đủ quyền' })).toBeInTheDocument();
   });
 });

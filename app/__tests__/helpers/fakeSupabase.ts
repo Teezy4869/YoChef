@@ -120,7 +120,11 @@ export function createFakeSupabase(initial: Session | null = null) {
   };
   // Readable by everyone (published recipes only, in the real policies); writes stay owner-only.
   const PUBLIC_READ = new Set(['ratings', 'recipe_rating_summary', 'comments', 'cooking_photos']);
-  const UNIQUE: Record<string, string[]> = { favorites: ['user_id', 'recipe_id'], ratings: ['user_id', 'recipe_id'] };
+  const UNIQUE: Record<string, string[]> = {
+    favorites: ['user_id', 'recipe_id'],
+    ratings: ['user_id', 'recipe_id'],
+    content_reports: ['reporter_id', 'target_table', 'target_id'],
+  };
   // public.recipe_rating_summary: no row for a recipe without ratings.
   const ratingSummary = (): Row[] => {
     const by = new Map<unknown, number[]>();
@@ -135,7 +139,9 @@ export function createFakeSupabase(initial: Session | null = null) {
   const ownerOf = (table: string, r: Row) =>
     table === 'shopping_list_items'
       ? (tables.shopping_lists ?? []).find((l) => l.id === r.shopping_list_id)?.user_id
-      : r.user_id;
+      : table === 'content_reports'
+        ? r.reporter_id
+        : r.user_id;
   // Reviewed content (comments, cooking photos): everyone reads approved rows,
   // authors also their own unless rejected, and only authors change a row that is
   // not rejected. Editing the text of an approved row sends it back to review.
@@ -245,7 +251,7 @@ export function createFakeSupabase(initial: Session | null = null) {
 
   const USER_TABLES = new Set([
     'favorites', 'shopping_lists', 'shopping_list_items', 'ratings', 'recipe_rating_summary', 'comments', 'cooking_photos',
-    'user_roles',
+    'user_roles', 'content_reports',
   ]);
 
   const from = jest.fn((table: string) =>

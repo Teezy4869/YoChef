@@ -84,7 +84,7 @@ describe('global security invariants', () => {
 
   it('authenticated inserts/deletes only on user-owned tables, and never truncates', async () => {
     // Phase 3 user tables, each guarded by owner RLS (supabase/tests/phase3.test.mjs).
-    const USER_OWNED = ['favorites', 'shopping_lists', 'shopping_list_items', 'ratings', 'comments', 'cooking_photos'];
+    const USER_OWNED = ['favorites', 'shopping_lists', 'shopping_list_items', 'ratings', 'comments', 'cooking_photos', 'content_reports'];
     const rows = await admin(
       db,
       `select c.relname, p.priv from pg_class c join pg_namespace n on n.oid = c.relnamespace

@@ -23,6 +23,8 @@ export function createFakeClient(options: { session?: Session | null; roles?: St
   const listeners = new Set<Listener>();
   const roles = { value: options.roles ?? [], error: options.rolesError ?? false };
   const counts: Record<string, number> = {};
+  // Rows the signed-in staff member may read (RLS is not modelled here).
+  const tables: Record<string, Record<string, unknown>[]> = {};
   const rpcHandlers: Record<string, (args: Record<string, unknown>) => Result | Promise<Result>> = {};
 
   const auth = {
@@ -46,6 +48,7 @@ export function createFakeClient(options: { session?: Session | null; roles?: St
 
   const from = vi.fn((table: string) => {
     const filters: Record<string, unknown> = {};
+    const lists: Record<string, unknown[]> = {};
     let head = false;
     const run = async (): Promise<Result & { count?: number | null }> => {
       if (table === 'user_roles') {
@@ -53,11 +56,17 @@ export function createFakeClient(options: { session?: Session | null; roles?: St
         return { data: session && filters.user_id === session.user.id ? roles.value.map((role) => ({ role })) : [], error: null };
       }
       if (head) return { data: null, error: null, count: counts[`${table}.${String(filters.status)}`] ?? 0 };
-      return { data: [], error: null };
+      const rows = (tables[table] ?? []).filter(
+        (r) => Object.entries(filters).every(([c, v]) => r[c] === v) && Object.entries(lists).every(([c, vs]) => vs.includes(r[c])),
+      );
+      return { data: rows.map((r) => ({ ...r })), error: null };
     };
     const b = {
       select: (_cols: string, opts?: { head?: boolean }) => ((head = !!opts?.head), b),
       eq: (col: string, value: unknown) => ((filters[col] = value), b),
+      in: (col: string, values: unknown[]) => ((lists[col] = values), b),
+      order: () => b,
+      limit: () => b,
       then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) => run().then(resolve, reject),
     };
     return b;
@@ -68,6 +77,15 @@ export function createFakeClient(options: { session?: Session | null; roles?: St
     return handler ? handler(args) : { data: null, error: { message: `no fake for ${fn}` } };
   });
 
-  const client = { auth, from, rpc } as unknown as AdminClient;
-  return { client, auth, from, rpc, roles, counts, rpcHandlers };
+  const storage = {
+    from: vi.fn(() => ({
+      createSignedUrls: vi.fn(async (paths: string[]) => ({
+        data: paths.map((p) => ({ path: p, signedUrl: `https://example.test/sign/${p}`, error: null })),
+        error: null,
+      })),
+    })),
+  };
+
+  const client = { auth, from, rpc, storage } as unknown as AdminClient;
+  return { client, auth, from, rpc, roles, counts, rpcHandlers, tables };
 }

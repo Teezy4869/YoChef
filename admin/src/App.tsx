@@ -7,6 +7,7 @@ import { hasRole, type AdminClient, type StaffRole } from '@/lib/supabase';
 import { AuditLogPage } from '@/pages/AuditLogPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { LoginPage } from '@/pages/LoginPage';
+import { ModerationPage } from '@/pages/ModerationPage';
 import { StaffPage } from '@/pages/StaffPage';
 import { ForbiddenPage, NotFoundPage, UnauthorizedPage } from '@/pages/StatusPages';
 
@@ -15,6 +16,7 @@ export type AdminRoute = { path: string; label: string; roles: StaffRole[]; elem
 /** Every sidebar link is a real route (phase4_08_admin_and_lifecycle). Guards are for the UI only. */
 export const ROUTES: AdminRoute[] = [
   { path: '/dashboard', label: 'Tổng quan', roles: ['editor', 'moderator'], element: <DashboardPage />, sidebar: true },
+  { path: '/moderation', label: 'Kiểm duyệt', roles: ['moderator'], element: <ModerationPage />, sidebar: true },
   { path: '/staff', label: 'Nhân sự', roles: ['super_admin'], element: <StaffPage />, sidebar: true },
   { path: '/audit-logs', label: 'Nhật ký quản trị', roles: ['super_admin'], element: <AuditLogPage />, sidebar: true },
 ];
