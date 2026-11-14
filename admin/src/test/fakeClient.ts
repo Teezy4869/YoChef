@@ -49,20 +49,31 @@ export function createFakeClient(options: { session?: Session | null; roles?: St
   const from = vi.fn((table: string) => {
     const filters: Record<string, unknown> = {};
     const lists: Record<string, unknown[]> = {};
+    const likes: Record<string, string> = {};
     let head = false;
+    let counted = false;
+    let single = false;
     const run = async (): Promise<Result & { count?: number | null }> => {
       if (table === 'user_roles') {
         if (roles.error) return { data: null, error: { message: 'boom' } };
         return { data: session && filters.user_id === session.user.id ? roles.value.map((role) => ({ role })) : [], error: null };
       }
       if (head) return { data: null, error: null, count: counts[`${table}.${String(filters.status)}`] ?? 0 };
+      const like = (v: unknown, pattern: string) => String(v).toLowerCase().includes(pattern.replace(/%/g, '').toLowerCase());
       const rows = (tables[table] ?? []).filter(
-        (r) => Object.entries(filters).every(([c, v]) => r[c] === v) && Object.entries(lists).every(([c, vs]) => vs.includes(r[c])),
+        (r) =>
+          Object.entries(filters).every(([c, v]) => r[c] === v) &&
+          Object.entries(lists).every(([c, vs]) => vs.includes(r[c])) &&
+          Object.entries(likes).every(([c, p]) => like(r[c], p)),
       );
-      return { data: rows.map((r) => ({ ...r })), error: null };
+      const data = rows.map((r) => ({ ...r }));
+      return single ? { data: data[0] ?? null, error: null } : { data, error: null, count: counted ? rows.length : null };
     };
     const b = {
-      select: (_cols: string, opts?: { head?: boolean }) => ((head = !!opts?.head), b),
+      select: (_cols: string, opts?: { head?: boolean; count?: string }) => ((head = !!opts?.head), (counted = !!opts?.count), b),
+      ilike: (col: string, pattern: string) => ((likes[col] = pattern), b),
+      range: () => b,
+      maybeSingle: () => ((single = true), run()),
       eq: (col: string, value: unknown) => ((filters[col] = value), b),
       in: (col: string, values: unknown[]) => ((lists[col] = values), b),
       order: () => b,
@@ -78,14 +89,18 @@ export function createFakeClient(options: { session?: Session | null; roles?: St
   });
 
   const storage = {
-    from: vi.fn(() => ({
-      createSignedUrls: vi.fn(async (paths: string[]) => ({
-        data: paths.map((p) => ({ path: p, signedUrl: `https://example.test/sign/${p}`, error: null })),
-        error: null,
-      })),
+    from: vi.fn(() => bucket),
+  };
+  const bucket = {
+    createSignedUrls: vi.fn(async (paths: string[]) => ({
+      data: paths.map((p) => ({ path: p, signedUrl: `https://example.test/sign/${p}`, error: null })),
+      error: null,
     })),
+    upload: vi.fn(async (path: string) => ({ data: { path }, error: null })),
+    remove: vi.fn(async (paths: string[]) => ({ data: paths, error: null })),
+    getPublicUrl: vi.fn((path: string) => ({ data: { publicUrl: `https://example.test/public/${path}` } })),
   };
 
   const client = { auth, from, rpc, storage } as unknown as AdminClient;
-  return { client, auth, from, rpc, roles, counts, rpcHandlers, tables };
+  return { client, auth, from, rpc, roles, counts, rpcHandlers, tables, bucket };
 }

@@ -8,6 +8,8 @@ import { AuditLogPage } from '@/pages/AuditLogPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { ModerationPage } from '@/pages/ModerationPage';
+import { RecipeEditPage } from '@/pages/RecipeEditPage';
+import { RecipeListPage } from '@/pages/RecipeListPage';
 import { StaffPage } from '@/pages/StaffPage';
 import { ForbiddenPage, NotFoundPage, UnauthorizedPage } from '@/pages/StatusPages';
 
@@ -16,6 +18,9 @@ export type AdminRoute = { path: string; label: string; roles: StaffRole[]; elem
 /** Every sidebar link is a real route (phase4_08_admin_and_lifecycle). Guards are for the UI only. */
 export const ROUTES: AdminRoute[] = [
   { path: '/dashboard', label: 'Tổng quan', roles: ['editor', 'moderator'], element: <DashboardPage />, sidebar: true },
+  { path: '/recipes', label: 'Công thức', roles: ['editor'], element: <RecipeListPage />, sidebar: true },
+  { path: '/recipes/new', label: 'Tạo công thức', roles: ['editor'], element: <RecipeEditPage />, sidebar: false },
+  { path: '/recipes/:id/edit', label: 'Sửa công thức', roles: ['editor'], element: <RecipeEditPage />, sidebar: false },
   { path: '/moderation', label: 'Kiểm duyệt', roles: ['moderator'], element: <ModerationPage />, sidebar: true },
   { path: '/staff', label: 'Nhân sự', roles: ['super_admin'], element: <StaffPage />, sidebar: true },
   { path: '/audit-logs', label: 'Nhật ký quản trị', roles: ['super_admin'], element: <AuditLogPage />, sidebar: true },

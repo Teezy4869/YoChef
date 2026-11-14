@@ -160,4 +160,84 @@ check('nobody reads admin_audit_logs directly, not even S', refused(directLog), 
 const directRole = await call('/rest/v1/user_roles', { method: 'POST', token: S.token, body: { user_id: A.id, role: 'editor' } });
 check('nobody writes user_roles directly, not even S', refused(directRole), detail(directRole));
 
+// --- 4.5 Recipe CMS ---------------------------------------------------------------------
+// E works on a throw-away recipe; S hard-deletes it at the end (and any leftover).
+{
+  const PREFIX = 'zz-smoke-cms';
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+  const save = (u, id, recipe, ingredients, steps) =>
+    rpc(u, 'save_recipe', { p_id: id, p_recipe: recipe, p_ingredients: ingredients, p_steps: steps, p_reason: 'smoke:admin' });
+  const move = (u, id, to) => rpc(u, 'transition_recipe_status', { p_id: id, p_to: to, p_reason: 'smoke:admin' });
+  const remove = (u, id, slug) => rpc(u, 'delete_recipe', { p_id: id, p_confirm_slug: slug, p_reason: 'smoke:admin dọn dữ liệu' });
+  const upload = (u, path) =>
+    fetch(`${url}/storage/v1/object/recipe-images/${path}`, {
+      method: 'POST',
+      headers: { apikey: key, Authorization: `Bearer ${u?.token ?? key}`, 'Content-Type': 'image/png', 'x-upsert': 'false' },
+      body: PNG,
+    }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }));
+  const anonSees = async (id) => rows(await call(`/rest/v1/recipes?select=id&id=eq.${id}`)).length === 1;
+
+  const old = rows(await call(`/rest/v1/recipes?select=id,slug,status&slug=like.${PREFIX}*`, { token: E.token }));
+  for (const r of old) {
+    if (r.status === 'published' || r.status === 'staged') await move(E, r.id, 'archived');
+    await remove(S, r.id, r.slug);
+  }
+
+  const cat = rows(await call('/rest/v1/categories?select=id&order=sort_order&limit=1'))[0]?.id;
+  const ing = rows(await call('/rest/v1/ingredients?select=id&order=name&limit=2'));
+  const slug = `${PREFIX}-${Date.now()}`;
+  const recipe = { slug, name: 'YoChef smoke CMS', default_servings: 2 };
+  const ingredients = [
+    { ingredient_id: ing[0]?.id, quantity: 100, unit: 'g', quantity_basis: 'book' },
+    { ingredient_id: ing[1]?.id, quantity: null, unit: null, quantity_basis: 'to_taste' },
+  ];
+  const steps = [{ instruction: 'Bước thử' }];
+
+  for (const [who, u] of [['A', A], ['M', M]]) {
+    const r = await save(u, null, recipe, ingredients, steps);
+    check(`${who} cannot save a recipe`, refused(r), detail(r));
+  }
+  const created = await save(E, null, recipe, ingredients, steps);
+  const id = created.body;
+  check('E creates a draft', created.status === 200 && typeof id === 'string', detail(created));
+  if (typeof id !== 'string') finish();
+  const asE = await call(`/rest/v1/recipes?select=status&id=eq.${id}`, { token: E.token });
+  check('E reads the draft; anon and A do not', rows(asE)[0]?.status === 'draft' && !(await anonSees(id)) &&
+    rows(await call(`/rest/v1/recipes?select=id&id=eq.${id}`, { token: A.token })).length === 0, detail(asE));
+
+  const skip = await move(E, id, 'published');
+  check('draft cannot jump to published', codeOf(skip) === '22023', detail(skip));
+  const notReady = await move(E, id, 'staged');
+  check('staging needs a category (field message returned)', codeOf(notReady) === '22023' && /category_id/.test(notReady.body?.details ?? ''), detail(notReady));
+  const fixed = await save(E, id, { ...recipe, category_id: cat }, ingredients, steps);
+  check('E adds the category', fixed.status === 200, detail(fixed));
+  const staged = await move(E, id, 'staged');
+  const published = await move(E, id, 'published');
+  check('E stages then publishes it; anon sees it', staged.body === 'staged' && published.body === 'published' && (await anonSees(id)), `${detail(staged)}; ${detail(published)}`);
+  const byM = await move(M, id, 'archived');
+  check('M cannot change a recipe status', refused(byM), detail(byM));
+  const archived = await move(E, id, 'archived');
+  check('E archives it; anon no longer sees it', archived.body === 'archived' && !(await anonSees(id)), detail(archived));
+
+  const coverPath = `${slug}/cover-${Date.now()}.png`;
+  const up = await upload(E, coverPath);
+  check('E uploads a new cover', up.status === 200, `HTTP ${up.status}`);
+  const overwrite = await upload(E, `${slug}/cover.png`);
+  check('a cover name outside cover-<time> is refused', overwrite.status >= 400, `HTTP ${overwrite.status}`);
+  const byA = await upload(A, `${slug}/cover-1.png`);
+  check('A cannot upload covers', byA.status >= 400, `HTTP ${byA.status}`);
+  const delCover = await call(`/storage/v1/object/recipe-images/${coverPath}`, { method: 'DELETE', token: E.token });
+  check('E deletes the unused cover', delCover.status === 200, detail(delCover));
+
+  const byE = await remove(E, id, slug);
+  check('E cannot hard-delete', refused(byE), detail(byE));
+  const wrong = await remove(S, id, `${slug}-x`);
+  check('S must type the right slug', codeOf(wrong) === '22023', detail(wrong));
+  const gone = await remove(S, id, slug);
+  const after = await call(`/rest/v1/recipes?select=id&id=eq.${id}`, { token: E.token });
+  check('S deletes the archived recipe', gone.status === 200 && rows(after).length === 0, `${detail(gone)}; ${detail(after)}`);
+  const trail = rows(await rpc(S, 'list_admin_audit_logs', { p_limit: 20 })).filter((l) => l.target_id === id).map((l) => l.action);
+  check('the audit log has create, status moves and delete', ['recipe.create', 'recipe.status', 'recipe.delete'].every((a) => trail.includes(a)), trail.join(','));
+}
+
 finish();

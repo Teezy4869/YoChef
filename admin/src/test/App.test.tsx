@@ -60,9 +60,9 @@ describe('routes and guards', () => {
   });
 
   it.each<[StaffRole, string[]]>([
-    ['editor', ['Tổng quan']],
+    ['editor', ['Tổng quan', 'Công thức']],
     ['moderator', ['Tổng quan', 'Kiểm duyệt']],
-    ['super_admin', ['Tổng quan', 'Kiểm duyệt', 'Nhân sự', 'Nhật ký quản trị']],
+    ['super_admin', ['Tổng quan', 'Công thức', 'Kiểm duyệt', 'Nhân sự', 'Nhật ký quản trị']],
   ])('the sidebar of a %s lists exactly the routes that role may open', async (role, labels) => {
     const fake = signedIn([role]);
     renderAt('/dashboard', fake);
@@ -232,5 +232,112 @@ describe('moderation page', () => {
   it('is closed to editors', async () => {
     setup(['editor']);
     expect(await screen.findByRole('heading', { name: 'Không đủ quyền' })).toBeInTheDocument();
+  });
+});
+
+describe('recipe CMS', () => {
+  const CATS = [{ id: 'cat-1', name: 'Món chính', sort_order: 1 }];
+  const INGS = [{ id: 'ing-1', name: 'Thịt lợn' }, { id: 'ing-2', name: 'Muối' }];
+  function setup(roles: StaffRole[] = ['editor']) {
+    const fake = signedIn(roles);
+    fake.tables.categories = CATS;
+    fake.tables.ingredients = INGS;
+    fake.tables.recipes = [
+      {
+        id: 'r1', slug: '001-thit-kho', name: 'Thịt kho', status: 'staged', updated_at: '2026-11-14T00:00:00Z', description: null,
+        category_id: 'cat-1', difficulty: 'easy', default_servings: 4, serving_basis: 'book', serving_note: null,
+        prep_time_minutes: null, cook_time_minutes: 30, cover_image_path: '001-thit-kho/cover.webp',
+        recipe_ingredients: [
+          { sort_order: 2, quantity: null, unit: null, quantity_basis: 'to_taste', preparation_note: null, is_optional: false, ingredient: { id: 'ing-2', name: 'Muối' } },
+          { sort_order: 1, quantity: '500.000', unit: 'g', quantity_basis: 'book', preparation_note: 'cắt miếng', is_optional: false, ingredient: { id: 'ing-1', name: 'Thịt lợn' } },
+        ],
+        recipe_steps: [{ step_number: 1, instruction: 'Kho nhỏ lửa', duration_seconds: 1800, timer_enabled: true }],
+      },
+      { id: 'r2', slug: '002-canh', name: 'Canh chua', status: 'draft', updated_at: '2026-11-13T00:00:00Z' },
+    ];
+    fake.rpcHandlers.create_ingredient = ({ p_name }) => ({ data: `new-${String(p_name)}`, error: null });
+    fake.rpcHandlers.save_recipe = ({ p_id }) => ({ data: p_id ?? 'r1', error: null });
+    fake.rpcHandlers.transition_recipe_status = ({ p_to }) => ({ data: p_to, error: null });
+    return fake;
+  }
+
+  it('lists every status for editors and filters by status', async () => {
+    const fake = setup();
+    renderAt('/recipes', fake);
+    expect(await screen.findByRole('link', { name: 'Thịt kho' })).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: 'Chờ công bố' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Trạng thái'), { target: { value: 'draft' } });
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Thịt kho' })).toBeNull());
+    expect(await screen.findByRole('link', { name: 'Canh chua' })).toBeInTheDocument();
+  });
+
+  it('loads a recipe in order and saves it through save_recipe, creating a new ingredient first', async () => {
+    const fake = setup();
+    renderAt('/recipes/r1/edit', fake);
+    expect(await screen.findByDisplayValue('Thịt kho')).toBeInTheDocument();
+    const first = screen.getByRole('group', { name: 'Nguyên liệu 1' });
+    expect(within(first).getByLabelText('Tên')).toHaveValue('Thịt lợn');
+    expect(within(first).getByLabelText('Số lượng')).toHaveValue('500');
+    expect(screen.getByLabelText('Thời lượng (phút)')).toHaveValue('30');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Thêm nguyên liệu' }));
+    const third = screen.getByRole('group', { name: 'Nguyên liệu 3' });
+    fireEvent.change(within(third).getByLabelText('Tên'), { target: { value: 'Lá chanh' } });
+    fireEvent.change(within(third).getByLabelText('Số lượng'), { target: { value: '2,5' } });
+    expect(within(third).getByText('Sẽ tạo nguyên liệu mới')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+    expect(await screen.findByText('Đã lưu công thức.')).toBeInTheDocument();
+    expect(fake.rpc).toHaveBeenCalledWith('create_ingredient', { p_name: 'Lá chanh' });
+    const call = fake.rpc.mock.calls.find(([fn]) => fn === 'save_recipe')?.[1] as Record<string, unknown>;
+    expect(call.p_id).toBe('r1');
+    expect(call.p_ingredients).toEqual([
+      { ingredient_id: 'ing-1', quantity: 500, unit: 'g', quantity_basis: 'book', preparation_note: 'cắt miếng', is_optional: false },
+      { ingredient_id: 'ing-2', quantity: null, unit: null, quantity_basis: 'to_taste', preparation_note: null, is_optional: false },
+      { ingredient_id: 'new-Lá chanh', quantity: 2.5, unit: null, quantity_basis: 'book', preparation_note: null, is_optional: false },
+    ]);
+    expect(call.p_steps).toEqual([{ instruction: 'Kho nhỏ lửa', duration_seconds: 1800, timer_enabled: true }]);
+    expect((call.p_recipe as Record<string, unknown>).prep_time_minutes).toBeNull(); // unknown stays NULL
+  });
+
+  it('shows the server readiness messages next to the fields', async () => {
+    const fake = setup();
+    fake.rpcHandlers.transition_recipe_status = () => ({
+      data: null,
+      error: { code: '22023', message: 'recipe is not ready', details: JSON.stringify({ ingredients: 'Có nguyên liệu bị lặp.' }) } as never,
+    });
+    renderAt('/recipes/r1/edit', fake);
+    fireEvent.click(await screen.findByRole('button', { name: 'Chuyển sang Đã công bố' }));
+    expect(await screen.findByText('Có nguyên liệu bị lặp.')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Công thức chưa đủ điều kiện.');
+    expect(screen.getByRole('button', { name: 'Chuyển sang Nháp' })).toBeInTheDocument(); // staged -> draft is a move
+  });
+
+  it('checks the form before calling the server', async () => {
+    const fake = setup();
+    renderAt('/recipes/new', fake);
+    fireEvent.change(await screen.findByLabelText('Tên món'), { target: { value: 'Gà nướng mật ong' } });
+    expect(screen.getByLabelText('Slug')).toHaveValue('ga-nuong-mat-ong');
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo bản nháp' }));
+    expect(await screen.findByText('Hãy sửa các ô được đánh dấu.')).toBeInTheDocument();
+    expect(screen.getByText('Chọn hoặc nhập tên nguyên liệu.')).toBeInTheDocument();
+    expect(fake.rpc).not.toHaveBeenCalledWith('save_recipe', expect.anything());
+  });
+
+  it('offers the hard delete to super admins only', async () => {
+    renderAt('/recipes/r1/edit', setup(['editor']));
+    await screen.findByDisplayValue('Thịt kho');
+    expect(screen.queryByRole('button', { name: 'Xóa vĩnh viễn' })).toBeNull();
+  });
+
+  it('a super admin must type the slug to delete', async () => {
+    const fake = setup(['super_admin']);
+    fake.rpcHandlers.delete_recipe = () => ({ data: null, error: null });
+    renderAt('/recipes/r1/edit', fake);
+    const del = await screen.findByRole('button', { name: 'Xóa vĩnh viễn' });
+    expect(del).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/Gõ lại slug/), { target: { value: '001-thit-kho' } });
+    fireEvent.change(screen.getByLabelText('Lý do (bắt buộc)'), { target: { value: 'Trùng' } });
+    fireEvent.click(del);
+    await waitFor(() => expect(fake.rpc).toHaveBeenCalledWith('delete_recipe', { p_id: 'r1', p_confirm_slug: '001-thit-kho', p_reason: 'Trùng' }));
   });
 });

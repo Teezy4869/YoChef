@@ -224,3 +224,154 @@ describe('4.2 content reports', () => {
     assert.equal((await rpc(sup, `select id from public.content_reports`)).rows.length, 3);
   });
 });
+
+describe('4.5 recipe CMS', () => {
+  let cat;
+  let salt;
+  let pork;
+  let draftId;
+  const save = (uid, id, recipe, ingredients, steps, reason = null) =>
+    rpc(uid, `select public.save_recipe($1, $2::jsonb, $3::jsonb, $4::jsonb, $5) as id`,
+      [id, JSON.stringify(recipe), JSON.stringify(ingredients), JSON.stringify(steps), reason]);
+  const move = (uid, id, to) => rpc(uid, `select public.transition_recipe_status($1, $2) as status`, [id, to]);
+  const base = (over = {}) => ({ slug: '900-ga-nuong', name: 'Gà nướng', default_servings: 4, ...over });
+  const ING = () => [
+    { ingredient_id: pork, quantity: 500, unit: 'g', quantity_basis: 'book', preparation_note: ' cắt miếng ' },
+    { ingredient_id: salt, quantity: null, unit: null, quantity_basis: 'to_taste' },
+  ];
+  const STEPS = [{ instruction: ' Ướp thịt ' }, { instruction: 'Nướng', duration_seconds: 1200, timer_enabled: true }];
+  const detailOf = (res) => JSON.parse(res.error?.detail ?? '{}');
+
+  before(async () => {
+    [{ id: cat }] = await admin(db, `select id from public.categories where slug = 'mon_chinh'`);
+    [{ id: salt }] = await admin(db, `insert into public.ingredients (slug, name) values ('muoi', 'Muối') returning id`);
+    [{ id: pork }] = await admin(db, `insert into public.ingredients (slug, name) values ('thit-lon', 'Thịt lợn') returning id`);
+  });
+
+  it('only editors save; a new recipe is a draft with its children in the given order, audited', async () => {
+    for (const uid of [user, moderator, null]) {
+      assert.equal((await save(uid, null, base(), ING(), STEPS)).error?.code, INSUFFICIENT_PRIVILEGE);
+    }
+    const res = await save(editor, null, base({ description: '  ', serving_note: '' }), ING(), STEPS, 'Món mới');
+    assert.equal(res.error, null);
+    draftId = res.rows[0].id;
+    const [r] = await admin(db, `select status, description, serving_note, category_id from public.recipes where id = $1`, [draftId]);
+    assert.deepEqual(r, { status: 'draft', description: null, serving_note: null, category_id: null });
+    const ing = await admin(db,
+      `select sort_order, quantity, quantity_basis, preparation_note from public.recipe_ingredients where recipe_id = $1 order by sort_order`, [draftId]);
+    assert.deepEqual(ing, [
+      { sort_order: 1, quantity: '500.000', quantity_basis: 'book', preparation_note: 'cắt miếng' },
+      { sort_order: 2, quantity: null, quantity_basis: 'to_taste', preparation_note: null },
+    ]);
+    const steps = await admin(db, `select step_number, instruction, timer_enabled from public.recipe_steps where recipe_id = $1 order by step_number`, [draftId]);
+    assert.deepEqual(steps, [
+      { step_number: 1, instruction: 'Ướp thịt', timer_enabled: false },
+      { step_number: 2, instruction: 'Nướng', timer_enabled: true },
+    ]);
+    const [a] = await admin(db, `select actor_id, action, reason from public.admin_audit_logs where target_id = $1`, [draftId]);
+    assert.deepEqual(a, { actor_id: editor, action: 'recipe.create', reason: 'Món mới' });
+    assert.equal((await save(editor, null, base(), ING(), STEPS)).error?.code, '23505'); // slug taken
+    const zero = await save(editor, null, base({ slug: 'x-1' }), [{ ingredient_id: salt, quantity: 0, quantity_basis: 'book' }], STEPS);
+    assert.equal(zero.error?.code, '23514');
+  });
+
+  it('editors read every status; the app search still lists published recipes only', async () => {
+    const r = await rpc(editor, `select status from public.recipes where id = $1`, [draftId]);
+    assert.deepEqual(r.rows, [{ status: 'draft' }]);
+    for (const uid of [user, moderator, null]) {
+      assert.deepEqual((await rpc(uid, `select id from public.recipes where id = $1`, [draftId])).rows, [], String(uid));
+      assert.deepEqual((await rpc(uid, `select id from public.recipe_steps where recipe_id = $1`, [draftId])).rows, []);
+    }
+    assert.deepEqual((await rpc(editor, `select slug from public.search_recipes('gà nướng')`)).rows, []);
+  });
+
+  it('follows the lifecycle; staging and publishing need a ready recipe', async () => {
+    assert.equal((await move(editor, draftId, 'published')).error?.code, INVALID_PARAMETER); // draft -> published
+    assert.equal((await move(editor, draftId, null)).error?.code, INVALID_PARAMETER);
+    const notReady = await move(editor, draftId, 'staged');
+    assert.equal(notReady.error?.code, INVALID_PARAMETER);
+    assert.deepEqual(detailOf(notReady), { category_id: 'Chọn danh mục.' });
+    assert.equal((await save(editor, draftId, base({ category_id: cat }), ING(), STEPS)).error, null);
+    assert.deepEqual((await move(editor, draftId, 'staged')).rows, [{ status: 'staged' }]);
+    assert.equal((await move(moderator, draftId, 'published')).error?.code, INSUFFICIENT_PRIVILEGE);
+    assert.deepEqual((await move(editor, draftId, 'published')).rows, [{ status: 'published' }]);
+    const [{ published_at }] = await admin(db, `select published_at from public.recipes where id = $1`, [draftId]);
+    assert.ok(published_at);
+    assert.deepEqual((await rpc(null, `select slug from public.search_recipes('gà nướng')`)).rows, [{ slug: '900-ga-nuong' }]);
+    assert.deepEqual((await move(editor, draftId, 'archived')).rows, [{ status: 'archived' }]);
+    assert.equal((await move(editor, draftId, 'published')).error?.code, INVALID_PARAMETER); // archived -> published
+    assert.deepEqual((await move(editor, draftId, 'draft')).rows, [{ status: 'draft' }]);
+    const moves = await admin(db,
+      `select details from public.admin_audit_logs where target_id = $1 and action = 'recipe.status' order by created_at, id`, [draftId]);
+    assert.deepEqual(moves.map((m) => `${m.details.from}>${m.details.to}`), ['draft>staged', 'staged>published', 'published>archived', 'archived>draft']);
+  });
+
+  it('a staged recipe stays ready when edited; a set cover must exist in storage', async () => {
+    await move(editor, draftId, 'staged');
+    const empty = await save(editor, draftId, base({ category_id: cat }), [], STEPS);
+    assert.equal(empty.error?.code, INVALID_PARAMETER);
+    assert.deepEqual(detailOf(empty), { ingredients: 'Cần ít nhất một nguyên liệu.' });
+    const dup = await save(editor, draftId, base({ category_id: cat }),
+      [...ING(), { ingredient_id: pork, quantity: 1, unit: 'kg', quantity_basis: 'book' }], STEPS);
+    assert.deepEqual(detailOf(dup), { ingredients: 'Có nguyên liệu bị lặp.' });
+    const cover = '900-ga-nuong/cover-1.webp';
+    const missing = await save(editor, draftId, base({ category_id: cat, cover_image_path: cover }), ING(), STEPS);
+    assert.deepEqual(detailOf(missing), { cover_image_path: 'Ảnh bìa không có trong kho ảnh.' });
+    const [{ n }] = await admin(db, `select count(*)::int n from public.recipe_ingredients where recipe_id = $1`, [draftId]);
+    assert.equal(n, 2); // the failed saves rolled back
+    await rpc(editor, `insert into storage.objects (bucket_id, name) values ('recipe-images', $1)`, [cover]);
+    assert.equal((await save(editor, draftId, base({ category_id: cat, cover_image_path: cover }), ING(), STEPS)).error, null);
+  });
+
+  it('nobody writes recipes or their children directly, not even an editor', async () => {
+    for (const sql of [
+      `update public.recipes set status = 'published' where id = $1`,
+      `delete from public.recipe_steps where recipe_id = $1`,
+      `insert into public.recipe_diets (recipe_id, diet_id) select $1, gen_random_uuid()`,
+    ]) {
+      assert.equal((await rpc(editor, sql, [draftId])).error?.code, INSUFFICIENT_PRIVILEGE, sql);
+    }
+  });
+
+  it('creates an ingredient once per name, with a folded slug', async () => {
+    const first = await rpc(editor, `select public.create_ingredient('  Lá chanh Đà Lạt ') as id`);
+    const again = await rpc(editor, `select public.create_ingredient('lá chanh đà lạt') as id`);
+    assert.equal(first.rows[0].id, again.rows[0].id);
+    const [row] = await admin(db, `select slug, name from public.ingredients where id = $1`, [first.rows[0].id]);
+    assert.deepEqual(row, { slug: 'la-chanh-da-lat', name: 'Lá chanh Đà Lạt' });
+    assert.equal((await rpc(user, `select public.create_ingredient('Muối hồng')`)).error?.code, INSUFFICIENT_PRIVILEGE);
+    assert.equal((await rpc(editor, `select public.create_ingredient('   ')`)).error?.code, INVALID_PARAMETER);
+  });
+
+  it('editors upload new covers only and delete a cover no recipe uses; super admins delete any', async () => {
+    const up = (uid, name) => rpc(uid, `insert into storage.objects (bucket_id, name) values ('recipe-images', $1) returning name`, [name]);
+    const del = (uid, name) => rpc(uid, `delete from storage.objects where bucket_id = 'recipe-images' and name = $1 returning name`, [name]);
+    assert.equal((await up(editor, '900-ga-nuong/cover-2.webp')).error, null);
+    for (const name of ['900-ga-nuong/cover.webp', '900-ga-nuong/anh.webp', 'covers/x.gif', '../cover-3.webp']) {
+      assert.equal((await up(editor, name)).error?.code, INSUFFICIENT_PRIVILEGE, name);
+    }
+    assert.equal((await up(user, '900-ga-nuong/cover-4.webp')).error?.code, INSUFFICIENT_PRIVILEGE);
+    assert.deepEqual((await del(editor, '900-ga-nuong/cover-1.webp')).rows, []); // in use
+    assert.equal((await del(editor, '900-ga-nuong/cover-2.webp')).rows.length, 1);
+    assert.deepEqual((await del(user, '900-ga-nuong/cover-1.webp')).rows, []);
+    assert.equal((await del(sup, '900-ga-nuong/cover-1.webp')).rows.length, 1);
+  });
+
+  it('only a super admin hard-deletes, slug typed, never a published recipe or one with user activity', async () => {
+    const del = (uid, id, slug, reason = 'Trùng') => rpc(uid, `select public.delete_recipe($1, $2, $3)`, [id, slug, reason]);
+    await admin(db, `update public.recipes set cover_image_path = null where id = $1`, [draftId]);
+    assert.equal((await del(editor, draftId, '900-ga-nuong')).error?.code, INSUFFICIENT_PRIVILEGE);
+    assert.equal((await del(sup, draftId, '900-ga')).error?.code, INVALID_PARAMETER);
+    assert.equal((await del(sup, draftId, '900-ga-nuong', ' ')).error?.code, INVALID_PARAMETER);
+    assert.equal((await move(editor, draftId, 'published')).error, null);
+    assert.equal((await del(sup, draftId, '900-ga-nuong')).error?.code, INVALID_PARAMETER);
+    await move(editor, draftId, 'archived');
+    await admin(db, `insert into public.favorites (user_id, recipe_id) values ($1, $2)`, [user, draftId]);
+    assert.equal((await del(sup, draftId, '900-ga-nuong')).error?.code, INVALID_PARAMETER);
+    await admin(db, `delete from public.favorites where recipe_id = $1`, [draftId]);
+    assert.equal((await del(sup, draftId, '900-ga-nuong')).error, null);
+    assert.deepEqual(await admin(db, `select id from public.recipe_steps where recipe_id = $1`, [draftId]), []);
+    const [a] = await admin(db, `select details from public.admin_audit_logs where target_id = $1 and action = 'recipe.delete'`, [draftId]);
+    assert.deepEqual(a.details, { slug: '900-ga-nuong', name: 'Gà nướng' });
+  });
+});

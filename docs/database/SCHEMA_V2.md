@@ -1,6 +1,6 @@
 # YoChef v2: Schema chuẩn (SCHEMA_V2)
 
-**Trạng thái:** `0001_catalog` = `supabase/migrations/20261108130000_catalog.sql`, `0002_identity_rbac` = `20261108130100_identity_rbac.sql` (bước 0.4). Phase 3: `favorites` = `20261113234830_phase3_favorites.sql` (3.1), `shopping_lists` = `20261114041322_phase3_shopping_lists.sql` (3.2), `ratings` = `20261114045322_phase3_ratings.sql` (3.3), `comments` = `20261114051346_phase3_comments.sql` (3.4), `cooking_photos` = `20261114054707_phase3_cooking_photos.sql` (3.5), duyệt nội dung = `20261114060039_phase3_moderation.sql` (3.6). Phase 4: vai trò và nhật ký quản trị = `20261114153457_phase4_rbac_audit.sql` (4.1), báo cáo vi phạm = `20261114155100_phase4_content_reports.sql` (4.2). Tên logic `00NN_*` trong tài liệu ứng với file có tiền tố timestamp mà Supabase CLI yêu cầu. Tài liệu này là **nguồn sự thật duy nhất** về schema: migration viết theo nó, và khi migration buộc phải khác, tài liệu được sửa trong cùng commit.
+**Trạng thái:** `0001_catalog` = `supabase/migrations/20261108130000_catalog.sql`, `0002_identity_rbac` = `20261108130100_identity_rbac.sql` (bước 0.4). Phase 3: `favorites` = `20261113234830_phase3_favorites.sql` (3.1), `shopping_lists` = `20261114041322_phase3_shopping_lists.sql` (3.2), `ratings` = `20261114045322_phase3_ratings.sql` (3.3), `comments` = `20261114051346_phase3_comments.sql` (3.4), `cooking_photos` = `20261114054707_phase3_cooking_photos.sql` (3.5), duyệt nội dung = `20261114060039_phase3_moderation.sql` (3.6). Phase 4: vai trò và nhật ký quản trị = `20261114153457_phase4_rbac_audit.sql` (4.1), báo cáo vi phạm = `20261114155100_phase4_content_reports.sql` (4.2), CMS công thức = `20261114160903_phase4_recipe_cms.sql` (4.5). Tên logic `00NN_*` trong tài liệu ứng với file có tiền tố timestamp mà Supabase CLI yêu cầu. Tài liệu này là **nguồn sự thật duy nhất** về schema: migration viết theo nó, và khi migration buộc phải khác, tài liệu được sửa trong cùng commit.
 **Project:** Supabase `bdhphjwhagygbwtfhhxn` (YoChef v2), PostgreSQL 17.
 **Ngày:** 2026-11-08.
 
@@ -149,7 +149,14 @@ Phase 0 không có đường ghi nào từ client. Dữ liệu được nạp b�
 
 **RLS:**
 - `anon` và `authenticated` SELECT `status = 'published'`.
-- Editor đọc mọi trạng thái: thêm ở 4.5 (CMS), cùng các RPC ghi công thức.
+- **Editor đọc mọi trạng thái (4.5):** policy `is_editor()` trên `recipes`, `recipe_ingredients`, `recipe_steps`, `recipe_diets`. Vì vậy `search_recipes` (tạo lại ở 4.5) và truy vấn chi tiết của app lọc `status = 'published'` **tường minh**, để editor dùng app không thấy bản nháp.
+- **Ghi (4.5, `20261114160903_phase4_recipe_cms.sql`):** client không có quyền ghi bảng catalog nào; mọi thao tác qua RPC DEFINER, có `admin_audit_logs` trong cùng giao dịch:
+  - `save_recipe(p_id, p_recipe, p_ingredients, p_steps, p_reason)`: chỉ editor; `p_id` NULL thì tạo bản `draft`. Ghi cha, rồi **thay toàn bộ** nguyên liệu và bước theo thứ tự mảng (`sort_order`, `step_number` từ 1). Chuỗi rỗng thành NULL. Công thức đang `staged` hay `published` phải vẫn đạt điều kiện sau khi sửa, nếu không cả giao dịch hủy. Slug trùng `23505`; vi phạm CHECK của bảng `23514`.
+  - `transition_recipe_status(p_id, p_to, p_reason)`: đúng sơ đồ draft → staged/archived; staged → published/draft/archived; published → staged/archived; archived → draft. `draft → published` bị từ chối. Lên `staged` hay `published` phải đạt điều kiện. Lần công bố đầu đặt `published_at`.
+  - Điều kiện (`private.recipe_problems`, trả lỗi theo trường trong `detail` của lỗi `22023`): có danh mục, có khẩu phần mặc định, ít nhất một nguyên liệu và không lặp nguyên liệu, ít nhất một bước, mỗi bước tối đa 2000 ký tự, và ảnh bìa nếu có thì phải tồn tại trong `recipe-images` (hoặc là URL `https://`). **Lệch spec 4.5 có chủ đích:** mô tả, thời gian và ảnh bìa không bắt buộc, vì "không biết" là NULL (C5) và 8 công thức có ảnh bị cách ly không có ảnh bìa. Công thức đã công bố không bị kiểm lại khi migrate; công thức nào chưa đạt (ví dụ #095 lặp "Tỏi") vẫn hiện, nhưng phải sửa mới lưu được.
+  - `delete_recipe(p_id, p_confirm_slug, p_reason)`: chỉ super_admin, gõ đúng slug, có lý do; từ chối công thức `published` hay đã có yêu thích, đánh giá, bình luận, ảnh. Ảnh bìa của công thức bị xóa còn lại trong bucket.
+  - `create_ingredient(p_name)`: editor tạo nguyên liệu mới (slug gấp từ tên); tên đã có thì trả id sẵn có.
+  - Không có trigger chặn đổi `status` trực tiếp như spec gợi ý: client không có quyền UPDATE trên `recipes`, nên chỉ RPC đổi được.
 
 **Index:** `(status, category_id)`, `category_id`.
 
@@ -376,7 +383,7 @@ Quy tắc chi tiết nằm trong `phase4_08_nutrition_data_contract.md`. Public 
 
 | Bucket | Public | Đường dẫn | Ghi | Migration |
 |---|---|---|---|---|
-| `recipe-images` | Có | `<recipe slug>/cover.webp` | Phase 0: chỉ script seed (secret key). 4.5: editor | 0001 |
+| `recipe-images` | Có | `<recipe slug>/cover.webp` (seed), `<slug>/cover-<thời điểm>.<webp\|jpg\|png>` (editor) | Seed bằng secret key. Từ 4.5: editor tải ảnh mới với tên `cover-<số>` (không có UPDATE nên không ghi đè), editor xóa ảnh không còn công thức nào dùng, super_admin xóa mọi ảnh | 0001, 4.5 |
 | `avatars` | Có | `<user id>/<file>` | Chủ sở hữu, trong thư mục của mình (policy trên `storage.objects`) | 1.1 (`20261111120000`) |
 | `cooking-photos` | Không (signed URL) | `<user id>/<tên file>.<jpg\|png\|webp>` | Chủ sở hữu, trong thư mục của mình; không ai ghi đè file. Quyền đọc file đi theo `status` của dòng | 3.5 (`20261114054707`) |
 

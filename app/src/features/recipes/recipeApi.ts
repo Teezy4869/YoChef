@@ -188,9 +188,10 @@ export function parseRecipeDetail(row: Row): RecipeDetail {
   };
 }
 
-/** Null when the slug does not exist or the recipe is not published (RLS hides it). */
+/** Null when the slug does not exist or the recipe is not published. */
 export async function fetchRecipeDetail(client: YoChefClient, slug: string): Promise<RecipeDetail | null> {
-  const { data, error } = await client.from('recipes').select(DETAIL_SELECT).eq('slug', slug).maybeSingle();
+  // Explicit status: since 4.5 an editor's RLS also returns drafts, which the app never shows.
+  const { data, error } = await client.from('recipes').select(DETAIL_SELECT).eq('slug', slug).eq('status', 'published').maybeSingle();
   if (error) fail(error, 'Không tải được công thức.');
   return data ? parseRecipeDetail(data as unknown as Row) : null;
 }
