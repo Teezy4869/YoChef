@@ -220,10 +220,13 @@ export async function handleNutritionAction(
   if (req.action === 'search_usda') {
     const query = validateQuery(req.query);
     const key = requireUsdaKey(deps.usdaApiKey);
-    const url =
-      `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(query)}` +
-      `&pageSize=${MAX_RESULTS}&dataType=${encodeURIComponent('Foundation,SR Legacy,Survey (FNDDS)')}`;
-    const res = await fetchProviderJson(deps.fetchImpl, url, { headers: { 'X-Api-Key': key } });
+    // POST with a JSON body: the GET form of this filter was answered with HTTP 400 about half
+    // the time on the live API (measured 2026-11-15), for every query.
+    const res = await fetchProviderJson(deps.fetchImpl, 'https://api.nal.usda.gov/fdc/v1/foods/search', {
+      method: 'POST',
+      headers: { 'X-Api-Key': key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, pageSize: MAX_RESULTS, dataType: ['Foundation', 'SR Legacy', 'Survey (FNDDS)'] }),
+    });
     classifyUsda(res.status, res.ok);
     if (!isRecord(res.body) || !Array.isArray(res.body.foods)) {
       throw new ContractError('malformed_provider_response', 'USDA returned an unexpected response shape.');

@@ -29,8 +29,8 @@ describe('nutrition-search contract', () => {
     const res = await handleNutritionAction({ action: 'search_usda', query: ' pork ' }, { fetchImpl, usdaApiKey: KEY, now: NOW });
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).not.toContain(KEY);
-    expect(url).toContain('query=pork');
-    expect(decodeURIComponent(url)).toContain('dataType=Foundation,SR Legacy,Survey (FNDDS)');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({ query: 'pork', pageSize: 10, dataType: ['Foundation', 'SR Legacy', 'Survey (FNDDS)'] });
     expect((init.headers as Record<string, string>)['X-Api-Key']).toBe(KEY);
     if (!('items' in res)) throw new Error('expected items');
     expect(res.items).toHaveLength(10);

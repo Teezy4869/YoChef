@@ -65,7 +65,7 @@ function finish() {
 async function call(path, { method = 'GET', token, body } = {}) {
   const res = await fetch(`${url}${path}`, {
     method,
-    headers: { apikey: key, Authorization: `Bearer ${token ?? key}`, 'Content-Type': 'application/json' },
+    headers: { apikey: key, Authorization: `Bearer ${token ?? key}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await res.text();
@@ -182,6 +182,11 @@ check('nobody writes user_roles directly, not even S', refused(directRole), deta
     if (r.status === 'published' || r.status === 'staged') await move(E, r.id, 'archived');
     await remove(S, r.id, r.slug);
   }
+  // Covers left by an earlier run that stopped before its own cleanup.
+  const list = (prefix, search) => call('/storage/v1/object/list/recipe-images', { method: 'POST', token: S.token, body: { prefix, search, limit: 100 } });
+  for (const dir of rows(await list('', PREFIX))) {
+    for (const f of rows(await list(dir.name))) await call(`/storage/v1/object/recipe-images/${dir.name}/${f.name}`, { method: 'DELETE', token: S.token });
+  }
 
   const cat = rows(await call('/rest/v1/categories?select=id&order=sort_order&limit=1'))[0]?.id;
   const ing = rows(await call('/rest/v1/ingredients?select=id&order=name&limit=2'));
@@ -293,7 +298,7 @@ check('nobody writes user_roles directly, not even S', refused(directRole), deta
   check('S must type the right slug', codeOf(wrong) === '22023', detail(wrong));
   const gone = await remove(S, id, slug);
   const after = await call(`/rest/v1/recipes?select=id&id=eq.${id}`, { token: E.token });
-  check('S deletes the archived recipe', gone.status === 200 && rows(after).length === 0, `${detail(gone)}; ${detail(after)}`);
+  check('S deletes the archived recipe', gone.status === 204 && rows(after).length === 0, `${detail(gone)}; ${detail(after)}`);
   const trail = rows(await rpc(S, 'list_admin_audit_logs', { p_limit: 20 })).filter((l) => l.target_id === id).map((l) => l.action);
   check('the audit log has create, status moves and delete', ['recipe.create', 'recipe.status', 'recipe.delete'].every((a) => trail.includes(a)), trail.join(','));
 }
@@ -321,6 +326,18 @@ check('nobody writes user_roles directly, not even S', refused(directRole), deta
   check('anon is refused', byAnon.status === 401, `HTTP ${byAnon.status}`);
   const bad = await invoke(E, { action: 'search_openfoodfacts', query: 'x' });
   check('an unknown action is refused', bad.status === 400 && bad.body?.error?.code === 'invalid_action', `HTTP ${bad.status}, ${bad.body?.error?.code ?? '-'}`);
+}
+
+// --- youtube-refresh: scheduler only ------------------------------------------------
+// The real secret is the project owner's, so only the refusals are checked here. A 401 (not a
+// 500 config_error) also shows YOUTUBE_REFRESH_SECRET is set on the server.
+{
+  const refresh = (headers) =>
+    fetch(`${url}/functions/v1/youtube-refresh`, { method: 'POST', headers }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }));
+  const none = await refresh({ apikey: key, Authorization: `Bearer ${E.token}` });
+  check('youtube-refresh refuses an editor without the secret', none.status === 401 && none.body?.error?.code === 'unauthorized', `HTTP ${none.status}, ${none.body?.error?.code ?? '-'}`);
+  const wrong = await refresh({ 'x-refresh-secret': 'x'.repeat(40) });
+  check('youtube-refresh refuses a wrong secret', wrong.status === 401 && wrong.body?.error?.code === 'unauthorized', `HTTP ${wrong.status}, ${wrong.body?.error?.code ?? '-'}`);
 }
 
 finish();
