@@ -1,16 +1,16 @@
-YoChef schema verify  2026-11-14T04:50:07.006Z  repo migrations vs v2 bdhphjwhagygbwtfhhxn
-INFO  migrations in repo: 6
+YoChef schema verify  2026-11-14T05:08:10.749Z  repo migrations vs v2 bdhphjwhagygbwtfhhxn
+INFO  migrations in repo: 7
 SAME  enums: 1 in repo, 1 on v2
-SAME  tables: 13 in repo, 13 on v2
+SAME  tables: 15 in repo, 15 on v2
 SAME  buckets: 2 in repo, 2 on v2
-SAME  columns: 101 in repo, 101 on v2
-SAME  indexes: 35 in repo, 35 on v2
-SAME  policies: 26 in repo, 26 on v2
-SAME  triggers: 9 in repo, 9 on v2
+SAME  columns: 110 in repo, 110 on v2
+SAME  indexes: 38 in repo, 38 on v2
+SAME  policies: 30 in repo, 30 on v2
+SAME  triggers: 10 in repo, 10 on v2
 SAME  functions: 9 in repo, 9 on v2
-SAME  constraints: 78 in repo, 78 on v2
-SAME  table_grants: 23 in repo, 23 on v2
-SAME  column_grants: 31 in repo, 31 on v2
+SAME  constraints: 83 in repo, 83 on v2
+SAME  table_grants: 28 in repo, 28 on v2
+SAME  column_grants: 35 in repo, 35 on v2
 SAME  schema_grants: 1 in repo, 1 on v2
 SAME  function_grants: 9 in repo, 9 on v2
 SCHEMA MATCHES
