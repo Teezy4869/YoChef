@@ -24,6 +24,7 @@ describe('validateEnv (fail-closed)', () => {
     ['template placeholders', 'https://<project-ref>.supabase.co', '<sb_publishable_...>'],
     ['http URL', 'http://bdhphjwhagygbwtfhhxn.supabase.co', PUBLISHABLE],
     ['foreign host', 'https://evil.example.com', PUBLISHABLE],
+    ['the old read-only project', 'https://ihfuftmpsfgtwvmtfdja.supabase.co', PUBLISHABLE],
     ['secret key', URL, 'sb_secret_abc123'],
     ['service_role JWT', URL, jwt({ role: 'service_role' })],
     ['unreadable JWT', URL, 'eyJnot-a-jwt'],

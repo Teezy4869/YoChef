@@ -108,7 +108,7 @@ Chỉ dùng **publishable key**. Chỉ biến có tiền tố `EXPO_PUBLIC_` ho�
 
 ## 8. Dựng database cho project mới
 
-Chỉ làm khi bàn giao sang project Supabase **mới**. Nếu dùng đúng project v2 đang có, bỏ qua tới mục 9 (kiểm tra `migration list`).
+Chỉ làm khi bàn giao sang project Supabase **mới**. Khi đó sửa ref trong `scripts/lib/v2.mjs` trước (các lệnh `db:*` và smoke ghim theo file này). Nếu dùng đúng project v2 đang có, bỏ qua tới mục 9 (kiểm tra `migration list`).
 
 ```bash
 npx supabase login
@@ -149,8 +149,9 @@ Kết quả mong đợi hiện tại: `check` exit 0 (app 123/123); `test:db` 55
 Kiểm tra bổ sung:
 
 ```bash
-npx supabase migration list --linked   # local và remote phải khớp
-npx supabase db advisors --linked      # kỳ vọng: không có vấn đề
+npm run db:list       # local và remote phải khớp
+npm run db:verify     # schema v2 giống hệt schema dựng từ migration (SCHEMA MATCHES)
+npm run db:advisors   # chỉ còn các cảnh báo đã ghi trong docs/evidence/*/v2_state.log
 ```
 
 ## 10. Chạy ứng dụng

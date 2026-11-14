@@ -1,4 +1,4 @@
-YoChef live user smoke  2026-11-14T03:26:51.380Z  target bdhphjwhagygbwtfhhxn.supabase.co  A t***@gmail.com  B t***@gmail.com
+YoChef live user smoke  2026-11-14T04:09:34.566Z  target bdhphjwhagygbwtfhhxn.supabase.co  A t***@gmail.com  B t***@gmail.com
 PASS  user A signs in  (HTTP 200)
 PASS  user B signs in  (HTTP 200)
 PASS  A and B are different users  (A af4e8b26…, B 0867dac9…)

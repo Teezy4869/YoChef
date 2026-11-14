@@ -36,3 +36,5 @@ Duyệt mỗi lần `db push` và mỗi lần ghi dữ liệu lên v2 · gõ m�
 |---|---|---|
 | YoChef v2 | `bdhphjwhagygbwtfhhxn` | Đang dùng, quản lý 100% bằng migration |
 | cooking-app (cũ) | `ihfuftmpsfgtwvmtfdja` | **Chỉ đọc**, không ghi, không xóa cho tới khi v2 được chấp nhận |
+
+Lệnh tới database đi qua `npm run db:push`, `db:list`, `db:advisors`, `db:verify` (ghim `--project-ref` v2 trong `scripts/lib/v2.mjs`), không gọi `supabase … --linked` trần. Script smoke từ chối mọi URL khác v2; app từ chối URL của project cũ.

@@ -34,16 +34,22 @@ Yêu cầu: Node.js >= 22 (đang dùng 24.18.0), npm 11. Không cần Docker.
 ```bash
 npx supabase login                       # một lần, trên máy chủ dự án
 npx supabase link --project-ref bdhphjwhagygbwtfhhxn
-npx supabase migration list --linked     # lịch sử migration phải khớp repo
-npx supabase db push --linked            # chỉ sau khi test:db xanh và chủ dự án duyệt
+npm run db:list        # migration list, lịch sử phải khớp repo
+npm run db:verify      # schema thật trên v2 phải giống hệt schema dựng từ migration
+npm run db:push        # chỉ sau khi test:db xanh và chủ dự án duyệt
+npm run db:advisors
 ```
+
+Các lệnh `db:*` (`scripts/sb.mjs`) luôn thêm `--linked --project-ref bdhphjwhagygbwtfhhxn`, nên không thể
+đẩy nhầm sang project khác dù `supabase link` bị đổi. Mọi script smoke cũng từ chối URL khác v2, và app
+từ chối URL của project cũ `ihfuftmpsfgtwvmtfdja`. Ref v2 nằm ở một chỗ duy nhất: `scripts/lib/v2.mjs`.
 
 Nạp lại 250 công thức (idempotent, zip nằm ngoài repo, kiểm tra sha256):
 
 ```bash
 npm run seed:build -- --zip <đường dẫn>/recipes_001_250_release_candidate.zip
-npx supabase db query --linked -f supabase/.seed-out/seed.sql
-npx supabase storage cp -r supabase/.seed-out/recipe-images ss:/// --linked --content-type image/webp --experimental -j 4
+node scripts/sb.mjs db query -f supabase/.seed-out/seed.sql
+npx supabase storage cp -r supabase/.seed-out/recipe-images ss:/// --linked --project-ref bdhphjwhagygbwtfhhxn --content-type image/webp --experimental -j 4
 ```
 
 ## Ba tầng kiểm thử (K8)

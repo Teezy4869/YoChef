@@ -14,6 +14,8 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { OLD_REF, V2_URL } from './lib/v2.mjs';
+
 const { values } = parseArgs({ options: { log: { type: 'string' } } });
 
 const url = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? '').replace(/\/+$/, '');
@@ -24,6 +26,8 @@ function refuse(msg) {
   process.exit(2);
 }
 if (!/^https:\/\/[a-z0-9]+\.supabase\.co$/.test(url)) refuse('EXPO_PUBLIC_SUPABASE_URL missing or not https://<ref>.supabase.co');
+if (url.includes(OLD_REF)) refuse(`URL points to the old project ${OLD_REF} (read-only reference); YoChef v2 is ${V2_URL}`);
+if (url !== V2_URL) refuse(`URL must be the YoChef v2 project ${V2_URL}`);
 if (!key) refuse('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY missing');
 if (key.startsWith('sb_secret_')) refuse('a secret key was supplied; only the publishable key is allowed');
 if (key.startsWith('eyJ')) {

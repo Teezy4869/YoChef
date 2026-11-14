@@ -20,6 +20,8 @@ export type RawEnv = {
 };
 
 const SUPABASE_URL_RE = /^https:\/\/[a-z0-9]{20}\.supabase\.co$/;
+// The pre-rebuild project: read-only reference with a schema the app does not match (AGENTS.md).
+const OLD_PROJECT_REF = 'ihfuftmpsfgtwvmtfdja';
 
 export function rawEnvFromProcess(): RawEnv {
   return {
@@ -50,6 +52,8 @@ export function validateEnv(raw: RawEnv): EnvResult {
     problems.push('Thiếu EXPO_PUBLIC_SUPABASE_URL.');
   } else if (!SUPABASE_URL_RE.test(url)) {
     problems.push('EXPO_PUBLIC_SUPABASE_URL phải có dạng https://<project-ref>.supabase.co.');
+  } else if (url.includes(OLD_PROJECT_REF)) {
+    problems.push('EXPO_PUBLIC_SUPABASE_URL đang trỏ tới project cũ (chỉ đọc). YoChef v2 dùng project bdhphjwhagygbwtfhhxn.');
   }
 
   if (!key) {
