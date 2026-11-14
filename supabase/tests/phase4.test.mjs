@@ -375,3 +375,136 @@ describe('4.5 recipe CMS', () => {
     assert.deepEqual(a.details, { slug: '900-ga-nuong', name: 'Gà nướng' });
   });
 });
+
+describe('4.3 nutrition', () => {
+  let recipeId;
+  let pork;
+  let sauce;
+  let leaf;
+  const food = (externalId, nutrients, over = {}) => ({
+    provider: 'usda', externalId, description: `USDA ${externalId}`, dataType: 'SR Legacy', basis: 'per_100g',
+    sourceVersion: '2019-04-01', retrievedAt: '2026-11-14T00:00:00Z', nutrients, ...over,
+  });
+  const PORK = { energyKcal: 242, proteinG: 27.3, fatG: 14, carbsG: 0, sodiumMg: 62, saturatedFatG: 5.2, fiberG: 0, sugarG: null };
+  const SAUCE = { energyKcal: 35, proteinG: 5.1, fatG: 0, carbsG: 3.6, sodiumMg: 7851, saturatedFatG: 0, fiberG: 0, sugarG: 3.6 };
+  const mapping = (uid, ing, f, status = 'CANDIDATE') =>
+    rpc(uid, `select public.save_ingredient_nutrition($1, $2::jsonb, $3) as s`, [ing, f === null ? null : JSON.stringify(f), status]);
+  const verifyMapping = (uid, ing) => rpc(uid, `select public.verify_ingredient_nutrition($1) as s`, [ing]);
+  const calc = (uid) => rpc(uid, `select public.calculate_recipe_nutrition($1) as r`, [recipeId]);
+  const verify = (uid) => rpc(uid, `select public.verify_recipe_nutrition($1) as s`, [recipeId]);
+  const stored = () => admin(db, `select status, totals, per_serving, completeness::float as completeness, reason_codes from public.recipe_nutrition where recipe_id = $1`, [recipeId]).then((r) => r[0]);
+
+  before(async () => {
+    const [{ id: cat }] = await admin(db, `select id from public.categories where slug = 'mon_chinh'`);
+    [{ id: recipeId }] = await admin(db,
+      `insert into public.recipes (slug, name, category_id, default_servings, status, published_at)
+       values ('950-thit-luoc', 'Thịt luộc', $1, 2, 'published', now()) returning id`, [cat]);
+    [{ id: pork }] = await admin(db, `select id from public.ingredients where slug = 'thit-lon'`);
+    [{ id: sauce }] = await admin(db, `insert into public.ingredients (slug, name) values ('nuoc-mam', 'Nước mắm') returning id`);
+    [{ id: leaf }] = await admin(db, `insert into public.ingredients (slug, name) values ('la-chanh', 'Lá chanh') returning id`);
+    await admin(db,
+      `insert into public.recipe_ingredients (recipe_id, ingredient_id, sort_order, quantity, unit, quantity_basis, is_optional) values
+       ($1, $2, 1, 500, 'g', 'book', false), ($1, $3, 2, 2, 'Muỗng canh', 'book', false), ($1, $4, 3, null, null, 'to_taste', true)`,
+      [recipeId, pork, sauce, leaf]);
+  });
+
+  it('only editors manage nutrition; the public reads nothing that is not verified', async () => {
+    for (const uid of [user, moderator, null]) {
+      assert.equal((await mapping(uid, pork, food('167812', PORK))).error?.code, INSUFFICIENT_PRIVILEGE);
+      assert.equal((await calc(uid)).error?.code, INSUFFICIENT_PRIVILEGE);
+    }
+    assert.equal((await rpc(user, `select * from public.ingredient_nutrition`)).rows.length, 0);
+    assert.equal((await rpc(null, `select * from public.ingredient_nutrition`)).error?.code, INSUFFICIENT_PRIVILEGE);
+    assert.equal((await rpc(user, `insert into public.recipe_nutrition (recipe_id, calculation_version, status, totals, completeness)
+      values ($1, '2.0.0', 'VERIFIED', '{}', 1)`, [recipeId])).error?.code, INSUFFICIENT_PRIVILEGE);
+    const seeded = await rpc(editor, `select unit, grams_per_unit::float as g from public.nutrition_unit_conversions where verified_at is not null order by unit`);
+    assert.deepEqual(seeded.rows, [{ unit: 'g', g: 1 }, { unit: 'gram', g: 1 }, { unit: 'kg', g: 1000 }, { unit: 'mg', g: 0.001 }]);
+  });
+
+  it('unverified inputs never produce a number: totals stay NULL, with the reasons', async () => {
+    assert.equal((await mapping(editor, pork, food('167812', PORK))).error, null);
+    const r = (await calc(editor)).rows[0].r;
+    assert.equal(r.status, 'NOT_CALCULATED'); // nothing usable yet
+    assert.deepEqual(r.reason_codes, ['no_verified_conversion', 'unmapped_nutrition', 'unverified_mapping']);
+    assert.deepEqual(Object.values(r.totals), Array(8).fill(null));
+    assert.deepEqual(r.excluded_optional, [leaf]);
+    assert.equal((await verifyMapping(editor, pork)).error, null);
+    const partly = (await calc(editor)).rows[0].r;
+    assert.equal(partly.status, 'INCOMPLETE'); // the sauce still blocks every total
+    assert.deepEqual(Object.values(partly.totals), Array(8).fill(null));
+    assert.equal((await verify(editor)).error?.code, INVALID_PARAMETER);
+  });
+
+  it('a unit counts once a verified rule exists; an ingredient rule wins over a global one', async () => {
+    const save = (ing, unit, grams, source = 'Đo thực tế', method = 'cân 10 lần') =>
+      rpc(editor, `select public.save_unit_conversion($1, $2, $3, $4, $5) as id`, [ing, unit, grams, source, method]);
+    const global = (await save(null, ' Muỗng canh ', 15)).rows[0].id;
+    const [{ unit }] = await admin(db, `select unit from public.nutrition_unit_conversions where id = $1`, [global]);
+    assert.equal(unit, 'muỗng canh');
+    assert.ok((await calc(editor)).rows[0].r.reason_codes.includes('unverified_conversion'));
+    const noSource = (await save(null, 'chén', 200, null, null)).rows[0].id;
+    assert.equal((await rpc(editor, `select public.verify_unit_conversion($1)`, [noSource])).error?.code, INVALID_PARAMETER);
+    assert.equal((await rpc(editor, `select public.verify_unit_conversion($1)`, [global])).error, null);
+    const specific = (await save(sauce, 'muỗng canh', 18)).rows[0].id;
+    await rpc(editor, `select public.verify_unit_conversion($1)`, [specific]);
+    await mapping(editor, sauce, food('174531', SAUCE));
+    await verifyMapping(editor, sauce);
+    const r = (await calc(editor)).rows[0].r;
+    assert.equal(r.status, 'CALCULATED');
+    assert.deepEqual(r.breakdown.map((b) => [b.name, Number(b.grams)]), [['Thịt lợn', 500], ['Nước mắm', 36]]);
+  });
+
+  it('computes totals from verified inputs; per serving comes from the unrounded total; 0 stays 0, unknown stays NULL', async () => {
+    const s = await stored();
+    // pork 500 g + sauce 2 x 18 g = 36 g
+    assert.deepEqual(s.totals, {
+      energy_kcal: 1222.6, protein_g: 138.3, fat_g: 70, carbs_g: 1.3, sodium_mg: 3136.4,
+      saturated_fat_g: 26, fiber_g: 0, sugar_g: null,
+    });
+    assert.equal(s.per_serving.protein_g, 69.2); // 138.336 / 2 = 69.168
+    assert.equal(s.per_serving.sugar_g, null);
+    assert.equal(s.completeness, 0.9375); // 15 known values of 2 x 8
+    assert.equal(s.status, 'CALCULATED');
+    assert.deepEqual((await rpc(null, `select status from public.recipe_nutrition where recipe_id = $1`, [recipeId])).rows, []);
+  });
+
+  it('verification recomputes; then the public reads the result of a published recipe', async () => {
+    assert.equal((await verify(moderator)).error?.code, INSUFFICIENT_PRIVILEGE);
+    assert.deepEqual((await verify(editor)).rows, [{ s: 'VERIFIED' }]);
+    const pub = await rpc(null, `select status, per_serving from public.recipe_nutrition where recipe_id = $1`, [recipeId]);
+    assert.equal(pub.rows[0].status, 'VERIFIED');
+    assert.equal(pub.rows[0].per_serving.energy_kcal, 611.3);
+    await admin(db, `update public.recipes set status = 'staged' where id = $1`, [recipeId]);
+    assert.deepEqual((await rpc(null, `select status from public.recipe_nutrition where recipe_id = $1`, [recipeId])).rows, []);
+    await admin(db, `update public.recipes set status = 'published' where id = $1`, [recipeId]);
+  });
+
+  it('any input change marks the result STALE until recalculated and verified again', async () => {
+    const check = async (change) => {
+      await calc(editor);
+      await verify(editor);
+      await change();
+      assert.equal((await stored()).status, 'STALE');
+      assert.equal((await rpc(null, `select status from public.recipe_nutrition where recipe_id = $1`, [recipeId])).rows.length, 0);
+    };
+    await check(() => admin(db, `update public.recipes set default_servings = 3 where id = $1`, [recipeId]));
+    await check(() => admin(db, `update public.recipe_ingredients set quantity = 400 where recipe_id = $1 and sort_order = 1`, [recipeId]));
+    await check(() => mapping(editor, sauce, food('174531', { ...SAUCE, sodiumMg: 7000 })));
+    await verifyMapping(editor, sauce);
+    await check(() => rpc(editor, `select public.save_unit_conversion($1, 'muỗng canh', 17, 'Đo', 'cân')`, [sauce]));
+    assert.equal((await verify(editor)).error?.code, INVALID_PARAMETER); // STALE cannot be verified
+  });
+
+  it('saving a mapping clears its verification; a branded food or a missing USDA id cannot be verified', async () => {
+    const [before] = await admin(db, `select mapping_status from public.ingredient_nutrition where ingredient_id = $1`, [sauce]);
+    assert.equal(before.mapping_status, 'VERIFIED');
+    await mapping(editor, sauce, food('174531', SAUCE, { dataType: 'Branded', basis: null }));
+    const [after] = await admin(db, `select mapping_status, basis, energy_kcal, verified_at from public.ingredient_nutrition where ingredient_id = $1`, [sauce]);
+    assert.deepEqual(after, { mapping_status: 'CANDIDATE', basis: null, energy_kcal: null, verified_at: null });
+    assert.equal((await verifyMapping(editor, sauce)).error?.code, INVALID_PARAMETER);
+    assert.equal((await mapping(editor, sauce, food('', SAUCE))).error?.code, INVALID_PARAMETER);
+    assert.equal((await mapping(editor, sauce, null, 'UNAVAILABLE')).error, null);
+    const audit = await admin(db, `select count(*)::int n from public.admin_audit_logs where action like 'nutrition.%'`);
+    assert.ok(audit[0].n >= 8);
+  });
+});

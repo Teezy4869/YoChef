@@ -9,6 +9,7 @@ import { Screen } from '@/components/Screen';
 import { CommentSection } from '@/features/community/CommentSection';
 import { CookingPhotoSection } from '@/features/community/CookingPhotoSection';
 import { FavoriteButton } from '@/features/favorites/FavoriteButton';
+import { NutritionSection } from '@/features/nutrition/NutritionSection';
 import { RatingSection } from '@/features/ratings/RatingSection';
 import { AddToShoppingButton } from '@/features/shopping/AddToShoppingButton';
 import { formatSeconds, joinMeta, timeLabel } from '@/features/recipes/format';
@@ -162,6 +163,10 @@ function RecipeDetailView({
             </View>
           ))
         )}
+      </View>
+
+      <View style={styles.block}>
+        <NutritionSection recipeId={recipe.id} />
       </View>
 
       <View style={styles.block}>

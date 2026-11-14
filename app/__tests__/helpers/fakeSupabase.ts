@@ -119,7 +119,7 @@ export function createFakeSupabase(initial: Session | null = null) {
     cooking_photos: { status: 'pending', caption: null },
   };
   // Readable by everyone (published recipes only, in the real policies); writes stay owner-only.
-  const PUBLIC_READ = new Set(['ratings', 'recipe_rating_summary', 'comments', 'cooking_photos']);
+  const PUBLIC_READ = new Set(['ratings', 'recipe_rating_summary', 'comments', 'cooking_photos', 'recipe_nutrition']);
   const UNIQUE: Record<string, string[]> = {
     favorites: ['user_id', 'recipe_id'],
     ratings: ['user_id', 'recipe_id'],
@@ -251,7 +251,7 @@ export function createFakeSupabase(initial: Session | null = null) {
 
   const USER_TABLES = new Set([
     'favorites', 'shopping_lists', 'shopping_list_items', 'ratings', 'recipe_rating_summary', 'comments', 'cooking_photos',
-    'user_roles', 'content_reports',
+    'user_roles', 'content_reports', 'recipe_nutrition',
   ]);
 
   const from = jest.fn((table: string) =>

@@ -229,6 +229,27 @@ check('nobody writes user_roles directly, not even S', refused(directRole), deta
   const delCover = await call(`/storage/v1/object/recipe-images/${coverPath}`, { method: 'DELETE', token: E.token });
   check('E deletes the unused cover', delCover.status === 200, detail(delCover));
 
+  // --- 4.3 nutrition on the same throw-away recipe (its result goes with it) ---
+  for (const [who, u] of [['A', A], ['M', M]]) {
+    const r = await rpc(u, 'calculate_recipe_nutrition', { p_recipe_id: id });
+    check(`${who} cannot calculate nutrition`, refused(r), detail(r));
+  }
+  const calc = await rpc(E, 'calculate_recipe_nutrition', { p_recipe_id: id });
+  check(
+    'E calculates it: unverified inputs give no number (totals NULL, with reasons)',
+    calc.status === 200 && calc.body?.status !== 'CALCULATED' && calc.body?.totals?.energy_kcal === null && calc.body?.reason_codes?.length > 0,
+    `${detail(calc)}; ${calc.body?.status}; ${(calc.body?.reason_codes ?? []).join(',')}`,
+  );
+  const unverified = await rpc(E, 'verify_recipe_nutrition', { p_recipe_id: id });
+  check('an incomplete result cannot be verified', codeOf(unverified) === '22023', detail(unverified));
+  const nutAnon = await call(`/rest/v1/recipe_nutrition?select=status&recipe_id=eq.${id}`);
+  check('anon does not see an unverified result', nutAnon.status === 200 && rows(nutAnon).length === 0, detail(nutAnon));
+  const mapE = await call('/rest/v1/ingredient_nutrition?select=ingredient_id&limit=1', { token: E.token });
+  const mapA = await call('/rest/v1/ingredient_nutrition?select=ingredient_id&limit=1', { token: A.token });
+  check('E reads mappings; A reads none', mapE.status === 200 && mapA.status === 200 && rows(mapA).length === 0, `${detail(mapE)}; ${detail(mapA)}`);
+  const convA = await rpc(A, 'save_unit_conversion', { p_ingredient_id: null, p_unit: 'zz-smoke', p_grams: 1, p_source: 'x', p_method: 'x' });
+  check('A cannot write unit conversions', refused(convA), detail(convA));
+
   const byE = await remove(E, id, slug);
   check('E cannot hard-delete', refused(byE), detail(byE));
   const wrong = await remove(S, id, `${slug}-x`);
@@ -238,6 +259,31 @@ check('nobody writes user_roles directly, not even S', refused(directRole), deta
   check('S deletes the archived recipe', gone.status === 200 && rows(after).length === 0, `${detail(gone)}; ${detail(after)}`);
   const trail = rows(await rpc(S, 'list_admin_audit_logs', { p_limit: 20 })).filter((l) => l.target_id === id).map((l) => l.action);
   check('the audit log has create, status moves and delete', ['recipe.create', 'recipe.status', 'recipe.delete'].every((a) => trail.includes(a)), trail.join(','));
+}
+
+// --- 4.3 Edge Function nutrition-search (deployed, USDA_API_KEY set by the owner) -------
+{
+  const invoke = (u, body) =>
+    fetch(`${url}/functions/v1/nutrition-search`, {
+      method: 'POST',
+      headers: { apikey: key, Authorization: `Bearer ${u?.token ?? key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }));
+  const ok = await invoke(E, { action: 'search_usda', query: 'pork loin raw' });
+  const first = ok.body?.items?.[0];
+  check(
+    'E searches USDA through the function (per 100 g, at most 10 results)',
+    ok.status === 200 && Array.isArray(ok.body?.items) && ok.body.items.length <= 10 && first?.provider === 'usda',
+    `HTTP ${ok.status}, ${ok.body?.error?.code ?? `${ok.body?.items?.length ?? '-'} items`}`,
+  );
+  const detailRes = first ? await invoke(E, { action: 'get_usda_food', fdcId: first.externalId }) : null;
+  check('E reads one USDA food by id', detailRes?.status === 200 && detailRes.body?.item?.externalId === first?.externalId, `HTTP ${detailRes?.status ?? '-'}`);
+  const byA = await invoke(A, { action: 'search_usda', query: 'pork' });
+  check('A is refused (forbidden)', byA.status === 403 && byA.body?.error?.code === 'forbidden', `HTTP ${byA.status}, ${byA.body?.error?.code ?? byA.body?.code ?? '-'}`);
+  const byAnon = await invoke(null, { action: 'search_usda', query: 'pork' });
+  check('anon is refused', byAnon.status === 401, `HTTP ${byAnon.status}`);
+  const bad = await invoke(E, { action: 'search_openfoodfacts', query: 'x' });
+  check('an unknown action is refused', bad.status === 400 && bad.body?.error?.code === 'invalid_action', `HTTP ${bad.status}, ${bad.body?.error?.code ?? '-'}`);
 }
 
 finish();

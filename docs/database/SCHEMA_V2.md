@@ -1,6 +1,6 @@
 # YoChef v2: Schema chuẩn (SCHEMA_V2)
 
-**Trạng thái:** `0001_catalog` = `supabase/migrations/20261108130000_catalog.sql`, `0002_identity_rbac` = `20261108130100_identity_rbac.sql` (bước 0.4). Phase 3: `favorites` = `20261113234830_phase3_favorites.sql` (3.1), `shopping_lists` = `20261114041322_phase3_shopping_lists.sql` (3.2), `ratings` = `20261114045322_phase3_ratings.sql` (3.3), `comments` = `20261114051346_phase3_comments.sql` (3.4), `cooking_photos` = `20261114054707_phase3_cooking_photos.sql` (3.5), duyệt nội dung = `20261114060039_phase3_moderation.sql` (3.6). Phase 4: vai trò và nhật ký quản trị = `20261114153457_phase4_rbac_audit.sql` (4.1), báo cáo vi phạm = `20261114155100_phase4_content_reports.sql` (4.2), CMS công thức = `20261114160903_phase4_recipe_cms.sql` (4.5). Tên logic `00NN_*` trong tài liệu ứng với file có tiền tố timestamp mà Supabase CLI yêu cầu. Tài liệu này là **nguồn sự thật duy nhất** về schema: migration viết theo nó, và khi migration buộc phải khác, tài liệu được sửa trong cùng commit.
+**Trạng thái:** `0001_catalog` = `supabase/migrations/20261108130000_catalog.sql`, `0002_identity_rbac` = `20261108130100_identity_rbac.sql` (bước 0.4). Phase 3: `favorites` = `20261113234830_phase3_favorites.sql` (3.1), `shopping_lists` = `20261114041322_phase3_shopping_lists.sql` (3.2), `ratings` = `20261114045322_phase3_ratings.sql` (3.3), `comments` = `20261114051346_phase3_comments.sql` (3.4), `cooking_photos` = `20261114054707_phase3_cooking_photos.sql` (3.5), duyệt nội dung = `20261114060039_phase3_moderation.sql` (3.6). Phase 4: vai trò và nhật ký quản trị = `20261114153457_phase4_rbac_audit.sql` (4.1), báo cáo vi phạm = `20261114155100_phase4_content_reports.sql` (4.2), CMS công thức = `20261114160903_phase4_recipe_cms.sql` (4.5), dinh dưỡng = `20261114162121_phase4_nutrition.sql` (4.3). Tên logic `00NN_*` trong tài liệu ứng với file có tiền tố timestamp mà Supabase CLI yêu cầu. Tài liệu này là **nguồn sự thật duy nhất** về schema: migration viết theo nó, và khi migration buộc phải khác, tài liệu được sửa trong cùng commit.
 **Project:** Supabase `bdhphjwhagygbwtfhhxn` (YoChef v2), PostgreSQL 17.
 **Ngày:** 2026-11-08.
 
@@ -353,23 +353,18 @@ RLS theo `phase4_03`:
 
 Client không có quyền ghi; ghi qua RPC `assign_recipe_video` kèm biên nhận xác minh. **Vẫn còn câu hỏi pháp lý dành cho chủ dự án:** có được giữ lại video ID sau 30 ngày hay không.
 
-### 5.6 Dinh dưỡng (4.3), phác thảo
-- `ingredient_nutrition`:
-  - giá trị: `ingredient_id`, `basis` (`per_100g` hoặc null), `energy_kcal`, `protein_g`, `fat_g`, `carbs_g`, `sodium_mg`, `saturated_fat_g`, `fiber_g`, `sugar_g`. Tất cả nullable và ≥ 0;
-  - nguồn gốc: `provider`, `external_id`, `description`, `preparation_state`, `data_type`, `source_version`, `retrieved_at`;
-  - trạng thái: `mapping_status` (`UNMAPPED`,`CANDIDATE`,`NEEDS_REVIEW`,`VERIFIED`,`UNAVAILABLE`), `verified_by`, `verified_at`.
-- `nutrition_unit_conversions`:
-  - `ingredient_id` nullable; null nghĩa là quy tắc chung;
-  - `unit`, `grams_per_unit` > 0, `source`, `method`, `verified_by`, `verified_at`;
-  - unique `(ingredient_id, unit) nulls not distinct` (PostgreSQL ≥ 15), để mỗi đơn vị chỉ có một quy tắc chung.
-- `recipe_nutrition`:
-  - PK `recipe_id`;
-  - `calculation_version`, `status` (`NOT_CALCULATED`,`INCOMPLETE`,`CALCULATED`,`NEEDS_REVIEW`,`VERIFIED`,`STALE`);
-  - tổng và mỗi phần ăn của 8 chất, `completeness`, `reason_codes` text[], `calculated_at`, `verified_by`, `verified_at`.
+### 5.6 Dinh dưỡng (4.3, `20261114162121_phase4_nutrition.sql`, engine 2.0.0)
+Hợp đồng chi tiết: `phase4_08_nutrition_data_contract.md`. Nguồn dữ liệu: **chỉ USDA** (quyết định E11 của kế hoạch Phase 4; Open Food Facts để sau).
 
-Quy tắc chi tiết nằm trong `phase4_08_nutrition_data_contract.md`. Public chỉ đọc kết quả `VERIFIED` của công thức `published`.
-
-**Lưu ý dữ liệu:** đơn vị chưa chuẩn hóa. Bộ dữ liệu có cả `thìa`, `thìa canh` và `thìa to`, tổng cộng 45 đơn vị khác nhau. Bảng quy đổi phải xử lý từng đơn vị, không được giả định.
+- `ingredient_nutrition` (PK `ingredient_id`, FK cascade): `basis` (`per_100g` hoặc NULL), 8 chất (`energy_kcal`, `protein_g`, `fat_g`, `carbs_g`, `sodium_mg`, `saturated_fat_g`, `fiber_g`, `sugar_g`; NULL hoặc ≥ 0), nguồn gốc (`provider` = `usda`, `external_id` 1–10 chữ số, `description`, `data_type`, `preparation_state`, `source_version`, `retrieved_at`), `mapping_status` (`UNMAPPED`, `CANDIDATE`, `NEEDS_REVIEW`, `VERIFIED`, `UNAVAILABLE`), `verified_by`, `verified_at`. CHECK: không có `basis` thì mọi chất là NULL; `VERIFIED` bắt buộc có basis, nguồn và thời điểm xác minh.
+- `nutrition_unit_conversions`: `ingredient_id` (NULL là quy tắc chung), `unit` (chữ thường, đã bỏ khoảng trắng), `grams_per_unit` > 0, `source`, `method`, `verified_by`, `verified_at`; unique `(ingredient_id, unit) nulls not distinct`; xác minh cần nguồn và cách đo. Migration chỉ seed `g`, `gram`, `kg`, `mg` là đã xác minh (định nghĩa). Không giả định khối lượng riêng hay trọng lượng một quả/muỗng.
+- `recipe_nutrition` (PK `recipe_id`, FK cascade): `calculation_version`, `status` (`NOT_CALCULATED`, `INCOMPLETE`, `CALCULATED`, `NEEDS_REVIEW`, `VERIFIED`, `STALE`), `totals` và `per_serving` (jsonb 8 chất, NULL là chưa rõ), `completeness`, `reason_codes`, `breakdown` (từng nguyên liệu bắt buộc: gam và lý do), `excluded_optional`, `calculated_at`, `verified_by`, `verified_at`. **Lệch phác thảo cũ có chủ đích:** tổng và mỗi phần lưu thành jsonb thay vì 16 cột.
+- **Engine** (`private.compute_recipe_nutrition`): chỉ dùng mapping và quy đổi **đã xác minh** (quy tắc riêng của nguyên liệu thắng quy tắc chung). Nguyên liệu `is_optional` bị loại và liệt kê riêng. Một nguyên liệu bắt buộc không quy được ra gam hay không có mapping xác minh thì **mọi tổng là NULL** (không bao giờ cộng một phần). Một chất thiếu ở một nguyên liệu thì tổng chất đó NULL. 5 chất bắt buộc: năng lượng, đạm, béo, bột đường, natri. Mỗi phần tính từ tổng chưa làm tròn; làm tròn 1 chữ số, nửa ra xa 0. Trạng thái: không có gì dùng được hoặc khẩu phần không hợp lệ thì `NOT_CALCULATED`; còn nguyên liệu chưa giải được hay thiếu chất bắt buộc thì `INCOMPLETE`; đủ thì `CALCULATED`. `NEEDS_REVIEW` (bản xem trước dùng dữ liệu chưa xác minh) chưa làm: engine không bao giờ dùng dữ liệu chưa xác minh.
+- Hệ quả của hợp đồng với dữ liệu thật: nguyên liệu "vừa ăn" bắt buộc (`quantity` NULL, ví dụ muối, tiêu) chặn mọi tổng (`missing_quantity`). Đa số công thức sẽ `INCOMPLETE` cho tới khi editor đánh dấu các nguyên liệu đó là không bắt buộc hoặc ghi số lượng.
+- **RPC (DEFINER, chỉ editor và super_admin, có `admin_audit_logs`):** `save_ingredient_nutrition(p_ingredient_id, p_food, p_status)` (nhận đúng thực phẩm chuẩn hóa từ Edge Function; lưu là xóa xác minh), `verify_ingredient_nutrition`, `save_unit_conversion` (lưu là xóa xác minh), `verify_unit_conversion`, `calculate_recipe_nutrition` (ghi kết quả mới, không bao giờ là `VERIFIED`), `verify_recipe_nutrition` (tính lại từ dữ liệu hiện tại; từ chối nếu không phải `CALCULATED`, sai phiên bản engine, hay lệch với lần tính lại).
+- **STALE:** trigger trên `recipe_ingredients`, `recipes.default_servings`, `ingredient_nutrition` và `nutrition_unit_conversions` đánh dấu mọi kết quả liên quan là `STALE`, kể cả kết quả đã xác minh (khi đó nó không còn công khai).
+- **RLS:** `anon` và `authenticated` đọc `recipe_nutrition` khi `VERIFIED` và công thức `published`; editor đọc mọi kết quả, mapping và quy đổi. Client không ghi được bảng nào.
+- **Edge Function `nutrition-search`** (`supabase/functions/nutrition-search`): action `search_usda` (tối đa 10 kết quả, chỉ kiểu Foundation, SR Legacy, Survey (FNDDS)) và `get_usda_food`; chỉ editor/super_admin (đọc vai trò bằng JWT của người gọi); khóa USDA trong secret, gửi qua header; hết 8 giây là `provider_timeout`; không có `DEMO_KEY`. Logic ở `contract.ts` (port từ v1, bỏ Open Food Facts), test bằng Vitest trong `admin/src/test/nutritionContract.test.ts`.
 
 ### 5.7 Quản trị (4.1, 4.2)
 - `admin_audit_logs` (**đã làm ở 4.1**): `id`, `actor_id` (không FK, để còn nguyên khi tài khoản bị xóa; NULL là tác vụ hệ thống), `action` (dạng `nhóm.hành_động`, ví dụ `role.assign`), `target_table`, `target_id`, `reason` (NULL hoặc 1–500 ký tự), `details jsonb`, `created_at`. Chỉ được thêm: trigger `private.forbid_change()` chặn UPDATE và DELETE với mọi vai trò. Client không có quyền nào trên bảng (RLS bật, không có policy); chỉ đọc qua `list_admin_audit_logs()`. Các RPC ghi qua `private.audit()` (INVOKER, chỉ chạy được bên trong RPC DEFINER).

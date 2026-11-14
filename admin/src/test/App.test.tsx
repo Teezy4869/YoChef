@@ -60,9 +60,9 @@ describe('routes and guards', () => {
   });
 
   it.each<[StaffRole, string[]]>([
-    ['editor', ['Tổng quan', 'Công thức']],
+    ['editor', ['Tổng quan', 'Công thức', 'Dinh dưỡng']],
     ['moderator', ['Tổng quan', 'Kiểm duyệt']],
-    ['super_admin', ['Tổng quan', 'Công thức', 'Kiểm duyệt', 'Nhân sự', 'Nhật ký quản trị']],
+    ['super_admin', ['Tổng quan', 'Công thức', 'Dinh dưỡng', 'Kiểm duyệt', 'Nhân sự', 'Nhật ký quản trị']],
   ])('the sidebar of a %s lists exactly the routes that role may open', async (role, labels) => {
     const fake = signedIn([role]);
     renderAt('/dashboard', fake);
@@ -339,5 +339,81 @@ describe('recipe CMS', () => {
     fireEvent.change(screen.getByLabelText('Lý do (bắt buộc)'), { target: { value: 'Trùng' } });
     fireEvent.click(del);
     await waitFor(() => expect(fake.rpc).toHaveBeenCalledWith('delete_recipe', { p_id: 'r1', p_confirm_slug: '001-thit-kho', p_reason: 'Trùng' }));
+  });
+});
+
+describe('nutrition page', () => {
+  const PORK = {
+    provider: 'usda', externalId: '167812', description: 'Pork, fresh, loin, raw', dataType: 'SR Legacy', basis: 'per_100g',
+    sourceVersion: 'SR Legacy 2019-04-01', retrievedAt: '2026-11-14T00:00:00.000Z',
+    nutrients: { energyKcal: 242, proteinG: 27.3, fatG: 14, carbsG: 0, sodiumMg: 62, saturatedFatG: null, fiberG: null, sugarG: null },
+  };
+  function setup() {
+    const fake = signedIn(['editor']);
+    fake.tables.ingredients = [
+      { id: 'ing-1', name: 'Thịt lợn', nutrition: null },
+      { id: 'ing-2', name: 'Muối', nutrition: { mapping_status: 'CANDIDATE', description: 'Salt, table', external_id: '173468', energy_kcal: 0, protein_g: 0, fat_g: 0, carbs_g: 0, sodium_mg: 38758, saturated_fat_g: null, fiber_g: null, sugar_g: null } },
+    ];
+    fake.tables.recipes = [{ id: 'r1', name: 'Thịt luộc', status: 'published', nutrition: null }];
+    fake.rpcHandlers.save_ingredient_nutrition = ({ p_status }) => ({ data: p_status, error: null });
+    fake.rpcHandlers.verify_ingredient_nutrition = () => ({ data: 'VERIFIED', error: null });
+    renderAt('/nutrition', fake);
+    return fake;
+  }
+
+  it('maps an ingredient to a USDA food found through the Edge Function', async () => {
+    const fake = setup();
+    fake.functions.invoke.mockResolvedValueOnce({ data: { items: [PORK, { ...PORK, externalId: '999', dataType: 'Branded', basis: null }], source: 'usda' }, error: null });
+    fireEvent.click(await screen.findByRole('button', { name: /^Thịt lợn/ }));
+    fireEvent.change(screen.getByLabelText(/Tìm trên USDA/), { target: { value: 'pork loin raw' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Tìm' }));
+    const result = await screen.findByRole('listitem', { name: 'USDA 167812' });
+    expect(fake.functions.invoke).toHaveBeenCalledWith('nutrition-search', { body: { action: 'search_usda', query: 'pork loin raw' } });
+    expect(within(screen.getByRole('listitem', { name: 'USDA 999' })).getByRole('button', { name: 'Dùng thực phẩm này' })).toBeDisabled();
+    fireEvent.click(within(result).getByRole('button', { name: 'Dùng thực phẩm này' }));
+    expect(await screen.findByText('Đã lưu làm ứng viên. Kiểm tra rồi bấm Xác minh.')).toBeInTheDocument();
+    expect(fake.rpc).toHaveBeenCalledWith('save_ingredient_nutrition', { p_ingredient_id: 'ing-1', p_food: PORK, p_status: 'CANDIDATE' });
+  });
+
+  it('verifies a candidate and shows unknown values as a dash', async () => {
+    const fake = setup();
+    fireEvent.click(await screen.findByRole('button', { name: /^Muối/ }));
+    const panel = screen.getByLabelText('Dinh dưỡng của Muối');
+    expect(within(panel).getByText('Béo bão hòa /100 g').nextSibling).toHaveTextContent('—');
+    expect(within(panel).getByText('Năng lượng /100 g').nextSibling).toHaveTextContent('0 kcal');
+    fireEvent.click(within(panel).getByRole('button', { name: 'Xác minh' }));
+    expect(await screen.findByText('Đã xác minh.')).toBeInTheDocument();
+    expect(fake.rpc).toHaveBeenCalledWith('verify_ingredient_nutrition', { p_ingredient_id: 'ing-2' });
+  });
+
+  it('explains an Edge Function refusal', async () => {
+    const fake = setup();
+    fake.functions.invoke.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'Edge Function returned a non-2xx status code', context: new Response(JSON.stringify({ error: { code: 'config_error', message: 'x' } }), { status: 503 }) },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: /^Thịt lợn/ }));
+    fireEvent.change(screen.getByLabelText(/Tìm trên USDA/), { target: { value: 'pork' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Tìm' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Máy chủ chưa cấu hình khóa USDA.');
+  });
+
+  it('calculates a recipe and offers verification only for a complete result', async () => {
+    const fake = setup();
+    const nulls = { energy_kcal: null, protein_g: null, fat_g: null, carbs_g: null, sodium_mg: null, saturated_fat_g: null, fiber_g: null, sugar_g: null };
+    fake.rpcHandlers.calculate_recipe_nutrition = () => ({
+      data: { status: 'INCOMPLETE', totals: nulls, per_serving: nulls, completeness: 0.5, reason_codes: ['missing_quantity'],
+        breakdown: [{ ingredient_id: 'ing-2', name: 'Muối', grams: null, reasons: ['missing_quantity'] }] },
+      error: null,
+    });
+    fireEvent.click(await screen.findByRole('tab', { name: 'Công thức' }));
+    fireEvent.change(screen.getByLabelText('Tìm công thức'), { target: { value: 'thịt' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Tìm' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Tính dinh dưỡng Thịt luộc' }));
+    const box = await screen.findByLabelText('Kết quả dinh dưỡng');
+    expect(within(box).getByText('Thiếu dữ liệu')).toBeInTheDocument();
+    expect(within(box).getByText('Muối: thiếu số lượng (ví dụ "vừa ăn")')).toBeInTheDocument();
+    expect(within(box).getAllByText('—').length).toBe(16);
+    expect(within(box).queryByRole('button', { name: 'Xác minh kết quả' })).toBeNull();
   });
 });

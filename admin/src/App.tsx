@@ -8,6 +8,7 @@ import { AuditLogPage } from '@/pages/AuditLogPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { ModerationPage } from '@/pages/ModerationPage';
+import { NutritionPage } from '@/pages/NutritionPage';
 import { RecipeEditPage } from '@/pages/RecipeEditPage';
 import { RecipeListPage } from '@/pages/RecipeListPage';
 import { StaffPage } from '@/pages/StaffPage';
@@ -21,6 +22,7 @@ export const ROUTES: AdminRoute[] = [
   { path: '/recipes', label: 'Công thức', roles: ['editor'], element: <RecipeListPage />, sidebar: true },
   { path: '/recipes/new', label: 'Tạo công thức', roles: ['editor'], element: <RecipeEditPage />, sidebar: false },
   { path: '/recipes/:id/edit', label: 'Sửa công thức', roles: ['editor'], element: <RecipeEditPage />, sidebar: false },
+  { path: '/nutrition', label: 'Dinh dưỡng', roles: ['editor'], element: <NutritionPage />, sidebar: true },
   { path: '/moderation', label: 'Kiểm duyệt', roles: ['moderator'], element: <ModerationPage />, sidebar: true },
   { path: '/staff', label: 'Nhân sự', roles: ['super_admin'], element: <StaffPage />, sidebar: true },
   { path: '/audit-logs', label: 'Nhật ký quản trị', roles: ['super_admin'], element: <AuditLogPage />, sidebar: true },

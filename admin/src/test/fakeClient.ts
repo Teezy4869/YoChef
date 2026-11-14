@@ -101,6 +101,8 @@ export function createFakeClient(options: { session?: Session | null; roles?: St
     getPublicUrl: vi.fn((path: string) => ({ data: { publicUrl: `https://example.test/public/${path}` } })),
   };
 
-  const client = { auth, from, rpc, storage } as unknown as AdminClient;
-  return { client, auth, from, rpc, roles, counts, rpcHandlers, tables, bucket };
+  const functions = { invoke: vi.fn(async (_name: string, _opts?: unknown): Promise<{ data: unknown; error: unknown }> => ({ data: null, error: { message: 'no fake' } })) };
+
+  const client = { auth, from, rpc, storage, functions } as unknown as AdminClient;
+  return { client, auth, from, rpc, roles, counts, rpcHandlers, tables, bucket, functions };
 }
