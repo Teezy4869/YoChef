@@ -24,3 +24,10 @@ $ npm run smoke:admin
 NOT RUN: "credentials for S are missing in .env.smoke". Blocked on the project owner creating test accounts
 S (super_admin, bootstrapped by SQL) and E, and adding SMOKE_EMAIL_SUPER / SMOKE_PASSWORD_SUPER and
 SMOKE_EMAIL_EDITOR / SMOKE_PASSWORD_EDITOR.
+
+== 4.1 smoke:admin with S and E  2026-11-14 ==
+The project owner created test accounts S and E and gave S super_admin by SQL (confirmed read-only on v2:
+S has super_admin, E had no role). S then made E an editor through manage_user_role in the smoke.
+$ npm run smoke:admin
+4.1 part: 28/28 PASS (docs/evidence/phase-4/live_admin_smoke_4.1.log).
+The run ended with 3 FAIL in the 4.5 part (HTTP 404 PGRST202: save_recipe is not on v2 yet; 4.5 is not pushed).
