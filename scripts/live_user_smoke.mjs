@@ -252,4 +252,59 @@ const MISSING_RECIPE = '00000000-0000-0000-0000-000000000000';
   check('A deletes the list and its items go with it', rows(del).length === 1 && after.status === 200 && rows(after).length === 0, detail(del));
 }
 
+// --- 3.3 Ratings --------------------------------------------------------------
+{
+  const ratingOf = (u) => `/rest/v1/ratings?user_id=eq.${u.id}&recipe_id=eq.${recipe.id}`;
+  const summaryPath = `/rest/v1/recipe_rating_summary?select=rating_count,avg_score&recipe_id=eq.${recipe.id}`;
+  const rate = (u, owner, score, recipeId = recipe.id) =>
+    call('/rest/v1/ratings', {
+      method: 'POST',
+      token: u?.token,
+      headers: returning,
+      body: JSON.stringify({ user_id: owner.id, recipe_id: recipeId, score }),
+    });
+  for (const u of [A, B]) await call(ratingOf(u), { method: 'DELETE', token: u.token }); // leftovers
+
+  const before = await call(summaryPath);
+  const base = rows(before)[0] ?? null;
+  check('anon reads the rating summary', before.status === 200, detail(before));
+  const anonRows = await call(`/rest/v1/ratings?select=score&recipe_id=eq.${recipe.id}`);
+  check('anon reads ratings of a published recipe', anonRows.status === 200, detail(anonRows));
+
+  const a = await rate(A, A, 4);
+  check('A rates the recipe', a.status === 201 && rows(a)[0]?.score === 4, detail(a));
+  const dup = await rate(A, A, 2);
+  check('a second rating by A is rejected', codeOf(dup) === '23505', detail(dup));
+  const change = await call(ratingOf(A), { method: 'PATCH', token: A.token, headers: returning, body: JSON.stringify({ score: 5 }) });
+  check('A changes the score', change.status === 200 && rows(change)[0]?.score === 5, detail(change));
+  const b = await rate(B, B, 3);
+  check('B rates the recipe', b.status === 201, detail(b));
+
+  const after = rows(await call(summaryPath))[0];
+  const count0 = base?.rating_count ?? 0;
+  check('the summary counts both ratings', after?.rating_count === count0 + 2, `count ${count0} -> ${after?.rating_count}`);
+  if (count0 === 0) check('the average is 4.0 for scores 5 and 3', Number(after?.avg_score) === 4, `avg ${after?.avg_score}`);
+
+  for (const bad of [0, 6]) {
+    const r = await call(ratingOf(A), { method: 'PATCH', token: A.token, headers: JSON_HEADERS, body: JSON.stringify({ score: bad }) });
+    check(`score ${bad} is rejected`, codeOf(r) === '23514', detail(r));
+  }
+  const bEdit = await call(ratingOf(A), { method: 'PATCH', token: B.token, headers: returning, body: JSON.stringify({ score: 1 }) });
+  check('B cannot change A score', bEdit.status === 200 && rows(bEdit).length === 0, detail(bEdit));
+  const bDel = await call(ratingOf(A), { method: 'DELETE', token: B.token, headers: returning });
+  check('B cannot remove A score', bDel.status === 200 && rows(bDel).length === 0, detail(bDel));
+  const forge = await rate(B, A, 1, MISSING_RECIPE);
+  check('B cannot rate as A', refused(forge), detail(forge));
+  const move = await call(ratingOf(A), { method: 'PATCH', token: A.token, headers: JSON_HEADERS, body: JSON.stringify({ recipe_id: MISSING_RECIPE }) });
+  check('a rating cannot move to another recipe', refused(move), detail(move));
+  const unknown = await rate(A, A, 3, MISSING_RECIPE);
+  check('only a published recipe can be rated', refused(unknown), detail(unknown));
+  const anonRate = await rate(null, A, 3);
+  check('anon cannot rate', refused(anonRate), detail(anonRate));
+
+  const delA = await call(ratingOf(A), { method: 'DELETE', token: A.token, headers: returning });
+  const delB = await call(ratingOf(B), { method: 'DELETE', token: B.token, headers: returning });
+  check('A and B remove their scores', rows(delA).length === 1 && rows(delB).length === 1, `${detail(delA)}; ${detail(delB)}`);
+}
+
 finish();

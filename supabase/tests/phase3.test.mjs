@@ -183,3 +183,69 @@ describe('3.2 shopping lists', () => {
     assert.equal(n.n, 0);
   });
 });
+
+describe('3.3 ratings', () => {
+  const rate = (uid, owner, recipe, score) =>
+    as(db, 'authenticated', uid,
+      `insert into public.ratings (user_id, recipe_id, score) values ($1, $2, $3) returning id`, [owner, recipe, score]);
+  const summary = (role, uid, recipe) =>
+    as(db, role, uid, `select rating_count, avg_score from public.recipe_rating_summary where recipe_id = $1`, [recipe]);
+
+  it('a recipe without ratings has no summary row (unknown, not 0)', async () => {
+    const { rows, error } = await summary('anon', null, publishedId);
+    assert.equal(error, null);
+    assert.deepEqual(rows, []);
+  });
+
+  it('users rate once, change their own score, and the average follows', async () => {
+    assert.equal((await rate(alice, alice, publishedId, 5)).error, null);
+    assert.equal((await rate(bob, bob, publishedId, 2)).error, null);
+    assert.equal((await rate(alice, alice, publishedId, 4)).error?.code, UNIQUE_VIOLATION);
+    const upd = await as(db, 'authenticated', alice,
+      `update public.ratings set score = 4 where user_id = $1 and recipe_id = $2 returning score`, [alice, publishedId]);
+    assert.deepEqual(upd.rows, [{ score: 4 }]);
+    for (const [role, uid] of [['anon', null], ['authenticated', bob]]) {
+      const { rows } = await summary(role, uid, publishedId);
+      assert.deepEqual(rows, [{ rating_count: 2, avg_score: '3.0' }], role);
+    }
+    const anonRows = await as(db, 'anon', null, `select score from public.ratings where recipe_id = $1 order by score`, [publishedId]);
+    assert.deepEqual(anonRows.rows, [{ score: 2 }, { score: 4 }]);
+  });
+
+  it('scores are 1 to 5', async () => {
+    const [{ id: other }] = await admin(db,
+      `insert into public.recipes (slug, name, default_servings, status, published_at, category_id)
+       select '004-rate', 'Rate', 2, 'published', now(), category_id from public.recipes where id = $1 returning id`, [publishedId]);
+    assert.equal((await rate(alice, alice, other, 6)).error?.code, CHECK_VIOLATION);
+    assert.equal((await rate(alice, alice, other, 0)).error?.code, CHECK_VIOLATION);
+  });
+
+  it('nobody changes or removes another user score, or rates as someone else', async () => {
+    const upd = await as(db, 'authenticated', bob, `update public.ratings set score = 1 where user_id = $1 returning id`, [alice]);
+    const del = await as(db, 'authenticated', bob, `delete from public.ratings where user_id = $1 returning id`, [alice]);
+    assert.deepEqual([upd.rows, del.rows], [[], []]);
+    const other = await admin(db, `select id from public.recipes where slug = '004-rate'`);
+    assert.equal((await rate(bob, alice, other[0].id, 3)).error?.code, INSUFFICIENT_PRIVILEGE);
+    const move = await as(db, 'authenticated', alice, `update public.ratings set recipe_id = $1 where user_id = $2`, [other[0].id, alice]);
+    assert.equal(move.error?.code, INSUFFICIENT_PRIVILEGE);
+  });
+
+  it('staged recipes cannot be rated and their ratings stay hidden', async () => {
+    assert.equal((await rate(alice, alice, stagedId, 3)).error?.code, INSUFFICIENT_PRIVILEGE);
+    await admin(db, `insert into public.ratings (user_id, recipe_id, score) values ($1, $2, 3)`, [bob, stagedId]);
+    const anon = await as(db, 'anon', null, `select id from public.ratings where recipe_id = $1`, [stagedId]);
+    const sum = await summary('anon', null, stagedId);
+    assert.deepEqual([anon.rows, sum.rows], [[], []]);
+  });
+
+  it('anon cannot write; a super admin may remove a score', async () => {
+    const ins = await as(db, 'anon', null, `insert into public.ratings (user_id, recipe_id, score) values ($1, $2, 3)`, [alice, publishedId]);
+    assert.equal(ins.error?.code, INSUFFICIENT_PRIVILEGE);
+    const [{ id: admUser }] = await admin(db, `insert into auth.users (email) values ('admin@example.test') returning id`);
+    await admin(db, `insert into public.user_roles (user_id, role) values ($1, 'super_admin')`, [admUser]);
+    const del = await as(db, 'authenticated', admUser, `delete from public.ratings where user_id = $1 and recipe_id = $2 returning id`, [bob, publishedId]);
+    assert.equal(del.rows.length, 1);
+    const { rows } = await summary('anon', null, publishedId);
+    assert.deepEqual(rows, [{ rating_count: 1, avg_score: '4.0' }]);
+  });
+});

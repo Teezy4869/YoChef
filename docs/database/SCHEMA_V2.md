@@ -1,6 +1,6 @@
 # YoChef v2: Schema chuẩn (SCHEMA_V2)
 
-**Trạng thái:** `0001_catalog` = `supabase/migrations/20261108130000_catalog.sql`, `0002_identity_rbac` = `20261108130100_identity_rbac.sql` (bước 0.4). Phase 3: `favorites` = `20261113234830_phase3_favorites.sql` (3.1), `shopping_lists` = `20261114041322_phase3_shopping_lists.sql` (3.2). Tên logic `00NN_*` trong tài liệu ứng với file có tiền tố timestamp mà Supabase CLI yêu cầu. Tài liệu này là **nguồn sự thật duy nhất** về schema: migration viết theo nó, và khi migration buộc phải khác, tài liệu được sửa trong cùng commit.
+**Trạng thái:** `0001_catalog` = `supabase/migrations/20261108130000_catalog.sql`, `0002_identity_rbac` = `20261108130100_identity_rbac.sql` (bước 0.4). Phase 3: `favorites` = `20261113234830_phase3_favorites.sql` (3.1), `shopping_lists` = `20261114041322_phase3_shopping_lists.sql` (3.2), `ratings` = `20261114045322_phase3_ratings.sql` (3.3). Tên logic `00NN_*` trong tài liệu ứng với file có tiền tố timestamp mà Supabase CLI yêu cầu. Tài liệu này là **nguồn sự thật duy nhất** về schema: migration viết theo nó, và khi migration buộc phải khác, tài liệu được sửa trong cùng commit.
 **Project:** Supabase `bdhphjwhagygbwtfhhxn` (YoChef v2), PostgreSQL 17.
 **Ngày:** 2026-11-08.
 
@@ -279,15 +279,16 @@ Các bảng dưới đây đã chốt về cột chính và quy tắc quyền. M
 - `ingredient_id` nullable, vì món tự nhập không có nguyên liệu tương ứng.
 - Dùng một tên thống nhất là `name`, cùng kiểu với `recipes.name`, thay vì để `title` ở app và `name` ở database.
 
-### 5.3 `ratings` (3.3)
-- `id`, `user_id`, `recipe_id`; unique `(user_id, recipe_id)`.
+### 5.3 `ratings` (3.3, `20261114045322_phase3_ratings.sql`)
+- `id`, `user_id` (FK `profiles` cascade), `recipe_id` (FK `recipes` cascade, có index); unique `(user_id, recipe_id)`.
 - `score` smallint 1–5, `created_at`, `updated_at`.
 - **Không có cột `review`.** `app-in4` §6.7 quy định chỉ có một thực thể Comment, nên phần nhận xét bằng chữ thuộc về `comments`.
 - **RLS:**
   - SELECT công khai khi công thức `published`.
   - Chủ sở hữu INSERT và UPDATE với `user_id = auth.uid()`.
   - Chủ sở hữu hoặc super_admin được DELETE.
-- Điểm trung bình được tính bằng view hoặc RPC, chốt ở 3.3.
+- **Grant:** `anon` SELECT; `authenticated` SELECT, INSERT trên `(user_id, recipe_id, score)`, UPDATE chỉ `score`, DELETE. Không đổi được người chấm hay công thức của một điểm.
+- **Điểm trung bình (O3, chốt ở 3.3): view** `public.recipe_rating_summary` (`security_invoker = true`): `recipe_id`, `rating_count`, `avg_score` (làm tròn 1 chữ số). Grant SELECT cho anon và authenticated. Công thức chưa có ai chấm thì **không có dòng**: trung bình là không rõ, không phải 0 (C5). View chạy dưới quyền người gọi nên chỉ tính các điểm người đó được thấy.
 
 ### 5.4 `comments` (3.4) và `cooking_photos` (3.5)
 Cột chung: `id`, `user_id`, `recipe_id` (cascade), `status` (`pending`,`approved`,`rejected`, default `pending`), `created_at`, `updated_at`.
@@ -409,5 +410,5 @@ Script `supabase/seed/import_recipes.mjs` (bước 0.5) upsert theo `source_key`
 |---|---|---|---|
 | O1 | Giữ video ID sau 30 ngày hay xóa (chính sách YouTube III.E.4) | 4.4 | Chủ dự án |
 | O2 | ~~Chủ sở hữu đọc `bio` của mình bằng RPC hay view~~ **Đã chốt (bước 1.1): RPC `public.get_my_profile()`**, trả đúng dòng của `auth.uid()`. | Phase 1 | Agent |
-| O3 | Điểm trung bình đánh giá: view hay RPC | 3.3 | Agent |
+| O3 | ~~Điểm trung bình đánh giá: view hay RPC~~ **Đã chốt (3.3): view `recipe_rating_summary`** (§5.3). Không cần quyền thực thi hàm, không lệch số vì không lưu sẵn | 3.3 | Agent |
 | O4 | Default privileges của project v2 mới (Supabase có thể đã đổi mặc định cho bảng mới): kiểm tra thật khi viết 0001; C8 vẫn áp dụng dù kết quả thế nào | 0.4 | Agent, có log |

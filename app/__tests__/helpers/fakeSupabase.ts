@@ -104,6 +104,19 @@ export function createFakeSupabase(initial: Session | null = null) {
     shopping_lists: { name: 'Danh sách mua sắm', source_recipe_id: null },
     shopping_list_items: { is_checked: false, sort_order: 0, ingredient_id: null, quantity: null, unit: null, note: null },
   };
+  // Readable by everyone (published recipes only, in the real policies); writes stay owner-only.
+  const PUBLIC_READ = new Set(['ratings', 'recipe_rating_summary']);
+  const UNIQUE: Record<string, string[]> = { favorites: ['user_id', 'recipe_id'], ratings: ['user_id', 'recipe_id'] };
+  // public.recipe_rating_summary: no row for a recipe without ratings.
+  const ratingSummary = (): Row[] => {
+    const by = new Map<unknown, number[]>();
+    for (const r of tables.ratings ?? []) by.set(r.recipe_id, [...(by.get(r.recipe_id) ?? []), Number(r.score)]);
+    return [...by].map(([recipe_id, scores]) => ({
+      recipe_id,
+      rating_count: scores.length,
+      avg_score: (Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10).toFixed(1),
+    }));
+  };
   // Items belong to whoever owns their list, as the RLS policies check.
   const ownerOf = (table: string, r: Row) =>
     table === 'shopping_list_items'
@@ -124,8 +137,9 @@ export function createFakeSupabase(initial: Session | null = null) {
         return { data: null, error: failure };
       }
       const me = session?.user.id;
-      if (!me) return { data: null, error: DENIED };
-      const rows = (tables[table] ??= []);
+      const publicRead = op === 'select' && PUBLIC_READ.has(table);
+      if (!me && !publicRead) return { data: null, error: DENIED };
+      const rows = table === 'recipe_rating_summary' ? ratingSummary() : (tables[table] ??= []);
       if (op === 'insert') {
         const list = Array.isArray(payload) ? payload : [payload ?? {}];
         const keys = (r: Row) => Object.keys(r).sort().join(',');
@@ -133,6 +147,10 @@ export function createFakeSupabase(initial: Session | null = null) {
           return { data: null, error: { message: 'All object keys must match', code: 'PGRST102' } };
         }
         if (list.some((r) => ownerOf(table, r) !== me)) return { data: null, error: DENIED };
+        const unique = UNIQUE[table];
+        if (unique && list.some((r) => rows.some((x) => unique.every((c) => x[c] === r[c])))) {
+          return { data: null, error: { message: 'duplicate key value violates unique constraint', code: '23505' } };
+        }
         const added = list.map((r) => ({
           id: `${table}-${++seq}`,
           created_at: new Date(Date.now() + seq).toISOString(),
@@ -142,7 +160,7 @@ export function createFakeSupabase(initial: Session | null = null) {
         rows.push(...added);
         return { data: returning ? added.map(view) : null, error: null };
       }
-      let hit = rows.filter((r) => ownerOf(table, r) === me && filters.every((f) => f(r)));
+      let hit = rows.filter((r) => (publicRead || ownerOf(table, r) === me) && filters.every((f) => f(r)));
       if (op === 'update') hit.forEach((r) => Object.assign(r, payload));
       if (op === 'delete') {
         tables[table] = rows.filter((r) => !hit.includes(r));
@@ -180,7 +198,7 @@ export function createFakeSupabase(initial: Session | null = null) {
     return b;
   }
 
-  const USER_TABLES = new Set(['favorites', 'shopping_lists', 'shopping_list_items']);
+  const USER_TABLES = new Set(['favorites', 'shopping_lists', 'shopping_list_items', 'ratings', 'recipe_rating_summary']);
 
   const from = jest.fn((table: string) =>
     USER_TABLES.has(table)

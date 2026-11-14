@@ -7,6 +7,7 @@ import { Banner } from '@/components/Banner';
 import { Button } from '@/components/Button';
 import { Screen } from '@/components/Screen';
 import { FavoriteButton } from '@/features/favorites/FavoriteButton';
+import { RatingSection } from '@/features/ratings/RatingSection';
 import { AddToShoppingButton } from '@/features/shopping/AddToShoppingButton';
 import { formatSeconds, joinMeta, timeLabel } from '@/features/recipes/format';
 import { coverUrl } from '@/features/recipes/recipeApi';
@@ -159,6 +160,10 @@ function RecipeDetailView({
             </View>
           ))
         )}
+      </View>
+
+      <View style={styles.block}>
+        <RatingSection recipeId={recipe.id} />
       </View>
 
       {recipe.source ? (
