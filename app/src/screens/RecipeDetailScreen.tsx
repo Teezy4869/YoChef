@@ -10,6 +10,7 @@ import { CommentSection } from '@/features/community/CommentSection';
 import { CookingPhotoSection } from '@/features/community/CookingPhotoSection';
 import { FavoriteButton } from '@/features/favorites/FavoriteButton';
 import { NutritionSection } from '@/features/nutrition/NutritionSection';
+import { VideoButton } from '@/features/videos/VideoButton';
 import { RatingSection } from '@/features/ratings/RatingSection';
 import { AddToShoppingButton } from '@/features/shopping/AddToShoppingButton';
 import { formatSeconds, joinMeta, timeLabel } from '@/features/recipes/format';
@@ -142,6 +143,7 @@ function RecipeDetailView({
         {recipe.steps.length > 0 ? (
           <Button title="Bắt đầu nấu" onPress={() => onCook(servings)} />
         ) : null}
+        <VideoButton recipeId={recipe.id} />
         {recipe.steps.length === 0 ? (
           <AppText tone="muted">Chưa có các bước thực hiện.</AppText>
         ) : (

@@ -56,3 +56,22 @@ export async function requireStaffRole(
   return { userId: user.id };
 }
 
+
+/** Constant-time comparison for equal-length strings (length itself is not secret). */
+export function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+/** Scheduler authentication for youtube-refresh (verify_jwt = false for that function). */
+export function checkRefreshSecret(provided: string | null, configured: string | undefined): void {
+  const secret = configured || '';
+  if (secret.length < 32) {
+    throw new ContractError('config_error', 'YOUTUBE_REFRESH_SECRET is not configured.');
+  }
+  if (!timingSafeEqual(provided || '', secret)) {
+    throw new ContractError('unauthorized', 'Invalid refresh secret.');
+  }
+}

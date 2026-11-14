@@ -274,7 +274,7 @@ describe('recipe CMS', () => {
   it('loads a recipe in order and saves it through save_recipe, creating a new ingredient first', async () => {
     const fake = setup();
     renderAt('/recipes/r1/edit', fake);
-    expect(await screen.findByDisplayValue('Thịt kho')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Tên món')).toHaveValue('Thịt kho');
     const first = screen.getByRole('group', { name: 'Nguyên liệu 1' });
     expect(within(first).getByLabelText('Tên')).toHaveValue('Thịt lợn');
     expect(within(first).getByLabelText('Số lượng')).toHaveValue('500');
@@ -325,7 +325,7 @@ describe('recipe CMS', () => {
 
   it('offers the hard delete to super admins only', async () => {
     renderAt('/recipes/r1/edit', setup(['editor']));
-    await screen.findByDisplayValue('Thịt kho');
+    expect(await screen.findByLabelText('Tên món')).toHaveValue('Thịt kho');
     expect(screen.queryByRole('button', { name: 'Xóa vĩnh viễn' })).toBeNull();
   });
 
@@ -415,5 +415,34 @@ describe('nutrition page', () => {
     expect(within(box).getByText('Muối: thiếu số lượng (ví dụ "vừa ăn")')).toBeInTheDocument();
     expect(within(box).getAllByText('—').length).toBe(16);
     expect(within(box).queryByRole('button', { name: 'Xác minh kết quả' })).toBeNull();
+  });
+});
+
+describe('recipe video section', () => {
+  it('searches, verifies through the Edge Function, then assigns the primary video', async () => {
+    const fake = signedIn(['editor']);
+    fake.tables.categories = [];
+    fake.tables.ingredients = [];
+    fake.tables.recipes = [{ id: 'r1', slug: '001-thit-kho', name: 'Thịt kho', status: 'published', recipe_ingredients: [], recipe_steps: [] }];
+    fake.tables.recipe_videos = [
+      { recipe_id: 'r1', youtube_video_id: 'zzzzzzzzzzz', title: null, channel_title: null, is_primary: false, verification_status: 'unavailable', unavailable_reason: 'not_embeddable', last_verified_at: null },
+    ];
+    fake.functions.invoke.mockImplementation(async (_name: string, opts?: unknown) => {
+      const body = (opts as { body: Record<string, unknown> }).body;
+      if (body.action === 'search') {
+        return { data: { items: [{ id: 'dQw4w9WgXcQ', title: 'Thịt kho tàu', channelTitle: 'Bếp Việt', thumbnailUrl: null }] }, error: null };
+      }
+      return { data: { item: { id: body.videoId, verificationStatus: 'verified', title: 'Thịt kho tàu' } }, error: null };
+    });
+    fake.rpcHandlers.assign_recipe_video = () => ({ data: 'v1', error: null });
+    renderAt('/recipes/r1/edit', fake);
+    expect(await screen.findByText(/không dùng được \(video không cho nhúng\)/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Tìm trên YouTube' }));
+    const cand = await screen.findByRole('listitem', { name: 'Ứng viên dQw4w9WgXcQ' });
+    expect(fake.functions.invoke).toHaveBeenCalledWith('youtube-search', { body: { action: 'search', query: 'Thịt kho' } });
+    fireEvent.click(within(cand).getByRole('button', { name: 'Xác minh' }));
+    fireEvent.click(await within(cand).findByRole('button', { name: 'Gắn làm video chính' }));
+    expect(await screen.findByText('Đã gắn video chính.')).toBeInTheDocument();
+    expect(fake.rpc).toHaveBeenCalledWith('assign_recipe_video', { p_recipe_id: 'r1', p_video_id: 'dQw4w9WgXcQ' });
   });
 });

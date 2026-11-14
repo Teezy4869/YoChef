@@ -3,6 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { useAdminAuth } from '@/auth/AdminAuth';
 import { hasRole } from '@/lib/supabase';
+
+import { RecipeVideoSection } from './RecipeVideoSection';
 import {
   coverUrl,
   deleteRecipe,
@@ -348,6 +350,8 @@ export function RecipeEditPage() {
           Thêm bước
         </button>
       </fieldset>
+
+      {!isNew && loaded.id ? <RecipeVideoSection recipeId={loaded.id} recipeName={form.name} /> : null}
 
       <button type="button" className={`${btn} self-start bg-orange-700 text-white`} disabled={busy} onClick={() => void save()}>
         {busy ? 'Đang lưu…' : isNew ? 'Tạo bản nháp' : 'Lưu thay đổi'}

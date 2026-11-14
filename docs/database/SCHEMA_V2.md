@@ -1,6 +1,6 @@
 # YoChef v2: Schema chuẩn (SCHEMA_V2)
 
-**Trạng thái:** `0001_catalog` = `supabase/migrations/20261108130000_catalog.sql`, `0002_identity_rbac` = `20261108130100_identity_rbac.sql` (bước 0.4). Phase 3: `favorites` = `20261113234830_phase3_favorites.sql` (3.1), `shopping_lists` = `20261114041322_phase3_shopping_lists.sql` (3.2), `ratings` = `20261114045322_phase3_ratings.sql` (3.3), `comments` = `20261114051346_phase3_comments.sql` (3.4), `cooking_photos` = `20261114054707_phase3_cooking_photos.sql` (3.5), duyệt nội dung = `20261114060039_phase3_moderation.sql` (3.6). Phase 4: vai trò và nhật ký quản trị = `20261114153457_phase4_rbac_audit.sql` (4.1), báo cáo vi phạm = `20261114155100_phase4_content_reports.sql` (4.2), CMS công thức = `20261114160903_phase4_recipe_cms.sql` (4.5), dinh dưỡng = `20261114162121_phase4_nutrition.sql` (4.3). Tên logic `00NN_*` trong tài liệu ứng với file có tiền tố timestamp mà Supabase CLI yêu cầu. Tài liệu này là **nguồn sự thật duy nhất** về schema: migration viết theo nó, và khi migration buộc phải khác, tài liệu được sửa trong cùng commit.
+**Trạng thái:** `0001_catalog` = `supabase/migrations/20261108130000_catalog.sql`, `0002_identity_rbac` = `20261108130100_identity_rbac.sql` (bước 0.4). Phase 3: `favorites` = `20261113234830_phase3_favorites.sql` (3.1), `shopping_lists` = `20261114041322_phase3_shopping_lists.sql` (3.2), `ratings` = `20261114045322_phase3_ratings.sql` (3.3), `comments` = `20261114051346_phase3_comments.sql` (3.4), `cooking_photos` = `20261114054707_phase3_cooking_photos.sql` (3.5), duyệt nội dung = `20261114060039_phase3_moderation.sql` (3.6). Phase 4: vai trò và nhật ký quản trị = `20261114153457_phase4_rbac_audit.sql` (4.1), báo cáo vi phạm = `20261114155100_phase4_content_reports.sql` (4.2), CMS công thức = `20261114160903_phase4_recipe_cms.sql` (4.5), dinh dưỡng = `20261114162121_phase4_nutrition.sql` (4.3), video = `20261114163608_phase4_recipe_videos.sql` (4.4). Tên logic `00NN_*` trong tài liệu ứng với file có tiền tố timestamp mà Supabase CLI yêu cầu. Tài liệu này là **nguồn sự thật duy nhất** về schema: migration viết theo nó, và khi migration buộc phải khác, tài liệu được sửa trong cùng commit.
 **Project:** Supabase `bdhphjwhagygbwtfhhxn` (YoChef v2), PostgreSQL 17.
 **Ngày:** 2026-11-08.
 
@@ -341,17 +341,14 @@ RLS theo `phase4_03`:
 - Trigger `reset_status_on_edit` không đụng tới quyết định của moderator, vì RPC không đổi nội dung.
 - Màn "Duyệt nội dung" trong app (chỉ hiện với moderator và super_admin) liệt kê bình luận và ảnh `pending`, cũ nhất trước, tối đa 50 mục mỗi loại. Đây là giải pháp tạm; 4.2 chuyển việc duyệt sang admin web kèm báo cáo vi phạm.
 
-### 5.5 `recipe_videos` (4.4)
-- `id`, `recipe_id` (cascade).
-- `youtube_video_id`: check khớp `^[A-Za-z0-9_-]{11}$`; unique `(recipe_id, youtube_video_id)`.
-- `title`, `channel_title`.
-- `is_primary`: unique partial index cho phép tối đa 1 video chính mỗi công thức.
-- `verification_status` (`unverified`,`verified`,`unavailable`), `unavailable_reason`, `last_verified_at`, `refresh_failures`.
-- `created_at`, `updated_at`.
-
-**Public chỉ đọc** video thỏa cả bốn điều kiện: là video chính, đã `verified`, `last_verified_at > now() - 30 days`, và công thức đang `published`.
-
-Client không có quyền ghi; ghi qua RPC `assign_recipe_video` kèm biên nhận xác minh. **Vẫn còn câu hỏi pháp lý dành cho chủ dự án:** có được giữ lại video ID sau 30 ngày hay không.
+### 5.5 `recipe_videos` (4.4, `20261114163608_phase4_recipe_videos.sql`)
+Chính sách: `phase4_08_youtube_freshness_policy.md` (YouTube Developer Policies III.E.4).
+- `id`, `recipe_id` (cascade), `youtube_video_id` (khớp `^[A-Za-z0-9_-]{11}$`), unique `(recipe_id, youtube_video_id)`; `title`, `channel_title`; `is_primary` (unique partial index: tối đa 1 video chính mỗi công thức); `verification_status` (`unverified`, `verified`, `unavailable`), `unavailable_reason`, `last_verified_at`, `last_checked_at` (lần thử làm mới gần nhất), `refresh_failures`; `created_at`, `updated_at`. CHECK: `verified` phải có `last_verified_at` và `title`.
+- **Public chỉ đọc** video thỏa cả bốn điều kiện: video chính, `verified`, `last_verified_at > now() - 30 days`, công thức `published`. Điều kiện ngày nằm ngay trong RLS nên video quá hạn bị ẩn ngay cả khi lịch làm mới dừng. App kiểm lại ngày một lần nữa. Editor đọc mọi dòng.
+- **Gắn video:** client không ghi bảng. Edge Function `youtube-search` (`verify`) gọi `videos.list`, rồi bằng service role ghi một biên nhận vào `private.video_verifications` (không lộ ra API) qua `record_video_verification`. `assign_recipe_video(p_recipe_id, p_video_id)` (editor) chỉ nhận biên nhận `verified` **của chính editor đó, trong 15 phút, chưa dùng**; khóa dòng công thức, hạ video chính cũ, ghi video mới với tiêu đề và kênh lấy từ biên nhận, ghi audit. `remove_recipe_video` (editor) xóa một video. Một kết quả `unavailable` ẩn video đó ở mọi công thức ngay lập tức và xóa tiêu đề, kênh.
+- Xác minh đạt khi video công khai, đã xử lý xong, cho nhúng, và không bị chặn ở Việt Nam. Kết quả `search.list` chỉ là ứng viên.
+- **Làm mới và lưu giữ (chỉ service role):** `claim_videos_for_refresh(50)` lấy video đã xác minh hơn 25 ngày và chưa thử trong 6 giờ qua; Edge Function `youtube-refresh` gọi `videos.list` một lần cho tối đa 50 id (1 đơn vị quota) rồi `apply_video_refresh` (đạt: cập nhật; không dùng được: ẩn, xóa metadata; lỗi: tăng `refresh_failures`); cuối cùng `expire_stale_videos()`. **Quyết định E10 (chủ dự án chọn):** dòng nào không được xác minh lại trong 30 ngày bị **xóa hẳn**, kể cả video ID; biên nhận quá 1 ngày cũng bị xóa. Mỗi lần chạy ghi audit hệ thống (`actor_id` NULL).
+- Lịch chạy: `supabase/scripts/youtube_schedule.sql` (pg_cron + pg_net, secret trong Vault), chủ dự án chạy tay trong SQL Editor; có thêm một job xóa quá hạn chạy thẳng trong database phòng khi HTTP lỗi. **Chưa kiểm được** cho tới khi lịch chạy thật.
 
 ### 5.6 Dinh dưỡng (4.3, `20261114162121_phase4_nutrition.sql`, engine 2.0.0)
 Hợp đồng chi tiết: `phase4_08_nutrition_data_contract.md`. Nguồn dữ liệu: **chỉ USDA** (quyết định E11 của kế hoạch Phase 4; Open Food Facts để sau).

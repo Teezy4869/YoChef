@@ -508,3 +508,110 @@ describe('4.3 nutrition', () => {
     assert.ok(audit[0].n >= 8);
   });
 });
+
+describe('4.4 recipe videos', () => {
+  let recipeId;
+  let editor2;
+  const VID = 'dQw4w9WgXcQ';
+  const VID2 = 'abcdefghij_';
+  const svc = (sql, params = []) => as(db, 'service_role', null, sql, params);
+  const receipt = (actor, id = VID, status = 'verified') =>
+    svc(`select public.record_video_verification($1, $2, $3, $4, $5, $6) as id`,
+      [id, actor, status, status === 'verified' ? `Cách làm ${id}` : null, status === 'verified' ? 'Bếp Việt' : null, status === 'verified' ? null : 'not_embeddable']);
+  const assign = (uid, id = VID) => rpc(uid, `select public.assign_recipe_video($1, $2) as id`, [recipeId, id]);
+  const publicRows = () => rpc(null, `select youtube_video_id from public.recipe_videos where recipe_id = $1`, [recipeId]).then((r) => r.rows);
+
+  before(async () => {
+    [{ id: recipeId }] = await admin(db, `select id from public.recipes where slug = '950-thit-luoc'`);
+    editor2 = await user_('editor2@example.test');
+    await grant(editor2, 'editor');
+  });
+
+  it('only the service role writes receipts and runs refresh or retention', async () => {
+    for (const uid of [editor, sup, user, null]) {
+      for (const sql of [
+        `select public.record_video_verification('${VID}', '${editor}', 'verified', 't', 'c', null)`,
+        `select * from public.claim_videos_for_refresh(10)`,
+        `select public.apply_video_refresh('[]'::jsonb)`,
+        `select public.expire_stale_videos()`,
+      ]) {
+        assert.equal((await rpc(uid, sql)).error?.code, INSUFFICIENT_PRIVILEGE, `${uid} ${sql}`);
+      }
+    }
+    assert.equal((await rpc(editor, `select * from private.video_verifications`)).error?.code, INSUFFICIENT_PRIVILEGE);
+  });
+
+  it('assigning needs a fresh verification by the same editor, used once', async () => {
+    assert.equal((await assign(editor)).error?.code, INVALID_PARAMETER); // no receipt yet
+    await receipt(editor2);
+    assert.equal((await assign(editor)).error?.code, INVALID_PARAMETER); // someone else's receipt
+    await receipt(editor, VID, 'unavailable');
+    assert.equal((await assign(editor)).error?.code, INVALID_PARAMETER); // unavailable result
+    const [{ id: old }] = (await receipt(editor)).rows;
+    await admin(db, `update private.video_verifications set created_at = now() - interval '16 minutes' where id = $1`, [old]);
+    assert.equal((await assign(editor)).error?.code, INVALID_PARAMETER); // expired
+    await receipt(editor);
+    assert.equal((await assign(user)).error?.code, INSUFFICIENT_PRIVILEGE);
+    assert.equal((await assign(editor)).error, null);
+    assert.equal((await assign(editor)).error?.code, INVALID_PARAMETER); // receipt consumed
+    const [row] = await admin(db, `select title, channel_title, is_primary, verification_status from public.recipe_videos where recipe_id = $1`, [recipeId]);
+    assert.deepEqual(row, { title: `Cách làm ${VID}`, channel_title: 'Bếp Việt', is_primary: true, verification_status: 'verified' });
+    const [a] = await admin(db, `select action, details from public.admin_audit_logs where action = 'video.assign'`);
+    assert.deepEqual(a, { action: 'video.assign', details: { youtube_video_id: VID } });
+  });
+
+  it('the public sees a fresh verified primary video of a published recipe only; editors see all', async () => {
+    assert.deepEqual(await publicRows(), [{ youtube_video_id: VID }]);
+    await receipt(editor, VID2);
+    await assign(editor, VID2); // the new primary demotes the old one
+    const all = await rpc(editor, `select youtube_video_id, is_primary from public.recipe_videos where recipe_id = $1 order by youtube_video_id`, [recipeId]);
+    assert.deepEqual(all.rows, [{ youtube_video_id: VID2, is_primary: true }, { youtube_video_id: VID, is_primary: false }]);
+    assert.deepEqual(await publicRows(), [{ youtube_video_id: VID2 }]);
+    await admin(db, `update public.recipe_videos set last_verified_at = now() - interval '31 days' where youtube_video_id = $1`, [VID2]);
+    assert.deepEqual(await publicRows(), []); // overdue is hidden even before retention runs
+    await admin(db, `update public.recipe_videos set last_verified_at = now() where youtube_video_id = $1`, [VID2]);
+    await admin(db, `update public.recipes set status = 'staged' where id = $1`, [recipeId]);
+    assert.deepEqual(await publicRows(), []);
+    await admin(db, `update public.recipes set status = 'published' where id = $1`, [recipeId]);
+    assert.equal((await rpc(editor, `update public.recipe_videos set is_primary = true where recipe_id = $1`, [recipeId])).error?.code, INSUFFICIENT_PRIVILEGE);
+  });
+
+  it('an unavailable check hides the video at once and clears its metadata', async () => {
+    await receipt(editor, VID2, 'unavailable');
+    const [row] = await admin(db, `select verification_status, title, unavailable_reason from public.recipe_videos where youtube_video_id = $1`, [VID2]);
+    assert.deepEqual(row, { verification_status: 'unavailable', title: null, unavailable_reason: 'not_embeddable' });
+    assert.deepEqual(await publicRows(), []);
+  });
+
+  it('refresh claims due videos once per 6 hours and applies the results', async () => {
+    await receipt(editor);
+    await assign(editor); // VID primary again, verified now
+    await admin(db, `update public.recipe_videos set last_verified_at = now() - interval '26 days', last_checked_at = null where youtube_video_id = $1`, [VID]);
+    assert.deepEqual((await svc(`select * from public.claim_videos_for_refresh(50)`)).rows, [{ youtube_video_id: VID }]);
+    assert.deepEqual((await svc(`select * from public.claim_videos_for_refresh(50)`)).rows, []); // checked just now
+    const failed = await svc(`select public.apply_video_refresh($1::jsonb) as r`, [JSON.stringify([{ video_id: VID, outcome: 'failed' }])]);
+    assert.deepEqual(failed.rows[0].r, { verified: 0, unavailable: 0, failed: 1 });
+    const ok = await svc(`select public.apply_video_refresh($1::jsonb) as r`,
+      [JSON.stringify([{ video_id: VID, outcome: 'verified', title: 'Mới', channel_title: 'Bếp' }])]);
+    assert.deepEqual(ok.rows[0].r, { verified: 1, unavailable: 0, failed: 0 });
+    const [row] = await admin(db, `select title, refresh_failures, last_verified_at > now() - interval '1 minute' as fresh from public.recipe_videos where youtube_video_id = $1`, [VID]);
+    assert.deepEqual(row, { title: 'Mới', refresh_failures: 0, fresh: true });
+  });
+
+  it('retention deletes every row not verified within 30 days, id included (E10), and is idempotent', async () => {
+    await admin(db, `update public.recipe_videos set last_verified_at = now() - interval '31 days' where recipe_id = $1`, [recipeId]);
+    assert.deepEqual((await svc(`select public.expire_stale_videos() as n`)).rows, [{ n: 2 }]); // the verified VID and the unavailable VID2
+    assert.deepEqual((await svc(`select public.expire_stale_videos() as n`)).rows, [{ n: 0 }]);
+    assert.deepEqual(await admin(db, `select id from public.recipe_videos where recipe_id = $1`, [recipeId]), []);
+    const [{ details }] = await admin(db, `select details from public.admin_audit_logs where action = 'video.expire'`);
+    assert.deepEqual(details, { deleted: 2 });
+  });
+
+  it('editors remove a video; others cannot', async () => {
+    await receipt(editor);
+    await assign(editor);
+    assert.equal((await rpc(user, `select public.remove_recipe_video($1, $2)`, [recipeId, VID])).error?.code, INSUFFICIENT_PRIVILEGE);
+    assert.deepEqual((await rpc(editor, `select public.remove_recipe_video($1, $2) as ok`, [recipeId, VID])).rows, [{ ok: true }]);
+    assert.deepEqual((await rpc(editor, `select public.remove_recipe_video($1, $2) as ok`, [recipeId, VID])).rows, [{ ok: false }]);
+  });
+});

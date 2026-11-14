@@ -214,6 +214,43 @@ check('nobody writes user_roles directly, not even S', refused(directRole), deta
   const staged = await move(E, id, 'staged');
   const published = await move(E, id, 'published');
   check('E stages then publishes it; anon sees it', staged.body === 'staged' && published.body === 'published' && (await anonSees(id)), `${detail(staged)}; ${detail(published)}`);
+  // --- 4.4 videos on the published throw-away recipe (deleted with it) ---
+  {
+    const yt = (u, body) =>
+      fetch(`${url}/functions/v1/youtube-search`, {
+        method: 'POST',
+        headers: { apikey: key, Authorization: `Bearer ${u?.token ?? key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }));
+    const assign = (u, video) => rpc(u, 'assign_recipe_video', { p_recipe_id: id, p_video_id: video });
+    const noReceipt = await assign(E, 'dQw4w9WgXcQ');
+    check('assigning without a verification is refused', codeOf(noReceipt) === '22023', detail(noReceipt));
+    const byA = await assign(A, 'dQw4w9WgXcQ');
+    check('A cannot assign videos', refused(byA), detail(byA));
+    const ytA = await yt(A, { action: 'search', query: 'thịt kho' });
+    check('A cannot use youtube-search', ytA.status === 403, `HTTP ${ytA.status}, ${ytA.body?.error?.code ?? '-'}`);
+    const found = await yt(E, { action: 'search', query: 'thịt kho tàu' });
+    check('E finds candidates through youtube-search', found.status === 200 && Array.isArray(found.body?.items), `HTTP ${found.status}, ${found.body?.error?.code ?? `${found.body?.items?.length ?? '-'} items`}`);
+    let verified = null;
+    for (const c of (found.body?.items ?? []).slice(0, 3)) {
+      const v = await yt(E, { action: 'verify', videoId: c.id });
+      if (v.body?.item?.verificationStatus === 'verified') {
+        verified = c.id;
+        break;
+      }
+    }
+    check('E verifies one candidate with videos.list', !!verified, verified ?? 'none of the first 3 candidates verified');
+    if (verified) {
+      const ok = await assign(E, verified);
+      const pub = await call(`/rest/v1/recipe_videos?select=youtube_video_id&recipe_id=eq.${id}`);
+      check('E assigns it and anon sees the primary video', ok.status === 200 && rows(pub)[0]?.youtube_video_id === verified, `${detail(ok)}; ${detail(pub)}`);
+      const reuse = await assign(E, verified);
+      check('a verification is used once', codeOf(reuse) === '22023', detail(reuse));
+      const removed = await rpc(E, 'remove_recipe_video', { p_recipe_id: id, p_video_id: verified });
+      check('E removes the video', removed.status === 200 && removed.body === true, detail(removed));
+    }
+  }
+
   const byM = await move(M, id, 'archived');
   check('M cannot change a recipe status', refused(byM), detail(byM));
   const archived = await move(E, id, 'archived');
