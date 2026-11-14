@@ -1,4 +1,4 @@
-YoChef schema verify  2026-11-14T13:36:28.745Z  repo migrations vs v2 bdhphjwhagygbwtfhhxn
+YoChef schema verify  2026-11-14T14:25:48.193Z  repo migrations vs v2 bdhphjwhagygbwtfhhxn
 INFO  migrations in repo: 10
 SAME  enums: 1 in repo, 1 on v2
 SAME  tables: 18 in repo, 18 on v2

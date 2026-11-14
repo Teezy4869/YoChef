@@ -126,3 +126,17 @@ $ npm run smoke:user
 - every check of 3.1-3.5 still passes after comments / cooking_photos moved to column-level SELECT;
 - FAIL "moderator M is configured and signs in": SMOKE_EMAIL_MOD / SMOKE_PASSWORD_MOD are not in .env.smoke yet.
 => 3.6 live checks (23) NOT RUN. Blocked on the project owner creating test account M with the moderator role.
+
+== 3.6 moderation, live checks with moderator M  2026-11-14T14:22:54Z ==
+The project owner created test account M (Add user + Auto Confirm), gave it the moderator role in the
+SQL Editor and added SMOKE_EMAIL_MOD / SMOKE_PASSWORD_MOD to .env.smoke.
+$ npm run smoke:user
+ALL PASS 100/100 (accounts 4, favorites 10, shopping 16, ratings 17, comments 15, cooking photos 16,
+moderation 22) (docs/evidence/phase-3/live_user_smoke.log). The 3.6 estimate of 23 checks was wrong: the block has 22.
+
+== Gate 3.7  2026-11-14 ==
+npm run check 169/169 + admin 1/1 (gate_check.log); npm run test:db 98/98 (gate_test_db.log);
+smoke:live 19/19, smoke:recipes 26/26, smoke:auth 26/26 (gate_smoke_*.log, same scripts and env files as the npm
+commands, logged here so the Phase 0-2 evidence is not overwritten); db:verify SCHEMA MATCHES;
+db:advisors 5 results, all accepted (gate_advisors.json): get_my_profile and moderate_community_content (DEFINER,
+by design), multiple_permissive_policies on comments and cooking_photos, auth_leaked_password_protection.

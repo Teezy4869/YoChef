@@ -19,17 +19,17 @@ YoChef là ứng dụng nấu ăn Việt Nam: tìm công thức, chỉnh khẩu 
 
 Không có backend Node riêng, không dùng Docker.
 
-## 2. Hiện trạng (tính đến 2026-11-13)
+## 2. Hiện trạng (tính đến 2026-11-14)
 
 | Phase | Trạng thái |
 |---|---|
 | 0. Nền móng (repo, schema, dữ liệu 250 công thức, test 3 tầng) | **Xong**, tag `phase-0-complete` |
 | 1. Khung app, theme, Auth, hồ sơ | **Xong**, tag `phase-1-complete`; `smoke:auth` 26/26. Xem `docs/reports/PHASE_1_PROGRESS.md` |
 | 2. Recipe core (tìm kiếm, chi tiết, khẩu phần, chế độ nấu) | Đã merge vào `main`, migration đã lên v2, `smoke:recipes` 26/26. 2.1–2.5 đã chạy trên máy thật; 2.6–2.12 (làm tròn A2, thông báo hẹn giờ, phiên nấu, giữ màn hình sáng) chờ kiểm trên máy thật. Xem `docs/reports/PHASE_2_CHANGES.md` |
-| 3. Yêu thích, mua sắm, đánh giá, bình luận, ảnh | Chưa làm |
-| 4. Admin: RBAC, kiểm duyệt, dinh dưỡng, YouTube, CMS | Chưa làm |
+| 3. Yêu thích, đi chợ, đánh giá, bình luận, ảnh nấu ăn, duyệt nội dung tối thiểu | Đã merge vào `main`, 6 migration đã lên v2, `smoke:user` 100/100. Chờ kiểm trên máy thật (gồm EXIF ảnh) rồi mới gắn tag `phase-3-complete`. Xem `docs/reports/PHASE_3_REPORT.md` |
+| 4. Admin: RBAC, kiểm duyệt (admin web, báo cáo vi phạm), dinh dưỡng, YouTube, CMS | Chưa làm. Một phần 4.2 (RPC duyệt, lịch sử duyệt) đã đưa sớm vào 3.6 |
 
-App đã có đăng nhập, hồ sơ, tìm kiếm, chi tiết công thức và chế độ nấu; `admin/` vẫn là màn hình mẫu.
+App đã có đăng nhập, hồ sơ, tìm kiếm, chi tiết công thức, chế độ nấu, yêu thích, đi chợ, đánh giá, bình luận, ảnh nấu ăn và màn duyệt nội dung cho moderator; `admin/` vẫn là màn hình mẫu.
 Chi tiết lộ trình: gói tài liệu gốc `YoChef_born_again/03_PHASE_0_REBUILD_GUIDE.md` §3.
 
 ## 3. Thông tin bàn giao (điền)
@@ -143,8 +143,9 @@ Ba tầng kiểm thử (một bước chỉ xong khi tầng 3 xanh cho phần ch
 | 3. Live trên Supabase | `npm run smoke:live` | `app/.env` có URL và publishable key |
 | 3. Live, công thức (khách) | `npm run smoke:recipes` | `app/.env`; migration `20261113120000_recipe_search` đã lên v2 |
 | 3. Live, người dùng đăng nhập | `npm run smoke:auth` | Như trên, thêm `.env.smoke` ở gốc repo với `SMOKE_EMAIL`, `SMOKE_PASSWORD` của hộp thư test |
+| 3. Live, tính năng người dùng | `npm run smoke:user` | `.env.smoke` có thêm user B (`SMOKE_EMAIL_B`, `SMOKE_PASSWORD_B`) và moderator M (`SMOKE_EMAIL_MOD`, `SMOKE_PASSWORD_MOD`). Cả 3 là tài khoản test tạo bằng Add user + Auto Confirm; M chỉ có vai trò `moderator` |
 
-Kết quả mong đợi hiện tại: `check` exit 0 (app 123/123); `test:db` 55/55 (có zip dữ liệu); `smoke:live` 19/19; `smoke:recipes` 26/26; `smoke:auth` 26/26. Log mẫu: `docs/evidence/phase-0/`, `phase-1/`, `phase-2/`.
+Kết quả mong đợi hiện tại: `check` exit 0 (app 169/169, admin 1/1); `test:db` 98/98 (có zip dữ liệu); `smoke:live` 19/19; `smoke:recipes` 26/26; `smoke:auth` 26/26; `smoke:user` 100/100. Log mẫu: `docs/evidence/phase-0/` … `phase-3/`.
 
 Kiểm tra bổ sung:
 
@@ -184,7 +185,8 @@ npm --prefix admin run build    # build admin
 
 ## 13. Giới hạn đã biết
 
-- Admin mới là khung; app chưa có tính năng Phase 3–4.
+- Admin mới là khung; app chưa có tính năng Phase 4. Việc duyệt nội dung tạm làm trong app (màn "Duyệt nội dung").
+- File ảnh nấu ăn không bị xóa khi người dùng hoặc công thức bị xóa (dòng thì bị xóa theo cascade); cần tác vụ dọn ở Phase 4.
 - Email xác nhận dùng dịch vụ mặc định của Supabase (chỉ gửi tới thành viên team); cần SMTP riêng trước khi có người dùng thật.
 - PGlite không chạy PostgREST, GoTrue hay Storage thật; tầng 3 bù phần này.
 - Dữ liệu từ sách, mục đích giáo dục; cần giữ ghi công nguồn (`recipe_sources`).
