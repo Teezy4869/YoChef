@@ -286,7 +286,11 @@ describe('0002_identity_rbac', () => {
     await admin(db, `insert into public.user_roles (user_id, role) values ($1, 'super_admin')`, [alice]);
     const { rows } = await as(db, 'authenticated', alice, `select private.is_editor() e, private.is_moderator() m, private.is_super_admin() s`);
     assert.deepEqual(rows, [{ e: true, m: true, s: true }]);
+    // Alice is the only super admin, which 4.1's keep_last_super_admin trigger protects;
+    // test cleanup bypasses triggers on purpose (phase4.test.mjs covers that rule).
+    await db.exec(`set session_replication_role = replica`);
     await admin(db, `delete from public.user_roles where user_id = $1`, [alice]);
+    await db.exec(`set session_replication_role = origin`);
   });
 
   it('anon cannot execute role helpers', async () => {

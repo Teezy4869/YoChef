@@ -1,6 +1,6 @@
 # YoChef v2: Schema chuẩn (SCHEMA_V2)
 
-**Trạng thái:** `0001_catalog` = `supabase/migrations/20261108130000_catalog.sql`, `0002_identity_rbac` = `20261108130100_identity_rbac.sql` (bước 0.4). Phase 3: `favorites` = `20261113234830_phase3_favorites.sql` (3.1), `shopping_lists` = `20261114041322_phase3_shopping_lists.sql` (3.2), `ratings` = `20261114045322_phase3_ratings.sql` (3.3), `comments` = `20261114051346_phase3_comments.sql` (3.4), `cooking_photos` = `20261114054707_phase3_cooking_photos.sql` (3.5), duyệt nội dung = `20261114060039_phase3_moderation.sql` (3.6). Tên logic `00NN_*` trong tài liệu ứng với file có tiền tố timestamp mà Supabase CLI yêu cầu. Tài liệu này là **nguồn sự thật duy nhất** về schema: migration viết theo nó, và khi migration buộc phải khác, tài liệu được sửa trong cùng commit.
+**Trạng thái:** `0001_catalog` = `supabase/migrations/20261108130000_catalog.sql`, `0002_identity_rbac` = `20261108130100_identity_rbac.sql` (bước 0.4). Phase 3: `favorites` = `20261113234830_phase3_favorites.sql` (3.1), `shopping_lists` = `20261114041322_phase3_shopping_lists.sql` (3.2), `ratings` = `20261114045322_phase3_ratings.sql` (3.3), `comments` = `20261114051346_phase3_comments.sql` (3.4), `cooking_photos` = `20261114054707_phase3_cooking_photos.sql` (3.5), duyệt nội dung = `20261114060039_phase3_moderation.sql` (3.6). Phase 4: vai trò và nhật ký quản trị = `20261114153457_phase4_rbac_audit.sql` (4.1). Tên logic `00NN_*` trong tài liệu ứng với file có tiền tố timestamp mà Supabase CLI yêu cầu. Tài liệu này là **nguồn sự thật duy nhất** về schema: migration viết theo nó, và khi migration buộc phải khác, tài liệu được sửa trong cùng commit.
 **Project:** Supabase `bdhphjwhagygbwtfhhxn` (YoChef v2), PostgreSQL 17.
 **Ngày:** 2026-11-08.
 
@@ -149,7 +149,7 @@ Phase 0 không có đường ghi nào từ client. Dữ liệu được nạp b�
 
 **RLS:**
 - `anon` và `authenticated` SELECT `status = 'published'`.
-- Editor đọc mọi trạng thái: thêm ở 4.1.
+- Editor đọc mọi trạng thái: thêm ở 4.5 (CMS), cùng các RPC ghi công thức.
 
 **Index:** `(status, category_id)`, `category_id`.
 
@@ -229,7 +229,9 @@ Phase 0 không có đường ghi nào từ client. Dữ liệu được nạp b�
 - Unique `(user_id, role)`; index `user_id`.
 - Người dùng không có dòng nào là người dùng thường.
 - **RLS:** `authenticated` chỉ SELECT dòng của chính mình. Không có quyền INSERT, UPDATE hay DELETE từ client.
-- Gán và thu hồi vai trò qua RPC `manage_user_role` (super_admin, có audit) ở lát cắt 4.1, kèm trigger chặn xóa super_admin cuối cùng.
+- **Gán và thu hồi (4.1, `20261114153457_phase4_rbac_audit.sql`):** RPC `public.manage_user_role(p_target, p_role, p_action, p_reason)`: DEFINER, chỉ `is_super_admin()` (khác thì `42501`); `p_action` là `assign` hoặc `revoke`, lý do bắt buộc (thiếu thì `22023`), tài khoản không tồn tại thì `P0002`. Trả `true` khi có thay đổi; gán vai trò đã có hay thu hồi vai trò không có thì trả `false` và không ghi nhật ký. Super admin không tự thu hồi `super_admin` của mình (`42501`). Mỗi thay đổi ghi một dòng `admin_audit_logs` trong cùng giao dịch; `granted_by` là người gán.
+- **Super admin cuối cùng:** trigger `private.keep_last_super_admin()` (DEFINER) trên `user_roles` từ chối xóa hay đổi dòng `super_admin` cuối cùng còn hoạt động (chưa xóa, không bị khóa: `auth.users.deleted_at`, `banned_until`), kể cả khi xóa tài khoản kéo theo cascade. Trigger khóa mọi dòng `super_admin` nên hai lệnh thu hồi đồng thời không cùng lọt.
+- **Đọc cho super admin:** `list_staff()` (mọi người có vai trò, kèm email và tên), `find_user_by_email(p_email)` (chỉ khớp đúng email, không phân biệt hoa thường; không có tìm kiếm hay liệt kê người dùng thường), `list_admin_audit_logs(p_limit, p_before)` (mới nhất trước, phân trang theo thời gian, `p_limit` kẹp 1–200). Cả ba là DEFINER và báo `42501` với người không phải super admin. Advisor `authenticated_security_definer_function_executable` sẽ báo cả 4 RPC: chấp nhận, cùng lý do như `get_my_profile()` (mỗi hàm tự kiểm vai trò trước khi làm gì).
 - **Bootstrap super_admin đầu tiên** (4.1): chủ dự án tự chạy một lệnh SQL trong SQL Editor với email do chính mình chọn. Lệnh này không nằm trong migration hay seed, để repo không chứa email.
 
 Hàm, tất cả nằm trong `private`, đều `STABLE SECURITY DEFINER set search_path = ''`, đọc `public.user_roles` theo `auth.uid()`:
@@ -363,7 +365,7 @@ Quy tắc chi tiết nằm trong `phase4_08_nutrition_data_contract.md`. Public 
 **Lưu ý dữ liệu:** đơn vị chưa chuẩn hóa. Bộ dữ liệu có cả `thìa`, `thìa canh` và `thìa to`, tổng cộng 45 đơn vị khác nhau. Bảng quy đổi phải xử lý từng đơn vị, không được giả định.
 
 ### 5.7 Quản trị (4.1, 4.2), phác thảo
-- `admin_audit_logs`: chỉ được thêm, không sửa; ghi `actor_id`, `action`, `target_table`, `target_id`, `reason`, `details jsonb`, `created_at`. Chỉ đọc qua RPC của super_admin.
+- `admin_audit_logs` (**đã làm ở 4.1**): `id`, `actor_id` (không FK, để còn nguyên khi tài khoản bị xóa; NULL là tác vụ hệ thống), `action` (dạng `nhóm.hành_động`, ví dụ `role.assign`), `target_table`, `target_id`, `reason` (NULL hoặc 1–500 ký tự), `details jsonb`, `created_at`. Chỉ được thêm: trigger `private.forbid_change()` chặn UPDATE và DELETE với mọi vai trò. Client không có quyền nào trên bảng (RLS bật, không có policy); chỉ đọc qua `list_admin_audit_logs()`. Các RPC ghi qua `private.audit()` (INVOKER, chỉ chạy được bên trong RPC DEFINER).
 - `content_reports`: người dùng báo cáo comment hoặc photo.
 - `moderation_actions` (**đã làm ở 3.6**): `id`, `actor_id` (không FK, để lịch sử còn nguyên khi tài khoản bị xóa và không bị cascade sửa), `target_table` (`comments`, `cooking_photos`), `target_id` (không FK, để lịch sử còn sau khi nội dung bị xóa), `from_status`, `to_status`, `reason` (NULL hoặc 1–500 ký tự), `created_at`. Chỉ được thêm: client không có quyền ghi, và trigger `private.forbid_change()` chặn UPDATE và DELETE với mọi vai trò, kể cả owner. Chỉ `is_moderator()` đọc được (RLS). Chỉ RPC `moderate_community_content` ghi vào bảng.
 

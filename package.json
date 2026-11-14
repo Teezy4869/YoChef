@@ -19,7 +19,8 @@
     "smoke:live": "node --env-file=app/.env scripts/live_smoke.mjs --log docs/evidence/phase-0/live_smoke.log",
     "smoke:auth": "node --env-file=app/.env --env-file-if-exists=.env.smoke scripts/live_auth_smoke.mjs --log docs/evidence/phase-1/live_auth_smoke.log",
     "smoke:recipes": "node --env-file=app/.env scripts/live_recipes_smoke.mjs --log docs/evidence/phase-2/live_recipes_smoke.log",
-    "smoke:user": "node --env-file=app/.env --env-file-if-exists=.env.smoke scripts/live_user_smoke.mjs --log docs/evidence/phase-3/live_user_smoke.log"
+    "smoke:user": "node --env-file=app/.env --env-file-if-exists=.env.smoke scripts/live_user_smoke.mjs --log docs/evidence/phase-3/live_user_smoke.log",
+    "smoke:admin": "node --env-file=app/.env --env-file-if-exists=.env.smoke scripts/live_admin_smoke.mjs --log docs/evidence/phase-4/live_admin_smoke.log"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.3.15",
