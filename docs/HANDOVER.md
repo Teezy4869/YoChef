@@ -19,17 +19,17 @@ YoChef là ứng dụng nấu ăn Việt Nam: tìm công thức, chỉnh khẩu 
 
 Không có backend Node riêng, không dùng Docker.
 
-## 2. Hiện trạng (tính đến 2026-11-14)
+## 2. Hiện trạng (tính đến 2026-11-15)
 
 | Phase | Trạng thái |
 |---|---|
 | 0. Nền móng (repo, schema, dữ liệu 250 công thức, test 3 tầng) | **Xong**, tag `phase-0-complete` |
 | 1. Khung app, theme, Auth, hồ sơ | **Xong**, tag `phase-1-complete`; `smoke:auth` 26/26. Xem `docs/reports/PHASE_1_PROGRESS.md` |
 | 2. Recipe core (tìm kiếm, chi tiết, khẩu phần, chế độ nấu) | Đã merge vào `main`, migration đã lên v2, `smoke:recipes` 26/26. 2.1–2.5 đã chạy trên máy thật; 2.6–2.12 (làm tròn A2, thông báo hẹn giờ, phiên nấu, giữ màn hình sáng) chờ kiểm trên máy thật. Xem `docs/reports/PHASE_2_CHANGES.md` |
-| 3. Yêu thích, đi chợ, đánh giá, bình luận, ảnh nấu ăn, duyệt nội dung tối thiểu | Đã merge vào `main`, 6 migration đã lên v2, `smoke:user` 100/100. Chờ kiểm trên máy thật (gồm EXIF ảnh) rồi mới gắn tag `phase-3-complete`. Xem `docs/reports/PHASE_3_REPORT.md` |
-| 4. Admin: RBAC, kiểm duyệt (admin web, báo cáo vi phạm), dinh dưỡng, YouTube, CMS | Chưa làm. Một phần 4.2 (RPC duyệt, lịch sử duyệt) đã đưa sớm vào 3.6 |
+| 3. Yêu thích, đi chợ, đánh giá, bình luận, ảnh nấu ăn, duyệt nội dung tối thiểu | Đã merge vào `main`, 6 migration đã lên v2, `smoke:user` 100/100 lúc đóng Phase 3 (nay 113/113 vì có thêm 4.2). Chờ kiểm trên máy thật (gồm EXIF ảnh) rồi mới gắn tag `phase-3-complete`. Xem `docs/reports/PHASE_3_REPORT.md` |
+| 4. Admin: RBAC và nhật ký, báo cáo vi phạm và kiểm duyệt, CMS công thức, dinh dưỡng (USDA), video YouTube | Đã merge vào `main`, 5 migration đã lên v2, 3 Edge Function đã deploy; `smoke:admin` 68/68, `smoke:user` 113/113. Chờ chủ dự án kiểm admin web trên trình duyệt và app trên máy thật, và chạy lịch làm mới video (mục 8), rồi mới gắn tag `phase-4-complete`. Xem `docs/reports/PHASE_4_REPORT.md` |
 
-App đã có đăng nhập, hồ sơ, tìm kiếm, chi tiết công thức, chế độ nấu, yêu thích, đi chợ, đánh giá, bình luận, ảnh nấu ăn và màn duyệt nội dung cho moderator; `admin/` vẫn là màn hình mẫu.
+App đã có đăng nhập, hồ sơ, tìm kiếm, chi tiết công thức, chế độ nấu, yêu thích, đi chợ, đánh giá, bình luận, ảnh nấu ăn màn duyệt nội dung cho moderator, nút báo cáo vi phạm, mục dinh dưỡng và nút xem video. Admin web (`admin/`) có đăng nhập theo vai trò, Nhân sự, Nhật ký, Kiểm duyệt, Công thức (CMS), Dinh dưỡng và video; hiện chỉ chạy local.
 Chi tiết lộ trình: gói tài liệu gốc `YoChef_born_again/03_PHASE_0_REBUILD_GUIDE.md` §3.
 
 ## 3. Thông tin bàn giao (điền)
@@ -49,8 +49,8 @@ Chi tiết lộ trình: gói tài liệu gốc `YoChef_born_again/03_PHASE_0_REB
 |---|---|---|---|
 | GitHub | Mã nguồn | Tài khoản `Teezy4869` | Cần quyền ghi repo |
 | Supabase | Database, Auth, Storage | `<email đăng nhập Dashboard>` | Tổ chức chứa v2: `lqnbivordcxkbiubogjt` |
-| Google Cloud (YouTube Data API) | Video tham khảo (Phase 4.4) | Chưa tạo | Khóa chỉ đặt ở Edge Function |
-| USDA FoodData Central | Dinh dưỡng (Phase 4.3) | Chưa tạo | Khóa chỉ đặt ở Edge Function |
+| Google Cloud (YouTube Data API v3) | Video tham khảo (Phase 4.4) | `<email tài khoản Google Cloud>` | Khóa chỉ đặt ở Edge Function. Hạn mức mặc định 10.000 đơn vị mỗi ngày; một lần tìm kiếm tốn 100, một lần xác minh tốn 1 |
+| USDA FoodData Central | Dinh dưỡng (Phase 4.3) | `<email đăng ký khóa USDA>` | Khóa chỉ đặt ở Edge Function. Hạn mức 1.000 lần gọi mỗi giờ |
 | Expo (EAS), nếu build bản cài | Build app | Chưa dùng | Chưa cần ở Phase 0 |
 
 ## 5. Dự án Supabase (điền)
@@ -73,9 +73,10 @@ Mật khẩu database: lưu ở `<trình quản lý mật khẩu>`. **Không ghi
 |---|---|---|---|
 | Publishable key | App, Admin (công khai, nhúng trong bundle) | `app/.env`, `admin/.env` | `app/.env` và `admin/.env` trên máy người bàn giao (không có trong git). Lấy lại: Dashboard → Project Settings → API Keys |
 | Mật khẩu database | Chỉ người quản trị, khi cần | Trình quản lý mật khẩu | `<tên trình quản lý mật khẩu>` |
-| Secret / service_role key | Chỉ Edge Function, không bao giờ ở client | Supabase secrets | Chưa tạo, chưa dùng |
-| `YOUTUBE_API_KEY` | Edge Function | `supabase secrets set` | Chưa tạo (Phase 4.4) |
-| USDA API key | Edge Function | `supabase secrets set` | Chưa tạo (Phase 4.3) |
+| Secret / service_role key | Chỉ Edge Function, không bao giờ ở client | Supabase tự cấp cho Edge Function (`SUPABASE_SERVICE_ROLE_KEY`) | Không lưu ở nơi nào khác; `youtube-search` và `youtube-refresh` dùng nó để ghi biên nhận và làm mới video |
+| `YOUTUBE_API_KEY` | Edge Function `youtube-search`, `youtube-refresh` | `supabase secrets set` | Đã đặt trên v2 (2026-11-14). Bản gốc: `<nơi lưu>` |
+| `YOUTUBE_REFRESH_SECRET` (từ 32 ký tự) | Edge Function `youtube-refresh` và Vault của database (lịch pg_cron) | `supabase secrets set`, `vault.create_secret` | Đã đặt trên function (2026-11-14); **chưa** đưa vào Vault vì lịch chưa chạy (mục 8). Bản gốc: `<nơi lưu>` |
+| `USDA_API_KEY` | Edge Function `nutrition-search` | `supabase secrets set` | Đã đặt trên v2 (2026-11-14). Bản gốc: `<nơi lưu>` |
 | Access token Supabase CLI | Máy dev | `supabase login` (lưu cục bộ) | máy từng người |
 
 Quy tắc: secret key, service_role và mật khẩu database **không** đi vào app, git hay chat. Mỗi người nhận tự tạo key của mình, không dùng chung bằng cách gửi file `.env`.
@@ -115,7 +116,7 @@ npx supabase login
 npx supabase link --project-ref <ref>
 npx supabase migration list --linked      # project trống: chưa có dòng remote
 npm run test:db                           # phải xanh trước khi push
-npx supabase db push --linked             # áp 2 migration
+npx supabase db push --linked             # áp mọi migration (15 tính đến Phase 4)
 ```
 
 Nạp 250 công thức và ảnh (zip nằm ngoài repo, kiểm tra sha256 tự động):
@@ -130,7 +131,18 @@ Kết quả đúng: 250 công thức (236 `published`, 14 `staged`), 542 nguyên
 
 Nếu đổi sang project khác: `scripts/live_smoke.mjs` ghi cứng số kỳ vọng. Với dữ liệu mới, cập nhật lại các số đó.
 
-Super admin đầu tiên (Phase 4.1): người nhận tự chạy một lệnh SQL trong SQL Editor với email của mình. Email: `<email super_admin>`. Không đưa email này vào migration hay seed.
+Super admin đầu tiên (Phase 4.1): người nhận tự chạy một lệnh SQL trong SQL Editor với email của mình (thêm một dòng `super_admin` vào `user_roles`). Email: `<email super_admin>`. Không đưa email này vào migration hay seed. Mọi vai trò khác gán trong admin web, trang Nhân sự (RPC `manage_user_role`, bắt buộc có lý do, có ghi nhật ký). Database không cho xóa super admin cuối cùng.
+
+Edge Function (Phase 4.3, 4.4). Đặt secret trước, rồi deploy (không cần Docker):
+
+```bash
+npx supabase secrets set --project-ref <ref> USDA_API_KEY=<khóa> YOUTUBE_API_KEY=<khóa> YOUTUBE_REFRESH_SECRET=<chuỗi ngẫu nhiên từ 32 ký tự>
+npx supabase functions deploy nutrition-search --use-api --project-ref <ref>
+npx supabase functions deploy youtube-search --use-api --project-ref <ref>
+npx supabase functions deploy youtube-refresh --use-api --no-verify-jwt --project-ref <ref>
+```
+
+`youtube-refresh` không kiểm JWT vì lịch chạy gọi nó bằng header `x-refresh-secret`. Lịch làm mới video hằng ngày: mở `supabase/scripts/youtube_schedule.sql`, thay `<the same secret>` bằng đúng chuỗi `YOUTUBE_REFRESH_SECRET`, chạy **một lần** trong SQL Editor, và không commit file đã sửa. **Trên v2 bước này chưa làm.** Khi chưa có lịch, video quá 30 ngày vẫn tự ẩn với người dùng (RLS kiểm ngày), nhưng không được xác minh lại và không bị xóa.
 
 ## 9. Kiểm tra mọi thứ đang chạy
 
@@ -143,9 +155,10 @@ Ba tầng kiểm thử (một bước chỉ xong khi tầng 3 xanh cho phần ch
 | 3. Live trên Supabase | `npm run smoke:live` | `app/.env` có URL và publishable key |
 | 3. Live, công thức (khách) | `npm run smoke:recipes` | `app/.env`; migration `20261113120000_recipe_search` đã lên v2 |
 | 3. Live, người dùng đăng nhập | `npm run smoke:auth` | Như trên, thêm `.env.smoke` ở gốc repo với `SMOKE_EMAIL`, `SMOKE_PASSWORD` của hộp thư test |
+| 3. Live, admin và tích hợp | `npm run smoke:admin` | `.env.smoke` có thêm super admin S (`SMOKE_EMAIL_SUPER`, `SMOKE_PASSWORD_SUPER`) và editor E (`SMOKE_EMAIL_EDITOR`, `SMOKE_PASSWORD_EDITOR`), cùng A và M. S được gán `super_admin` bằng SQL; E do S gán trong smoke. Cần 3 Edge Function đã deploy và có secret. Mỗi lần chạy tốn khoảng 101 đơn vị hạn mức YouTube và để lại dòng trong nhật ký admin |
 | 3. Live, tính năng người dùng | `npm run smoke:user` | `.env.smoke` có thêm user B (`SMOKE_EMAIL_B`, `SMOKE_PASSWORD_B`) và moderator M (`SMOKE_EMAIL_MOD`, `SMOKE_PASSWORD_MOD`). Cả 3 là tài khoản test tạo bằng Add user + Auto Confirm; M chỉ có vai trò `moderator` |
 
-Kết quả mong đợi hiện tại: `check` exit 0 (app 169/169, admin 1/1); `test:db` 98/98 (có zip dữ liệu); `smoke:live` 19/19; `smoke:recipes` 26/26; `smoke:auth` 26/26; `smoke:user` 100/100. Log mẫu: `docs/evidence/phase-0/` … `phase-3/`.
+Kết quả mong đợi hiện tại: `check` exit 0 (app 177/177, admin 38/38); `test:db` 132/132 (có zip dữ liệu); `smoke:live` 19/19; `smoke:recipes` 26/26; `smoke:auth` 26/26; `smoke:user` 113/113; `smoke:admin` 68/68. Log mẫu: `docs/evidence/phase-0/` … `phase-4/`.
 
 Kiểm tra bổ sung:
 
@@ -159,7 +172,7 @@ npm run db:advisors   # chỉ còn các cảnh báo đã ghi trong docs/evidence
 
 ```bash
 npm --prefix app start          # Expo (quét QR bằng Expo Go, hoặc nhấn a / w)
-npm --prefix admin run dev      # Admin tại http://localhost:5173
+npm --prefix admin run dev      # Admin tại http://localhost:5173 (cần admin/.env, đăng nhập bằng tài khoản có vai trò)
 npm --prefix admin run build    # build admin
 ```
 
@@ -178,15 +191,18 @@ npm --prefix admin run build    # build admin
 | # | Việc | Khi nào | Người quyết |
 |---|---|---|---|
 | 1 | Bắt đầu Phase 1: đăng ký và đăng nhập **thật** trên Supabase (trigger tạo profile mới chỉ test trên PGlite) | Việc đầu tiên | `<...>` |
-| 2 | Giữ hay xóa video ID YouTube sau 30 ngày (chính sách YouTube III.E.4) | Trước Phase 4.4 | `<...>` |
-| 3 | Rà dữ liệu: #095 "Tỏi" xuất hiện 2 lần; tên sách trong header JSON khác bản provenance; 14 công thức `staged`; 8 ảnh cách ly chưa có ảnh thay | Phase 4.5 | `<...>` |
+| 2 | ~~Giữ hay xóa video ID YouTube sau 30 ngày~~ **Đã chốt (E10): xóa hẳn dòng.** Việc còn lại: chạy `supabase/scripts/youtube_schedule.sql` trên v2 (mục 8) | Trước khi gắn video thật | Chủ dự án |
+| 3 | Rà dữ liệu: #095 "Tỏi" xuất hiện 2 lần; tên sách trong header JSON khác bản provenance; 14 công thức `staged`; 8 ảnh cách ly chưa có ảnh thay. CMS (admin web → Công thức) đã có để sửa; dữ liệu chưa được rà | Khi có editor | `<...>` |
 | 4 | Xác nhận tài khoản admin duy nhất trên project cũ có phải của chủ dự án; số phận project cũ | Trước khi bỏ project cũ | `<...>` |
+| 6 | Dinh dưỡng: chưa nguyên liệu nào có số liệu USDA đã xác minh, nên chưa công thức nào hiện dinh dưỡng. Editor phải gắn và xác minh từng nguyên liệu (admin web → Dinh dưỡng); nguyên liệu bắt buộc ghi "vừa ăn" sẽ chặn mọi tổng | Khi có editor | `<...>` |
+| 7 | Admin web chạy ở đâu (hiện chỉ local) | Trước khi có nhân sự thật | `<...>` |
 | 5 | Xử lý `npm audit` mức moderate trong tooling (bản "fix" tự động hạ Expo về 52, **không** dùng) | Khi nâng SDK | `<...>` |
 
 ## 13. Giới hạn đã biết
 
-- Admin mới là khung; app chưa có tính năng Phase 4. Việc duyệt nội dung tạm làm trong app (màn "Duyệt nội dung").
-- File ảnh nấu ăn không bị xóa khi người dùng hoặc công thức bị xóa (dòng thì bị xóa theo cascade); cần tác vụ dọn ở Phase 4.
+- Admin web chỉ chạy local, chưa có nơi host. Màn "Duyệt nội dung" trong app vẫn còn, làm dự phòng cho trang Kiểm duyệt trên admin web.
+- Phase 4 chưa được mở trên trình duyệt thật hay máy thật; lịch làm mới video (pg_cron) chưa chạy.
+- File ảnh nấu ăn không bị xóa khi người dùng hoặc công thức bị xóa (dòng thì bị xóa theo cascade). Phase 4 **chưa** làm tác vụ dọn này. Ảnh bìa cũ của công thức cũng ở lại bucket cho tới khi editor xóa.
 - Email xác nhận dùng dịch vụ mặc định của Supabase (chỉ gửi tới thành viên team); cần SMTP riêng trước khi có người dùng thật.
 - PGlite không chạy PostgREST, GoTrue hay Storage thật; tầng 3 bù phần này.
 - Dữ liệu từ sách, mục đích giáo dục; cần giữ ghi công nguồn (`recipe_sources`).

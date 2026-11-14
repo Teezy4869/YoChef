@@ -31,3 +31,69 @@ S has super_admin, E had no role). S then made E an editor through manage_user_r
 $ npm run smoke:admin
 4.1 part: 28/28 PASS (docs/evidence/phase-4/live_admin_smoke_4.1.log).
 The run ended with 3 FAIL in the 4.5 part (HTTP 404 PGRST202: save_recipe is not on v2 yet; 4.5 is not pushed).
+
+== 4.2, 4.5, 4.3, 4.4 pushed one by one; 3 Edge Functions deployed  2026-11-14 UTC (2026-11-15 local) ==
+The project owner approved pushing everything ("nghiệm thu toàn bộ và push toàn bộ dự án"). Each migration
+was pushed from its own branch, after a dry run that listed exactly that one file.
+$ npm run db:push   (branch phase-4/4.2-reports)
+Applying migration 20261114155100_phase4_content_reports.sql... Finished supabase db push.
+$ npm run db:push   (branch phase-4/4.5-cms)
+Applying migration 20261114160903_phase4_recipe_cms.sql... Finished supabase db push.
+$ npm run db:push   (branch phase-4/4.3-nutrition)
+Applying migration 20261114162121_phase4_nutrition.sql... Finished supabase db push.
+$ npm run db:push   (branch phase-4/4.4-youtube)
+Applying migration 20261114163608_phase4_recipe_videos.sql... Finished supabase db push.
+
+$ npm run db:list
+=> local and remote match: 15/15 (last: 20261114163608).
+
+$ npx supabase functions deploy <name> --use-api --project-ref bdhphjwhagygbwtfhhxn
+nutrition-search  ACTIVE, verify_jwt true   (deployed twice: version 2 sends the USDA search as POST, see below)
+youtube-search    ACTIVE, verify_jwt true
+youtube-refresh   ACTIVE, verify_jwt false  (--no-verify-jwt: it authenticates with x-refresh-secret)
+Secrets USDA_API_KEY, YOUTUBE_API_KEY and YOUTUBE_REFRESH_SECRET were set by the project owner beforehand.
+
+$ npm run db:verify
+SCHEMA MATCHES: 15 migrations, 25 tables, 3 buckets, 62 policies, 25 triggers, 44 functions (db_verify.log).
+
+$ npm run db:advisors
+28 results, all WARN, no ERROR, nothing callable by anon:
+WARN  authenticated_security_definer_function_executable (19): the 6 accepted before, plus 13 NEW:
+      update_report_workflow; create_ingredient, save_recipe, transition_recipe_status, delete_recipe;
+      save_ingredient_nutrition, verify_ingredient_nutrition, save_unit_conversion, verify_unit_conversion,
+      calculate_recipe_nutrition, verify_recipe_nutrition; assign_recipe_video, remove_recipe_video
+      -> accepted for the same reason: staff writes go through DEFINER RPCs because clients hold no write
+      privilege on those tables; each raises 42501 unless the matching private.is_*() is true.
+WARN  multiple_permissive_policies (8): comments, cooking_photos (accepted at 3.4 / 3.5), plus 6 NEW:
+      recipes, recipe_ingredients, recipe_steps, recipe_diets (public "published" policy + "Editors read every
+      recipe"), recipe_nutrition, recipe_videos (public policy + editor policy) -> accepted: the public policy
+      must stay separate because anon has no access to schema private.
+WARN  auth_leaked_password_protection (1): Auth setting, the project owner's call.
+
+$ npm run smoke:user
+113/113 ALL PASS (live_user_smoke.log): the 100 Phase 3 checks plus 13 for reports (4.2).
+
+$ npm run smoke:admin
+Run 1: 64 PASS, 2 FAIL. Both were bugs in the smoke script, not on v2:
+  - "E deletes the unused cover" HTTP 400 InvalidRequest: the script sent Content-Type: application/json
+    with an empty body on DELETE, which Storage refuses. Fixed: the header is sent only with a body.
+  - "S deletes the archived recipe" HTTP 204: delete_recipe returns void, so 204 is the right answer;
+    the check expected 200. The audit log already showed recipe.delete.
+Runs 2 and 3: the two checks above PASS; "E searches USDA" FAIL with HTTP 502 provider_error.
+  Measured with a read-only probe (editor account, 8 searches per pass): 7/8, 4/8, 3/8 OK. USDA answered
+  the GET form of the search with a non-OK status about half the time, for every query; the same URL with
+  the public DEMO_KEY gave HTTP 400 on 5 of 7 calls. Fixed in nutrition-search/contract.ts: the search is
+  now POST with a JSON body. After redeploying: 8/8 and 8/8 OK.
+Final run: 68/68 ALL PASS (live_admin_smoke.log): roles and audit 28, CMS 18, videos 8 (youtube-search found
+8 candidates, videos.list verified one, assign, one-use receipt, remove), nutrition RPCs 7, nutrition-search 5
+(USDA search 10 results, one food by id, refusals), youtube-refresh 2 (refuses a missing and a wrong secret).
+
+$ smoke:live / smoke:recipes / smoke:auth   (same scripts and env files, logged under phase-4)
+19/19, 26/26, 26/26 ALL PASS (live_smoke.log, live_recipes_smoke.log, live_auth_smoke.log).
+
+NOT VERIFIED on v2:
+  - youtube-refresh with the real secret (only the project owner holds it) and the pg_cron schedule
+    (supabase/scripts/youtube_schedule.sql has not been run).
+  - A verified nutrition result end to end: no ingredient has a verified USDA mapping yet, so the smoke
+    proves "unverified inputs give no number", not a published total.
+  - The admin web in a real browser and the app on a device.
