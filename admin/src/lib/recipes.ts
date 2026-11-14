@@ -102,7 +102,7 @@ export async function listRecipes(client: AdminClient, filter: { status: RecipeS
   if (filter.status) q = q.eq('status', filter.status);
   if (filter.search.trim()) q = q.ilike('name', `%${filter.search.trim().replace(/[%_]/g, '')}%`);
   const from = filter.page * PAGE;
-  const { data, error, count } = await q.order('updated_at', { ascending: false }).range(from, from + PAGE - 1);
+  const { data, error, count } = await q.order('updated_at', { ascending: false }).order('slug', { ascending: true }).range(from, from + PAGE - 1);
   if (error) fail(error, 'Không tải được danh sách công thức.');
   const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
     id: String(r.id), slug: String(r.slug), name: String(r.name), status: r.status as RecipeStatus, updatedAt: String(r.updated_at),
