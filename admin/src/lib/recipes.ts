@@ -244,8 +244,8 @@ export async function saveRecipe(
   return String(data);
 }
 
-export async function moveRecipe(client: AdminClient, id: string, to: RecipeStatus) {
-  const { error } = await client.rpc('transition_recipe_status', { p_id: id, p_to: to });
+export async function moveRecipe(client: AdminClient, id: string, to: RecipeStatus, reason: string) {
+  const { error } = await client.rpc('transition_recipe_status', { p_id: id, p_to: to, p_reason: reason });
   if (error) fail(error, 'Không đổi được trạng thái.');
 }
 

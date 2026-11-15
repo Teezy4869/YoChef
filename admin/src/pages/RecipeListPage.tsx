@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 import { useAdminAuth } from '@/auth/AdminAuth';
 import { listRecipes, PAGE, STATUS_LABEL, type ListRow, type RecipeStatus } from '@/lib/recipes';
@@ -7,6 +7,7 @@ import { listRecipes, PAGE, STATUS_LABEL, type ListRow, type RecipeStatus } from
 /** Every recipe for editors (RLS), newest edit first, filtered by status and name. */
 export function RecipeListPage() {
   const { client } = useAdminAuth();
+  const done = (useLocation().state as { notice?: string } | null)?.notice;
   const [status, setStatus] = useState<RecipeStatus | ''>('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
@@ -37,6 +38,7 @@ export function RecipeListPage() {
           Tạo công thức
         </Link>
       </div>
+      {done ? <p role="status" className="text-green-800">{done}</p> : null}
       <div className="flex flex-wrap gap-3">
         <label className="flex flex-col gap-1 text-sm">
           Trạng thái

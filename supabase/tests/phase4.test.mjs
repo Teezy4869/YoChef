@@ -233,7 +233,7 @@ describe('4.5 recipe CMS', () => {
   const save = (uid, id, recipe, ingredients, steps, reason = null) =>
     rpc(uid, `select public.save_recipe($1, $2::jsonb, $3::jsonb, $4::jsonb, $5) as id`,
       [id, JSON.stringify(recipe), JSON.stringify(ingredients), JSON.stringify(steps), reason]);
-  const move = (uid, id, to) => rpc(uid, `select public.transition_recipe_status($1, $2) as status`, [id, to]);
+  const move = (uid, id, to, reason = 'kiểm thử') => rpc(uid, `select public.transition_recipe_status($1, $2, $3) as status`, [id, to, reason]);
   const base = (over = {}) => ({ slug: '900-ga-nuong', name: 'Gà nướng', default_servings: 4, ...over });
   const ING = () => [
     { ingredient_id: pork, quantity: 500, unit: 'g', quantity_basis: 'book', preparation_note: ' cắt miếng ' },
@@ -288,6 +288,8 @@ describe('4.5 recipe CMS', () => {
   it('follows the lifecycle; staging and publishing need a ready recipe', async () => {
     assert.equal((await move(editor, draftId, 'published')).error?.code, INVALID_PARAMETER); // draft -> published
     assert.equal((await move(editor, draftId, null)).error?.code, INVALID_PARAMETER);
+    assert.equal((await move(editor, draftId, 'archived', null)).error?.code, INVALID_PARAMETER); // reason required (4.8)
+    assert.equal((await move(editor, draftId, 'archived', '   ')).error?.code, INVALID_PARAMETER);
     const notReady = await move(editor, draftId, 'staged');
     assert.equal(notReady.error?.code, INVALID_PARAMETER);
     assert.deepEqual(detailOf(notReady), { category_id: 'Chọn danh mục.' });

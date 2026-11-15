@@ -306,10 +306,24 @@ describe('recipe CMS', () => {
       error: { code: '22023', message: 'recipe is not ready', details: JSON.stringify({ ingredients: 'Có nguyên liệu bị lặp.' }) } as never,
     });
     renderAt('/recipes/r1/edit', fake);
-    fireEvent.click(await screen.findByRole('button', { name: 'Chuyển sang Đã công bố' }));
+    fireEvent.change(await screen.findByLabelText('Lý do chuyển trạng thái'), { target: { value: 'Đủ nội dung' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Chuyển sang Đã công bố' }));
     expect(await screen.findByText('Có nguyên liệu bị lặp.')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('Công thức chưa đủ điều kiện.');
     expect(screen.getByRole('button', { name: 'Chuyển sang Nháp' })).toBeInTheDocument(); // staged -> draft is a move
+  });
+
+  it('needs a reason to change the status, and sends it', async () => {
+    const fake = setup();
+    renderAt('/recipes/r1/edit', fake);
+    fireEvent.click(await screen.findByRole('button', { name: 'Chuyển sang Đã công bố' }));
+    expect(await screen.findByText('Cần ghi lý do chuyển trạng thái.')).toBeInTheDocument();
+    expect(fake.rpc).not.toHaveBeenCalledWith('transition_recipe_status', expect.anything());
+    fireEvent.change(screen.getByLabelText('Lý do chuyển trạng thái'), { target: { value: ' Đã duyệt nội dung ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Chuyển sang Đã công bố' }));
+    expect(await screen.findByText('Đã chuyển sang "Đã công bố".')).toBeInTheDocument();
+    expect(fake.rpc).toHaveBeenCalledWith('transition_recipe_status', { p_id: 'r1', p_to: 'published', p_reason: 'Đã duyệt nội dung' });
+    expect(screen.getByLabelText('Lý do chuyển trạng thái')).toHaveValue('');
   });
 
   it('checks the form before calling the server', async () => {
@@ -339,6 +353,7 @@ describe('recipe CMS', () => {
     fireEvent.change(screen.getByLabelText('Lý do (bắt buộc)'), { target: { value: 'Trùng' } });
     fireEvent.click(del);
     await waitFor(() => expect(fake.rpc).toHaveBeenCalledWith('delete_recipe', { p_id: 'r1', p_confirm_slug: '001-thit-kho', p_reason: 'Trùng' }));
+    expect(await screen.findByText('Đã xóa vĩnh viễn "Thịt kho".')).toBeInTheDocument(); // back on the list
   });
 });
 
@@ -409,8 +424,11 @@ describe('nutrition page', () => {
     fireEvent.click(await screen.findByRole('tab', { name: 'Công thức' }));
     fireEvent.change(screen.getByLabelText('Tìm công thức'), { target: { value: 'thịt' } });
     fireEvent.click(screen.getByRole('button', { name: 'Tìm' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Tính dinh dưỡng Thịt luộc' }));
+    const calc = await screen.findByRole('button', { name: 'Tính dinh dưỡng Thịt luộc' });
+    expect(calc.closest('li')).toHaveTextContent('Chưa tính');
+    fireEvent.click(calc);
     const box = await screen.findByLabelText('Kết quả dinh dưỡng');
+    expect(calc.closest('li')).toHaveTextContent('Thiếu dữ liệu'); // the list follows the result
     expect(within(box).getByText('Thiếu dữ liệu')).toBeInTheDocument();
     expect(within(box).getByText('Muối: thiếu số lượng (ví dụ "vừa ăn")')).toBeInTheDocument();
     expect(within(box).getAllByText('—').length).toBe(16);

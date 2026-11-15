@@ -61,6 +61,7 @@ export function RecipeEditPage() {
   const [savedCover, setSavedCover] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const [moveReason, setMoveReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirmSlug, setConfirmSlug] = useState('');
   const [deleteReason, setDeleteReason] = useState('');
@@ -152,10 +153,13 @@ export function RecipeEditPage() {
   const transition = async (to: RecipeStatus) => {
     if (!loaded.id) return;
     setNotice(null);
+    const why = moveReason.trim();
+    if (!why) return setNotice({ ok: false, text: 'Cần ghi lý do chuyển trạng thái.' });
     setBusy(true);
     try {
-      await moveRecipe(client, loaded.id, to);
+      await moveRecipe(client, loaded.id, to, why);
       setNotice({ ok: true, text: `Đã chuyển sang "${STATUS_LABEL[to]}".` });
+      setMoveReason('');
       setReload((r) => r + 1);
     } catch (e) {
       setErrors(e instanceof RecipeSaveError ? mapFields(e.fields) : {});
@@ -170,7 +174,7 @@ export function RecipeEditPage() {
     setBusy(true);
     try {
       await deleteRecipe(client, loaded.id, confirmSlug.trim(), deleteReason.trim());
-      navigate('/recipes', { replace: true });
+      navigate('/recipes', { replace: true, state: { notice: `Đã xóa vĩnh viễn "${form.name || confirmSlug.trim()}".` } });
     } catch (e) {
       setNotice({ ok: false, text: messageOf(e) });
       setBusy(false);
@@ -190,6 +194,10 @@ export function RecipeEditPage() {
           <span>
             Trạng thái: <strong>{STATUS_LABEL[loaded.status]}</strong>
           </span>
+          <label className="flex items-center gap-1">
+            Lý do chuyển trạng thái
+            <input className="rounded border border-slate-300 px-2 py-1" value={moveReason} maxLength={500} onChange={(e) => setMoveReason(e.target.value)} />
+          </label>
           {MOVES[loaded.status].map((to) => (
             <button key={to} type="button" className={`${btn} border border-slate-300`} disabled={busy} onClick={() => void transition(to)}>
               Chuyển sang {STATUS_LABEL[to]}

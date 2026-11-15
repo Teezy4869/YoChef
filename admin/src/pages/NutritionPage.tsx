@@ -303,7 +303,9 @@ function RecipesTab() {
     setNotice(null);
     setBusy(true);
     try {
-      setResult(await calculate(client, recipe.id));
+      const res = await calculate(client, recipe.id);
+      setResult(res);
+      setFound((f) => f.map((x) => (x.id === recipe.id ? { ...x, nutrition: res.status } : x)));
     } catch (e) {
       setResult(null);
       setNotice({ ok: false, text: messageOf(e) });
@@ -317,6 +319,7 @@ function RecipesTab() {
     try {
       await verifyRecipe(client, picked.id);
       setResult((r) => (r ? { ...r, status: 'VERIFIED' } : r));
+      setFound((f) => f.map((x) => (x.id === picked.id ? { ...x, nutrition: 'VERIFIED' } : x)));
       setNotice({ ok: true, text: 'Đã xác minh. Kết quả hiện công khai nếu công thức đã công bố.' });
     } catch (e) {
       setNotice({ ok: false, text: messageOf(e) });
