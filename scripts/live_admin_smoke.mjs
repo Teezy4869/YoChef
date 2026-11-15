@@ -212,6 +212,8 @@ check('nobody writes user_roles directly, not even S', refused(directRole), deta
 
   const skip = await move(E, id, 'published');
   check('draft cannot jump to published', codeOf(skip) === '22023', detail(skip));
+  const noReason = await rpc(E, 'transition_recipe_status', { p_id: id, p_to: 'archived' });
+  check('a status move needs a reason', codeOf(noReason) === '22023', detail(noReason));
   const notReady = await move(E, id, 'staged');
   check('staging needs a category (field message returned)', codeOf(notReady) === '22023' && /category_id/.test(notReady.body?.details ?? ''), detail(notReady));
   const fixed = await save(E, id, { ...recipe, category_id: cat }, ingredients, steps);

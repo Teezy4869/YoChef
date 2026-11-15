@@ -97,3 +97,19 @@ NOT VERIFIED on v2:
   - A verified nutrition result end to end: no ingredient has a verified USDA mapping yet, so the smoke
     proves "unverified inputs give no number", not a published total.
   - The admin web in a real browser and the app on a device.
+
+== 4.8 status reason pushed  2026-11-15 ==
+Approved by the project owner ("Duyệt cả hai": db push, then git push main).
+$ npm run db:push   (branch phase-4/4.8-admin-fixes, dry run listed only this file)
+Applying migration 20261115051929_phase4_status_reason.sql... Finished supabase db push.
+$ npm run db:list
+=> local and remote match: 16/16 (last: 20261115051929).
+$ npm run db:verify
+SCHEMA MATCHES (db_verify.log).
+$ npm run smoke:admin
+69/69 ALL PASS (live_admin_smoke.log): one new check, "a status move needs a reason" (HTTP 400, 22023).
+Admin web on localhost:5173 against v2, signed in as the super admin, temporary recipe zz-smoke-cms-ui-48:
+  - "Chuyển sang Lưu trữ" with an empty reason: "Cần ghi lý do chuyển trạng thái.", status unchanged.
+  - With a reason: moved to Lưu trữ, the reason field cleared.
+  - Nutrition tab: the found row went from "Chưa tính" to "Chưa tính được" after Tính.
+  - Hard delete: back on the list with "Đã xóa vĩnh viễn "YoChef thử 4.8"."

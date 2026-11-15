@@ -1,4 +1,4 @@
-YoChef live admin smoke  2026-11-14T19:43:09.633Z  target bdhphjwhagygbwtfhhxn.supabase.co  A t***@gmail.com  M t***@gmail.com  S s***@gmail.com  E h***@gmail.com
+YoChef live admin smoke  2026-11-15T05:31:55.478Z  target bdhphjwhagygbwtfhhxn.supabase.co  A t***@gmail.com  M t***@gmail.com  S s***@gmail.com  E h***@gmail.com
 PASS  A signs in  (HTTP 200)
 PASS  M signs in  (HTTP 200)
 PASS  S signs in  (HTTP 200)
@@ -32,6 +32,7 @@ PASS  M cannot save a recipe  (HTTP 403, code 42501)
 PASS  E creates a draft  (HTTP 200, code -)
 PASS  E reads the draft; anon and A do not  (HTTP 200, code -)
 PASS  draft cannot jump to published  (HTTP 400, code 22023)
+PASS  a status move needs a reason  (HTTP 400, code 22023)
 PASS  staging needs a category (field message returned)  (HTTP 400, code 22023)
 PASS  E adds the category  (HTTP 200, code -)
 PASS  E stages then publishes it; anon sees it  (HTTP 200, code -; HTTP 200, code -)
