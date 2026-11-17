@@ -12,7 +12,7 @@ import { useAuth } from '@/features/auth/AuthProvider';
 import { DISPLAY_NAME_MAX, validateDisplayName } from '@/features/auth/validation';
 import { ModerationEntry } from '@/features/moderation/ModerationEntry';
 import { useSupabase } from '@/lib/supabase';
-import { colors, spacing } from '@/theme/tokens';
+import { colors, radius, shadows, spacing } from '@/theme/tokens';
 
 import { pickAvatar } from './pickAvatar';
 import {
@@ -152,20 +152,24 @@ export function ProfileView({ session }: { session: Session }) {
 
   return (
     <Screen testID="account-signed-in">
-      <View style={styles.header}>
-        <Avatar uri={avatarPublicUrl(supabase, profile.avatar_path)} name={profile.display_name ?? session.user.email ?? null} />
+      {/* Modern Profile Header Card */}
+      <View style={styles.profileCard}>
+        <Avatar uri={avatarPublicUrl(supabase, profile.avatar_path)} name={profile.display_name ?? session.user.email ?? null} size={64} />
         <View style={styles.headerText}>
-          <AppText variant="title" testID="profile-name">
+          <AppText variant="title" testID="profile-name" style={styles.displayName}>
             {profile.display_name ?? 'Chưa đặt tên'}
           </AppText>
-          <AppText tone="muted">{session.user.email}</AppText>
+          <AppText tone="muted" style={styles.emailText}>
+            {session.user.email}
+          </AppText>
         </View>
       </View>
 
       {banner ? <Banner tone={banner.tone} message={banner.message} testID="profile-banner" /> : null}
 
       {editing ? (
-        <View style={styles.section}>
+        <View style={styles.editCard}>
+          <AppText variant="heading" style={styles.cardSectionTitle}>Chỉnh sửa thông tin</AppText>
           <TextField
             label="Tên hiển thị"
             value={name}
@@ -183,31 +187,38 @@ export function ProfileView({ session }: { session: Session }) {
             multiline
             maxLength={BIO_MAX + 50}
           />
-          <Button title="Lưu" onPress={save} loading={busy === 'save'} />
-          <Button title="Hủy" variant="ghost" onPress={() => setEditing(false)} disabled={busy === 'save'} />
+          <View style={styles.editButtonsRow}>
+            <Button title="Lưu" onPress={save} loading={busy === 'save'} />
+            <Button title="Hủy" variant="ghost" onPress={() => setEditing(false)} disabled={busy === 'save'} />
+          </View>
         </View>
       ) : (
-        <View style={styles.section}>
-          <AppText variant="heading">Giới thiệu</AppText>
-          <AppText tone={profile.bio ? 'default' : 'muted'} testID="profile-bio">
-            {profile.bio ?? 'Chưa có giới thiệu.'}
-          </AppText>
-          <Button title="Sửa hồ sơ" onPress={startEdit} disabled={busy !== null} />
-          <Button
-            title="Đổi ảnh đại diện"
-            variant="secondary"
-            onPress={changeAvatar}
-            loading={busy === 'avatar'}
-            disabled={busy !== null && busy !== 'avatar'}
-          />
-          <ModerationEntry userId={userId} />
-          <Button
-            title="Đăng xuất"
-            variant="ghost"
-            onPress={onSignOut}
-            loading={busy === 'signout'}
-            disabled={busy !== null && busy !== 'signout'}
-          />
+        <View style={styles.infoCard}>
+          <View style={styles.bioBlock}>
+            <AppText variant="heading" style={styles.cardSectionTitle}>Giới thiệu</AppText>
+            <AppText tone={profile.bio ? 'default' : 'muted'} testID="profile-bio" style={styles.bioText}>
+              {profile.bio ?? 'Chưa có giới thiệu.'}
+            </AppText>
+          </View>
+
+          <View style={styles.actionsBlock}>
+            <Button title="Sửa hồ sơ" onPress={startEdit} disabled={busy !== null} />
+            <Button
+              title="Đổi ảnh đại diện"
+              variant="secondary"
+              onPress={changeAvatar}
+              loading={busy === 'avatar'}
+              disabled={busy !== null && busy !== 'avatar'}
+            />
+            <ModerationEntry userId={userId} />
+            <Button
+              title="Đăng xuất"
+              variant="ghost"
+              onPress={onSignOut}
+              loading={busy === 'signout'}
+              disabled={busy !== null && busy !== 'signout'}
+            />
+          </View>
         </View>
       )}
     </Screen>
@@ -215,7 +226,61 @@ export function ProfileView({ session }: { session: Session }) {
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
-  headerText: { flex: 1, gap: spacing.xxs },
-  section: { gap: spacing.md },
+  profileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+    backgroundColor: colors.surface,
+    padding: spacing.xl,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    ...shadows.card,
+  },
+  headerText: { flex: 1, gap: 2 },
+  displayName: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  emailText: {
+    fontSize: 13,
+  },
+  editCard: {
+    backgroundColor: colors.surface,
+    padding: spacing.xl,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    gap: spacing.md,
+    ...shadows.subtle,
+  },
+  editButtonsRow: {
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  infoCard: {
+    backgroundColor: colors.surface,
+    padding: spacing.xl,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    gap: spacing.xl,
+    ...shadows.subtle,
+  },
+  bioBlock: {
+    gap: spacing.xs,
+  },
+  cardSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  bioText: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  actionsBlock: {
+    gap: spacing.sm,
+  },
 });

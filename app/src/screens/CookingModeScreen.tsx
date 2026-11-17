@@ -18,7 +18,7 @@ import type { RecipeDetail } from '@/features/recipes/types';
 import { useRecipeDetail } from '@/features/recipes/useRecipeDetail';
 import { useStepTimers } from '@/features/recipes/useStepTimers';
 import { useSupabase } from '@/lib/supabase';
-import { colors, radius, spacing } from '@/theme/tokens';
+import { colors, radius, shadows, spacing } from '@/theme/tokens';
 
 const ALARM_PATTERN = [0, 500, 250, 500, 250, 500];
 
@@ -160,6 +160,7 @@ function CookingRun({
 
   return (
     <Screen edges={['left', 'right', 'bottom']} testID="cooking-mode">
+      {/* Modern Coral Progress Bar */}
       <View
         style={styles.progress}
         testID="cooking-progress"
@@ -169,12 +170,17 @@ function CookingRun({
       >
         <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
       </View>
-      <AppText variant="caption" tone="muted">
-        {recipe.name}
-      </AppText>
-      <AppText variant="label" tone="primary" testID="step-counter">
-        {`Bước ${index + 1}/${steps.length}`}
-      </AppText>
+
+      <View style={styles.topMeta}>
+        <AppText variant="caption" tone="muted" numberOfLines={1} style={styles.recipeNameText}>
+          {recipe.name}
+        </AppText>
+        <View style={styles.counterBadge}>
+          <AppText variant="label" tone="primary" testID="step-counter" style={styles.counterText}>
+            {`Bước ${index + 1}/${steps.length}`}
+          </AppText>
+        </View>
+      </View>
 
       {doneSteps.map((s) => (
         <View key={s.stepNumber} style={styles.alarm} testID="timer-done">
@@ -183,53 +189,60 @@ function CookingRun({
         </View>
       ))}
 
-      <ScrollView contentContainerStyle={styles.body}>
-        <AppText style={styles.instruction} testID="step-instruction">
-          {step.instruction}
-        </AppText>
+      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+        {/* Flashcard to bản phong cách cooking-recipes */}
+        <View style={styles.flashcard}>
+          <AppText style={styles.instruction} testID="step-instruction">
+            {step.instruction}
+          </AppText>
 
-        {stepDone ? (
-          <View style={styles.stepDone} testID="step-done">
-            <AppText variant="label" tone="success">
-              ✓ Bước này đã xong
-            </AppText>
-            <Button title="Đánh dấu chưa xong" variant="ghost" onPress={unmark} />
-          </View>
-        ) : null}
+          {stepDone ? (
+            <View style={styles.stepDone} testID="step-done">
+              <AppText variant="label" tone="success" style={styles.stepDoneLabel}>
+                ✓ Bước này đã xong
+              </AppText>
+              <Button title="Đánh dấu chưa xong" variant="ghost" onPress={unmark} />
+            </View>
+          ) : null}
 
-        {hasTimer ? (
-          <View style={styles.timer} testID="timer-panel">
-            <AppText variant="caption" tone="muted">
-              {`Hẹn giờ ${formatSeconds(duration)}`}
-            </AppText>
-            <AppText variant="display" accessibilityRole="timer" testID="timer-clock">
-              {formatClock(remainingSeconds(state, duration, timers.clock))}
-            </AppText>
-            <View style={styles.timerButtons}>
-              {state.status === 'idle' ? (
-                <Button title="Bắt đầu hẹn giờ" onPress={() => ring(step.stepNumber, timers.start(step.stepNumber, duration))} />
-              ) : null}
-              {state.status === 'running' ? (
-                <Button title="Tạm dừng" variant="secondary" onPress={() => silence(step.stepNumber, timers.pause(step.stepNumber))} />
-              ) : null}
-              {state.status === 'paused' ? (
-                <Button title="Tiếp tục" onPress={() => ring(step.stepNumber, timers.resume(step.stepNumber))} />
-              ) : null}
-              {state.status !== 'idle' ? (
-                <Button title="Đặt lại" variant="ghost" onPress={() => silence(step.stepNumber, timers.reset(step.stepNumber))} />
+          {hasTimer ? (
+            <View style={styles.timer} testID="timer-panel">
+              <View style={styles.timerHeader}>
+                <AppText variant="caption" tone="muted" style={styles.timerTitle}>
+                  {`Hẹn giờ ${formatSeconds(duration)}`}
+                </AppText>
+              </View>
+              <AppText variant="display" accessibilityRole="timer" testID="timer-clock" style={styles.timerClock}>
+                {formatClock(remainingSeconds(state, duration, timers.clock))}
+              </AppText>
+              <View style={styles.timerButtons}>
+                {state.status === 'idle' ? (
+                  <Button title="Bắt đầu hẹn giờ" onPress={() => ring(step.stepNumber, timers.start(step.stepNumber, duration))} />
+                ) : null}
+                {state.status === 'running' ? (
+                  <Button title="Tạm dừng" variant="secondary" onPress={() => silence(step.stepNumber, timers.pause(step.stepNumber))} />
+                ) : null}
+                {state.status === 'paused' ? (
+                  <Button title="Tiếp tục" onPress={() => ring(step.stepNumber, timers.resume(step.stepNumber))} />
+                ) : null}
+                {state.status !== 'idle' ? (
+                  <Button title="Đặt lại" variant="ghost" onPress={() => silence(step.stepNumber, timers.reset(step.stepNumber))} />
+                ) : null}
+              </View>
+              {alarmsOff ? (
+                <AppText variant="caption" tone="muted" testID="alarm-off-hint">
+                  Thông báo đang tắt: hẹn giờ chỉ báo khi YoChef đang mở.
+                </AppText>
               ) : null}
             </View>
-            {alarmsOff ? (
-              <AppText variant="caption" tone="muted" testID="alarm-off-hint">
-                Thông báo đang tắt: hẹn giờ chỉ báo khi YoChef đang mở.
-              </AppText>
-            ) : null}
-          </View>
-        ) : null}
+          ) : null}
+        </View>
 
         {otherRunning.length > 0 ? (
           <View style={styles.running}>
-            <AppText variant="label">Đang hẹn giờ ở bước khác</AppText>
+            <AppText variant="label" style={styles.runningTitle}>
+              Đang hẹn giờ ở bước khác
+            </AppText>
             <View style={styles.chips}>
               {otherRunning.map((s) => (
                 <Chip
@@ -243,23 +256,28 @@ function CookingRun({
           </View>
         ) : null}
 
-        <Button
-          title={showIngredients ? 'Ẩn nguyên liệu' : 'Xem nguyên liệu'}
-          variant="ghost"
-          onPress={() => setShowIngredients((v) => !v)}
-        />
-        {showIngredients ? (
-          <View testID="cooking-ingredients">
-            <AppText variant="caption" tone="muted">{`Cho ${effectiveServings} người`}</AppText>
-            <IngredientRows
-              ingredients={recipe.ingredients}
-              defaultServings={recipe.defaultServings}
-              servings={effectiveServings}
-            />
-          </View>
-        ) : null}
+        <View style={styles.ingredientsToggleCard}>
+          <Button
+            title={showIngredients ? 'Ẩn nguyên liệu' : 'Xem nguyên liệu'}
+            variant="secondary"
+            onPress={() => setShowIngredients((v) => !v)}
+          />
+          {showIngredients ? (
+            <View testID="cooking-ingredients" style={styles.ingredientsBox}>
+              <AppText variant="caption" tone="muted" style={styles.ingServings}>
+                {`Cho ${effectiveServings} người`}
+              </AppText>
+              <IngredientRows
+                ingredients={recipe.ingredients}
+                defaultServings={recipe.defaultServings}
+                servings={effectiveServings}
+              />
+            </View>
+          ) : null}
+        </View>
       </ScrollView>
 
+      {/* Modern Controls Bar */}
       <View style={styles.nav}>
         <View style={styles.navButton}>
           <Button
@@ -282,24 +300,106 @@ function CookingRun({
 }
 
 const styles = StyleSheet.create({
-  progress: { height: 6, borderRadius: 3, backgroundColor: colors.border, overflow: 'hidden' },
+  progress: { height: 6, borderRadius: 3, backgroundColor: colors.borderLight, overflow: 'hidden' },
   progressFill: { height: 6, backgroundColor: colors.primary },
+  topMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  recipeNameText: {
+    flex: 1,
+    fontSize: 13,
+  },
+  counterBadge: {
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+  },
+  counterText: {
+    fontWeight: '700',
+    fontSize: 13,
+  },
   body: { gap: spacing.lg, paddingVertical: spacing.md },
-  instruction: { fontSize: 22, lineHeight: 32 },
+  flashcard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    gap: spacing.lg,
+    ...shadows.card,
+  },
+  instruction: {
+    fontSize: 20,
+    lineHeight: 30,
+    fontWeight: '500',
+    color: colors.text,
+  },
   timer: {
     gap: spacing.sm,
     padding: spacing.lg,
     borderRadius: radius.lg,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceSubtle,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderLight,
     alignItems: 'center',
+  },
+  timerHeader: {
+    marginBottom: 2,
+  },
+  timerTitle: {
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  timerClock: {
+    fontSize: 36,
+    lineHeight: 44,
+    fontWeight: '800',
+    color: colors.primary,
   },
   timerButtons: { alignSelf: 'stretch', gap: spacing.sm },
   alarm: { gap: spacing.sm },
-  stepDone: { gap: spacing.xs, alignItems: 'flex-start' },
+  stepDone: {
+    gap: spacing.xs,
+    alignItems: 'flex-start',
+    backgroundColor: colors.successSoft,
+    padding: spacing.md,
+    borderRadius: radius.md,
+  },
+  stepDoneLabel: {
+    fontWeight: '700',
+  },
   running: { gap: spacing.sm },
+  runningTitle: {
+    fontWeight: '700',
+    fontSize: 15,
+  },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  nav: { flexDirection: 'row', gap: spacing.md },
+  ingredientsToggleCard: {
+    gap: spacing.sm,
+  },
+  ingredientsBox: {
+    backgroundColor: colors.surface,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    gap: spacing.sm,
+    ...shadows.subtle,
+  },
+  ingServings: {
+    fontWeight: '600',
+    marginBottom: spacing.xs,
+  },
+  nav: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
+  },
   navButton: { flex: 1 },
 });

@@ -57,19 +57,19 @@ export function TextField({ label, error, hint, multiline, onFocus, onBlur, styl
 
 const styles = StyleSheet.create({
   wrapper: { gap: spacing.xs, alignSelf: 'stretch' },
-  label: { color: colors.text },
+  label: { color: colors.text, fontWeight: '600' },
   input: {
     ...typography.body,
     minHeight: touchTarget,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
     borderRadius: radius.md,
     backgroundColor: colors.surface,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm + 2,
     color: colors.text,
   },
   multiline: { minHeight: 112, textAlignVertical: 'top' },
-  focused: { borderColor: colors.primary },
-  invalid: { borderColor: colors.danger },
+  focused: { borderColor: colors.primary, backgroundColor: colors.surface },
+  invalid: { borderColor: colors.danger, backgroundColor: colors.dangerSoft },
 });

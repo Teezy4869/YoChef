@@ -1,5 +1,6 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { MainTabScreenProps } from '@/app/navigation/types';
@@ -7,9 +8,8 @@ import { AppText } from '@/components/AppText';
 import { Banner } from '@/components/Banner';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
-import { fetchCategories, coverUrl } from '@/features/recipes/recipeApi';
+import { coverUrl, fetchCategories } from '@/features/recipes/recipeApi';
 import { RecipeCard } from '@/features/recipes/RecipeCard';
-import { useRecipeSearch } from '@/features/recipes/useRecipeSearch';
 import {
   DIFFICULTY_LABEL,
   EMPTY_FILTERS,
@@ -17,9 +17,10 @@ import {
   type Difficulty,
   type SearchFilters,
 } from '@/features/recipes/types';
-import { useDebouncedValue } from '@/lib/useDebouncedValue';
+import { useRecipeSearch } from '@/features/recipes/useRecipeSearch';
 import { useSupabase } from '@/lib/supabase';
-import { colors, radius, spacing, touchTarget, typography } from '@/theme/tokens';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
+import { colors, radius, shadows, spacing, touchTarget, typography } from '@/theme/tokens';
 
 const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard'];
 const TIME_OPTIONS = [30, 60];
@@ -53,19 +54,38 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
 
   const header = (
     <View style={styles.header}>
-      <AppText variant="title">Khám phá món Việt</AppText>
-      <TextInput
-        accessibilityLabel="Tìm công thức"
-        placeholder="Tìm theo tên món hoặc nguyên liệu"
-        placeholderTextColor={colors.textMuted}
-        value={filters.query}
-        onChangeText={(query) => set({ query })}
-        autoCapitalize="none"
-        autoCorrect={false}
-        returnKeyType="search"
-        clearButtonMode="while-editing"
-        style={styles.search}
-      />
+      <View style={styles.titleRow}>
+        <AppText variant="caption" tone="primary" style={styles.eyebrow}>
+          ẨM THỰC VIỆT NAM
+        </AppText>
+        <AppText variant="title" style={styles.titleText}>
+          Khám phá món Việt
+        </AppText>
+      </View>
+
+      {/* Modern Search Bar */}
+      <View style={styles.searchContainer}>
+        <Ionicons name="search-outline" size={20} color={colors.textMuted} style={styles.searchIcon} />
+        <TextInput
+          accessibilityLabel="Tìm công thức"
+          placeholder="Tìm theo tên món hoặc nguyên liệu"
+          placeholderTextColor={colors.textMuted}
+          value={filters.query}
+          onChangeText={(query) => set({ query })}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+          clearButtonMode="never"
+          style={styles.search}
+        />
+        {filters.query.length > 0 ? (
+          <Pressable hitSlop={8} onPress={() => set({ query: '' })} style={styles.clearBtn}>
+            <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+          </Pressable>
+        ) : null}
+      </View>
+
+      {/* Category Filter Chips */}
       {categories.length > 0 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
           <Chip label="Tất cả" selected={filters.categorySlug === null} onPress={() => set({ categorySlug: null })} />
@@ -79,6 +99,8 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
           ))}
         </ScrollView>
       ) : null}
+
+      {/* Secondary Filter Chips: Difficulty & Max Minutes */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
         {DIFFICULTIES.map((d) => (
           <Chip
@@ -97,11 +119,17 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
           />
         ))}
       </ScrollView>
-      {!search.loading && !search.error ? (
-        <AppText variant="caption" tone="muted" accessibilityLiveRegion="polite" testID="result-count">
-          {search.total} công thức
+
+      <View style={styles.sectionHeader}>
+        <AppText variant="heading" style={styles.sectionTitle}>
+          {hasFilters ? 'Kết quả tìm kiếm' : 'Tất cả công thức'}
         </AppText>
-      ) : null}
+        {!search.loading && !search.error ? (
+          <AppText variant="caption" tone="muted" accessibilityLiveRegion="polite" testID="result-count">
+            {search.total} công thức
+          </AppText>
+        ) : null}
+      </View>
     </View>
   );
 
@@ -122,6 +150,7 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
   } else if (search.items.length === 0) {
     body = (
       <View style={styles.center} testID="recipes-empty">
+        <Ionicons name="search-outline" size={48} color={colors.textMuted} />
         <AppText variant="heading" align="center">
           Không tìm thấy công thức phù hợp
         </AppText>
@@ -171,19 +200,80 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  header: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, gap: spacing.sm },
-  search: {
-    ...typography.body,
-    minHeight: touchTarget,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.md,
+  header: { gap: spacing.xs },
+  titleRow: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+  },
+  eyebrow: {
+    fontWeight: '800',
+    fontSize: 11,
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  titleText: {
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: '800',
     color: colors.text,
   },
-  chips: { gap: spacing.sm, paddingVertical: spacing.xs },
-  list: { padding: spacing.lg, gap: spacing.md },
-  center: { flex: 1, padding: spacing.xl, gap: spacing.lg, justifyContent: 'center' },
-  footer: { paddingVertical: spacing.lg, gap: spacing.md },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.xs,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    paddingHorizontal: spacing.md,
+    ...shadows.subtle,
+  },
+  searchIcon: {
+    marginRight: spacing.sm,
+  },
+  search: {
+    ...typography.body,
+    flex: 1,
+    minHeight: touchTarget - 4,
+    color: colors.text,
+    fontSize: 15,
+  },
+  clearBtn: {
+    padding: 4,
+  },
+  chips: {
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xs,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  list: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xxl,
+  },
+  center: {
+    flex: 1,
+    padding: spacing.xl,
+    gap: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footer: {
+    paddingVertical: spacing.lg,
+    gap: spacing.md,
+  },
 });

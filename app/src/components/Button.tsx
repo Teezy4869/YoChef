@@ -1,6 +1,6 @@
 import { ActivityIndicator, Pressable, StyleSheet, View, type PressableProps } from 'react-native';
 
-import { colors, radius, spacing, touchTarget, typography } from '@/theme/tokens';
+import { colors, radius, shadows, spacing, touchTarget, typography } from '@/theme/tokens';
 
 import { AppText } from './AppText';
 
@@ -27,6 +27,7 @@ export function Button({ title, variant = 'primary', loading = false, disabled, 
       style={({ pressed }) => [
         styles.base,
         styles[variant],
+        variant === 'primary' && !inactive ? shadows.subtle : null,
         pressed && !inactive ? pressedStyle[variant] : null,
         inactive ? styles.inactive : null,
         fullWidth ? styles.fullWidth : null,
@@ -52,23 +53,28 @@ const styles = StyleSheet.create({
   base: {
     minHeight: touchTarget,
     borderRadius: radius.md,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.xl,
     justifyContent: 'center',
     alignItems: 'center',
   },
   fullWidth: { alignSelf: 'stretch' },
   content: { flexDirection: 'row', alignItems: 'center' },
-  label: { ...typography.label, fontSize: 16 },
+  label: { ...typography.label, fontSize: 16, fontWeight: '700' },
   primary: { backgroundColor: colors.primary },
-  secondary: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderStrong },
+  secondary: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.subtle,
+  },
   ghost: { backgroundColor: 'transparent' },
   danger: { backgroundColor: colors.danger },
   inactive: { opacity: 0.55 },
 });
 
 const pressedStyle = StyleSheet.create({
-  primary: { backgroundColor: colors.primaryPressed },
-  secondary: { backgroundColor: colors.surfaceMuted },
+  primary: { backgroundColor: colors.primaryPressed, transform: [{ scale: 0.985 }] },
+  secondary: { backgroundColor: colors.surfaceMuted, transform: [{ scale: 0.985 }] },
   ghost: { backgroundColor: colors.primarySoft },
-  danger: { opacity: 0.85 },
+  danger: { opacity: 0.85, transform: [{ scale: 0.985 }] },
 });

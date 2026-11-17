@@ -1,27 +1,45 @@
-// YoChef design tokens (Phase 1.2). Light theme only (app.json userInterfaceStyle).
-// Text/background pairs meet WCAG AA (4.5:1) for body text.
+// YoChef design tokens (Revamped Phase 2.1). Modern Culinary Editorial theme.
+// Text/background pairs meet WCAG AA (4.5:1) for body text and interactive states.
 
 export const colors = {
-  background: '#FAF7F2', // warm paper, matches splash and adaptive icon
+  background: '#FAFAF9', // crisp, elegant modern canvas
   surface: '#FFFFFF',
-  surfaceMuted: '#F3EDE4',
-  border: '#E5DCD0',
-  borderStrong: '#C9BCAB',
+  surfaceMuted: '#F4F4F5',
+  surfaceSubtle: '#F9FAFB',
+  border: '#E5E7EB',
+  borderLight: '#F3F4F6',
+  borderStrong: '#D1D5DB',
 
-  text: '#1F1A17',
-  textMuted: '#655B53', // 6.2:1 on background
+  text: '#111827', // dark slate for high contrast typography
+  textSecondary: '#4B5563',
+  textMuted: '#52525B', // >= 4.5:1 on background
+  textInverse: '#FFFFFF',
   textOnPrimary: '#FFFFFF',
 
-  primary: '#B93E0C', // 5.6:1 with white text
-  primaryPressed: '#962F06',
-  primarySoft: '#FBE7DC',
+  // Accessible warm culinary accent (meets WCAG AA >= 4.5:1 on white and background)
+  primary: '#CC3A00',
+  primaryBright: '#FF5E36', // Coral accent for visual graphics / badges
+  primaryPressed: '#B33300',
+  primarySoft: '#FFF1ED',
+  primaryLight: '#FFF1ED',
+  primaryDark: '#B33300',
 
-  danger: '#B42318',
-  dangerSoft: '#FDECEA',
-  success: '#067647',
-  successSoft: '#E6F4EC',
-  info: '#175CD3',
-  infoSoft: '#EAF1FD',
+  // Slate accents
+  dark: '#111827',
+  secondary: '#374151',
+  secondaryLight: '#F3F4F6',
+
+  // Status & Highlights
+  danger: '#B91C1C',
+  dangerSoft: '#FEE2E2',
+  error: '#EF4444',
+  success: '#047857',
+  successSoft: '#D1FAE5',
+  info: '#1D4ED8',
+  infoSoft: '#DBEAFE',
+  warning: '#D97706',
+  star: '#F59E0B',
+  gold: '#F59E0B',
 } as const;
 
 export const spacing = {
@@ -30,31 +48,67 @@ export const spacing = {
   sm: 8,
   md: 12,
   lg: 16,
-  xl: 24,
-  xxl: 32,
-  xxxl: 48,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
 } as const;
 
 export const radius = {
-  sm: 6,
-  md: 10,
-  lg: 16,
+  xs: 6,
+  sm: 8,
+  md: 14,
+  lg: 18,
+  xl: 24,
+  card: 20,
   pill: 999,
+  full: 9999,
 } as const;
 
 export const typography = {
-  display: { fontSize: 30, lineHeight: 38, fontWeight: '700' },
+  display: { fontSize: 28, lineHeight: 36, fontWeight: '700' },
   title: { fontSize: 22, lineHeight: 30, fontWeight: '700' },
   heading: { fontSize: 17, lineHeight: 24, fontWeight: '600' },
-  body: { fontSize: 16, lineHeight: 24, fontWeight: '400' },
+  body: { fontSize: 15, lineHeight: 22, fontWeight: '400' },
   label: { fontSize: 14, lineHeight: 20, fontWeight: '600' },
-  caption: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
+  caption: { fontSize: 12, lineHeight: 16, fontWeight: '400' },
 } as const;
 
 export type TextVariant = keyof typeof typography;
 
+export const shadows = {
+  none: {},
+  subtle: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  card: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  medium: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  glow: {
+    shadowColor: '#FF5E36',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+} as const;
+
 // Minimum touch target (Apple HIG 44pt, Material 48dp).
 export const touchTarget = 48;
 
-export const theme = { colors, spacing, radius, typography, touchTarget } as const;
+export const theme = { colors, spacing, radius, typography, shadows, touchTarget } as const;
 export type Theme = typeof theme;

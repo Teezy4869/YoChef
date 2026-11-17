@@ -1,6 +1,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { useAuth } from '@/features/auth/AuthProvider';
@@ -13,7 +14,7 @@ import { HomeScreen } from '@/screens/HomeScreen';
 import { ModerationScreen } from '@/screens/ModerationScreen';
 import { RecipeDetailScreen } from '@/screens/RecipeDetailScreen';
 import { ShoppingScreen } from '@/screens/ShoppingScreen';
-import { colors, typography } from '@/theme/tokens';
+import { colors, shadows, typography } from '@/theme/tokens';
 
 import type { MainTabParamList, RootStackParamList } from './types';
 
@@ -28,7 +29,7 @@ const navTheme: Theme = {
     background: colors.background,
     card: colors.surface,
     text: colors.text,
-    border: colors.border,
+    border: colors.borderLight,
     notification: colors.primary,
   },
 };
@@ -40,15 +41,62 @@ function MainTabs() {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
-        // No icon set is bundled yet; labels alone keep the bar readable.
-        tabBarIconStyle: { display: 'none' },
-        tabBarLabelStyle: { ...typography.label, fontSize: 15 },
+        tabBarStyle: {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.borderLight,
+          borderTopWidth: 1,
+          height: 64,
+          paddingBottom: 8,
+          paddingTop: 6,
+          ...shadows.subtle,
+        },
+        tabBarLabelStyle: {
+          ...typography.label,
+          fontSize: 12,
+          fontWeight: '600',
+        },
       }}
     >
-      <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Khám phá' }} />
-      <Tab.Screen name="Favorites" component={FavoritesScreen} options={{ title: 'Yêu thích' }} />
-      <Tab.Screen name="Shopping" component={ShoppingScreen} options={{ title: 'Đi chợ' }} />
-      <Tab.Screen name="Account" component={AccountScreen} options={{ title: 'Tài khoản' }} />
+      <Tab.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{
+          title: 'Khám phá',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'restaurant' : 'restaurant-outline'} size={size ?? 22} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Favorites"
+        component={FavoritesScreen}
+        options={{
+          title: 'Yêu thích',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'heart' : 'heart-outline'} size={size ?? 22} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Shopping"
+        component={ShoppingScreen}
+        options={{
+          title: 'Đi chợ',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'basket' : 'basket-outline'} size={size ?? 22} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Account"
+        component={AccountScreen}
+        options={{
+          title: 'Tài khoản',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'person' : 'person-outline'} size={size ?? 22} color={color} />
+          ),
+        }}
+      />
     </Tab.Navigator>
   );
 }
@@ -70,8 +118,10 @@ export function RootNavigator() {
       <Stack.Navigator
         screenOptions={{
           headerTintColor: colors.primary,
-          headerTitleStyle: { color: colors.text },
+          headerTitleStyle: { color: colors.text, fontWeight: '700' },
           contentStyle: { backgroundColor: colors.background },
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: colors.surface },
         }}
       >
         <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
