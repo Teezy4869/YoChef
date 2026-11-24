@@ -44,3 +44,48 @@ export function remainingSeconds(state: TimerState, durationSeconds: number, now
 export function isActive(state: TimerState): boolean {
   return state.status === 'running';
 }
+
+export const MIN_TIMER_SECONDS = 5;
+export const MAX_TIMER_SECONDS = 180 * 60; // 3 hours
+
+/**
+ * Adjusts the remaining time of a running or paused timer by deltaSeconds.
+ * Never drops below minSeconds. Idle and done timers are unchanged.
+ */
+export function adjustRemaining(
+  state: TimerState,
+  deltaSeconds: number,
+  now: number,
+  minSeconds = MIN_TIMER_SECONDS,
+): TimerState {
+  if (state.status === 'running') {
+    const curRemainingMs = Math.max(0, state.endsAt - now);
+    const newRemainingMs = Math.max(minSeconds * 1000, curRemainingMs + deltaSeconds * 1000);
+    return { status: 'running', endsAt: now + newRemainingMs };
+  }
+  if (state.status === 'paused') {
+    const newRemainingMs = Math.max(minSeconds * 1000, state.remainingMs + deltaSeconds * 1000);
+    return { status: 'paused', remainingMs: newRemainingMs };
+  }
+  return state;
+}
+
+/**
+ * Sets the exact remaining time of a running or paused timer to newSeconds.
+ * Clamped to at least minSeconds. Idle and done timers are unchanged.
+ */
+export function setRemaining(
+  state: TimerState,
+  newSeconds: number,
+  now: number,
+  minSeconds = MIN_TIMER_SECONDS,
+): TimerState {
+  const safeSeconds = Math.max(minSeconds, newSeconds);
+  if (state.status === 'running') {
+    return { status: 'running', endsAt: now + safeSeconds * 1000 };
+  }
+  if (state.status === 'paused') {
+    return { status: 'paused', remainingMs: safeSeconds * 1000 };
+  }
+  return state;
+}

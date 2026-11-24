@@ -1,12 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { act, cleanupAsync, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, cleanupAsync, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { useKeepAwake } from 'expo-keep-awake';
-import * as Notifications from 'expo-notifications';
 import { Vibration } from 'react-native';
 
 import App from '@/app/App';
 import { parseSession, SESSION_TTL_MS, sessionKey } from '@/features/recipes/cookingSession';
-import { IDLE, pause, remainingSeconds, resume, settle, start } from '@/features/recipes/timer';
+import {
+  adjustRemaining,
+  IDLE,
+  pause,
+  remainingSeconds,
+  resume,
+  setRemaining,
+  settle,
+  start,
+} from '@/features/recipes/timer';
 
 import { createFakeSupabase } from './helpers/fakeSupabase';
 import { detailRow } from './helpers/recipeFixtures';
@@ -40,6 +48,34 @@ describe('timer logic', () => {
     expect(resume({ status: 'paused', remainingMs: 0 }, 5)).toEqual({ status: 'done' });
     expect(remainingSeconds(IDLE, 90, 0)).toBe(90);
     expect(remainingSeconds({ status: 'done' }, 90, 0)).toBe(0);
+  });
+
+  it('adjusts and sets remaining time on running and paused timers', () => {
+    const t0 = 1_000_000;
+    const running = start(60, t0);
+    // Add 30s
+    const extended = adjustRemaining(running, 30, t0);
+    expect(extended).toEqual({ status: 'running', endsAt: t0 + 90_000 });
+    // Subtract 60s
+    const shortened = adjustRemaining(extended, -60, t0);
+    expect(shortened).toEqual({ status: 'running', endsAt: t0 + 30_000 });
+    // Subtract too much -> clamped to min (5s)
+    const clamped = adjustRemaining(shortened, -50, t0);
+    expect(clamped).toEqual({ status: 'running', endsAt: t0 + 5_000 });
+
+    // Paused timer
+    const paused = pause(running, t0 + 20_000); // 40s remaining
+    const pausedExtended = adjustRemaining(paused, 20, t0 + 20_000);
+    expect(pausedExtended).toEqual({ status: 'paused', remainingMs: 60_000 });
+
+    // Set exact remaining
+    const exact = setRemaining(running, 120, t0);
+    expect(exact).toEqual({ status: 'running', endsAt: t0 + 120_000 });
+
+    // Idle or done timers are unaffected by adjust/set
+    expect(adjustRemaining(IDLE, 30, t0)).toBe(IDLE);
+    expect(setRemaining(IDLE, 30, t0)).toBe(IDLE);
+    expect(adjustRemaining({ status: 'done' }, 30, t0)).toEqual({ status: 'done' });
   });
 });
 
@@ -145,25 +181,11 @@ describe('cooking mode', () => {
   });
 
   describe('timer on the screen', () => {
-    const notif = jest.mocked(Notifications);
-    const ALARM_1 = 'cook:001-thit-kho:1';
-    let permission: 'undetermined' | 'granted' | 'denied';
-    let userAnswer: boolean;
-
     beforeEach(async () => {
       jest.useFakeTimers({ now: new Date('2026-11-13T10:00:00Z') });
       jest.spyOn(Vibration, 'vibrate').mockImplementation(() => undefined);
       jest.clearAllMocks();
       await AsyncStorage.clear();
-      permission = 'undetermined';
-      userAnswer = true;
-      const status = () =>
-        ({ granted: permission === 'granted', canAskAgain: permission === 'undetermined', status: permission, expires: 'never' }) as never;
-      notif.getPermissionsAsync.mockImplementation(async () => status());
-      notif.requestPermissionsAsync.mockImplementation(async () => {
-        permission = userAnswer ? 'granted' : 'denied';
-        return status();
-      });
     });
     afterEach(() => {
       jest.useRealTimers();
@@ -204,6 +226,7 @@ describe('cooking mode', () => {
         jest.advanceTimersByTime(60_500);
       });
       expect(screen.getByTestId('timer-clock')).toHaveTextContent('00:00');
+      expect(screen.getByTestId('timer-done-modal')).toBeTruthy();
       expect(screen.getByText('Hết giờ bước 1!')).toBeTruthy();
       expect(Vibration.vibrate).toHaveBeenCalledTimes(1);
 
@@ -212,9 +235,106 @@ describe('cooking mode', () => {
       });
       expect(Vibration.vibrate).toHaveBeenCalledTimes(1); // not again
 
-      fireEvent.press(screen.getByRole('button', { name: 'Tắt báo bước 1' }));
-      expect(screen.queryByTestId('timer-done')).toBeNull();
+      fireEvent.press(screen.getByTestId('timer-done-confirm-btn'));
+      expect(screen.queryByTestId('timer-done-modal')).toBeNull();
       expect(screen.getByTestId('timer-clock')).toHaveTextContent('01:30');
+    });
+
+    it('allows adjusting time with quick buttons in idle and resetting to default', async () => {
+      await toTimerStep();
+      expect(screen.getByTestId('timer-clock')).toHaveTextContent('01:30');
+      expect(screen.queryByTestId('reset-default-duration-btn')).toBeNull();
+
+      // +30s -> 02:00
+      fireEvent.press(screen.getByTestId('adjust-plus-30'));
+      expect(screen.getByTestId('timer-clock')).toHaveTextContent('02:00');
+      expect(screen.getByTestId('reset-default-duration-btn')).toBeTruthy();
+
+      // +1m -> 03:00
+      fireEvent.press(screen.getByTestId('adjust-plus-60'));
+      expect(screen.getByTestId('timer-clock')).toHaveTextContent('03:00');
+
+      // -1m -> 02:00
+      fireEvent.press(screen.getByTestId('adjust-minus-60'));
+      expect(screen.getByTestId('timer-clock')).toHaveTextContent('02:00');
+
+      // Click "Về mặc định (01:30)"
+      fireEvent.press(screen.getByTestId('reset-default-duration-btn'));
+      expect(screen.getByTestId('timer-clock')).toHaveTextContent('01:30');
+      expect(screen.queryByTestId('reset-default-duration-btn')).toBeNull();
+    });
+
+    it('adjusts time while running', async () => {
+      await toTimerStep();
+      fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu hẹn giờ' }));
+
+      // Advance 30s -> 01:00 remaining
+      await act(async () => {
+        jest.advanceTimersByTime(30_000);
+      });
+      expect(screen.getByTestId('timer-clock')).toHaveTextContent('01:00');
+
+      // Press +30s -> should become 01:30
+      fireEvent.press(screen.getByTestId('adjust-plus-30'));
+      expect(screen.getByTestId('timer-clock')).toHaveTextContent('01:30');
+    });
+
+    it('opens modal to enter custom time and validates input', async () => {
+      await toTimerStep();
+      // Press clock to open modal
+      fireEvent.press(screen.getByTestId('timer-clock-pressable'));
+      expect(screen.getByTestId('timer-edit-modal')).toBeTruthy();
+      expect(screen.getByTestId('timer-input-minutes')).toHaveProp('value', '1');
+      expect(screen.getByTestId('timer-input-seconds')).toHaveProp('value', '30');
+
+      // Quick chip +1 phút inside modal
+      fireEvent.press(screen.getByRole('button', { name: '+1 phút' }));
+      expect(screen.getByTestId('timer-input-minutes')).toHaveProp('value', '2');
+
+      // Save -> should be 2m30s (02:30)
+      fireEvent.press(screen.getByTestId('timer-save-btn'));
+      expect(screen.queryByTestId('timer-edit-modal')).toBeNull();
+      expect(screen.getByTestId('timer-clock')).toHaveTextContent('02:30');
+
+      // Reopen modal and test validation (< 5s)
+      fireEvent.press(screen.getByTestId('timer-clock-pressable'));
+      fireEvent.changeText(screen.getByTestId('timer-input-minutes'), '0');
+      fireEvent.changeText(screen.getByTestId('timer-input-seconds'), '2');
+      fireEvent.press(screen.getByTestId('timer-save-btn'));
+      expect(screen.getByTestId('timer-modal-error')).toHaveTextContent('Thời gian tối thiểu là 5 giây.');
+
+      // Cancel modal
+      fireEvent.press(screen.getByTestId('timer-cancel-btn'));
+      expect(screen.queryByTestId('timer-edit-modal')).toBeNull();
+      expect(screen.getByTestId('timer-clock')).toHaveTextContent('02:30');
+    });
+
+    it('adds a timer to a step without default timer and can remove it', async () => {
+      await toTimerStep();
+      // Navigate to step 2 (which has duration_seconds: null)
+      fireEvent.press(screen.getByRole('button', { name: 'Bước tiếp' }));
+      expect(screen.getByTestId('step-counter')).toHaveTextContent('Bước 2/2');
+      expect(screen.queryByTestId('timer-panel')).toBeNull();
+      expect(screen.getByTestId('add-timer-btn')).toBeTruthy();
+
+      // Click add timer
+      fireEvent.press(screen.getByTestId('add-timer-btn'));
+      expect(screen.getByTestId('timer-edit-modal')).toBeTruthy();
+
+      // Set to 3 minutes
+      fireEvent.changeText(screen.getByTestId('timer-input-minutes'), '3');
+      fireEvent.changeText(screen.getByTestId('timer-input-seconds'), '0');
+      fireEvent.press(screen.getByTestId('timer-save-btn'));
+
+      // Timer panel should now be present on step 2
+      expect(screen.getByTestId('timer-panel')).toBeTruthy();
+      expect(screen.getByTestId('timer-clock')).toHaveTextContent('03:00');
+      expect(screen.getByTestId('remove-custom-timer-btn')).toBeTruthy();
+
+      // Remove custom timer
+      fireEvent.press(screen.getByTestId('remove-custom-timer-btn'));
+      expect(screen.queryByTestId('timer-panel')).toBeNull();
+      expect(screen.getByTestId('add-timer-btn')).toBeTruthy();
     });
 
     it('keeps a timer running on its step while you move to another step', async () => {
@@ -230,58 +350,24 @@ describe('cooking mode', () => {
       expect(screen.getByTestId('step-counter')).toHaveTextContent('Bước 1/2');
     });
 
-    it('asks for notifications at the first start and schedules the alarm at the end time', async () => {
-      await toTimerStep();
-      expect(notif.requestPermissionsAsync).not.toHaveBeenCalled(); // never on opening the screen
-
-      const startedAt = Date.now();
-      fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu hẹn giờ' }));
-      await waitFor(() => expect(notif.scheduleNotificationAsync).toHaveBeenCalledTimes(1));
-      expect(notif.requestPermissionsAsync).toHaveBeenCalledTimes(1);
-      expect(notif.scheduleNotificationAsync).toHaveBeenCalledWith(
-        expect.objectContaining({
-          identifier: ALARM_1,
-          content: expect.objectContaining({ title: 'Hết giờ bước 1', body: 'Thịt lợn kho cốt dừa' }),
-          trigger: expect.objectContaining({ type: 'date', date: startedAt + 90_000 }),
-        }),
-      );
-
-      fireEvent.press(screen.getByRole('button', { name: 'Tạm dừng' }));
-      await waitFor(() => expect(notif.cancelScheduledNotificationAsync).toHaveBeenCalledWith(ALARM_1));
-
-      fireEvent.press(screen.getByRole('button', { name: 'Tiếp tục' }));
-      await waitFor(() => expect(notif.scheduleNotificationAsync).toHaveBeenCalledTimes(2));
-      expect(notif.requestPermissionsAsync).toHaveBeenCalledTimes(1); // granted already, not asked again
-      expect(screen.queryByTestId('alarm-off-hint')).toBeNull();
-    });
-
-    it('keeps the timer when notifications are refused, says so, and never asks again', async () => {
-      userAnswer = false;
+    it('shows in-app popup with step instruction when timer completes and dismisses on confirm', async () => {
       await toTimerStep();
       fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu hẹn giờ' }));
-      expect(await screen.findByTestId('alarm-off-hint')).toBeTruthy();
-      expect(notif.scheduleNotificationAsync).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('timer-done-modal')).toBeNull();
 
-      fireEvent.press(screen.getByRole('button', { name: 'Đặt lại' }));
-      fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu hẹn giờ' }));
       await act(async () => {
-        jest.advanceTimersByTime(1_000);
+        jest.advanceTimersByTime(90_500);
       });
-      expect(screen.getByTestId('timer-clock')).toHaveTextContent('01:29');
-      expect(notif.requestPermissionsAsync).toHaveBeenCalledTimes(1);
-      expect(notif.scheduleNotificationAsync).not.toHaveBeenCalled();
+      expect(screen.getByTestId('timer-done-modal')).toBeTruthy();
+      expect(screen.getByText('Hết giờ bước 1!')).toBeTruthy();
+      expect(within(screen.getByTestId('timer-done-modal')).getByText('Luộc trứng.')).toBeTruthy();
+
+      fireEvent.press(screen.getByTestId('timer-done-confirm-btn'));
+      expect(screen.queryByTestId('timer-done-modal')).toBeNull();
+      expect(screen.getByTestId('timer-clock')).toHaveTextContent('01:30');
     });
 
-    it('cancels the alarms when the dish is finished', async () => {
-      await toTimerStep();
-      fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu hẹn giờ' }));
-      await waitFor(() => expect(notif.scheduleNotificationAsync).toHaveBeenCalledTimes(1));
-      fireEvent.press(screen.getByRole('button', { name: 'Bước tiếp' }));
-      fireEvent.press(screen.getByRole('button', { name: 'Hoàn thành' }));
-      await waitFor(() => expect(notif.cancelScheduledNotificationAsync).toHaveBeenCalledWith(ALARM_1));
-    });
-
-    it('keeps a timer and its alarm while the app is closed, then shows it on return', async () => {
+    it('keeps a timer while the app is closed, then shows popup on return if ended', async () => {
       const row = detailRow({
         recipe_steps: [
           { step_number: 1, instruction: 'Luộc trứng.', timer_enabled: true, duration_seconds: 90 },
@@ -292,7 +378,6 @@ describe('cooking mode', () => {
       fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu hẹn giờ' }));
       await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenLastCalledWith(SESSION_KEY, expect.stringContaining('"running"')));
       await cleanupAsync(); // app closed
-      expect(notif.cancelScheduledNotificationAsync).not.toHaveBeenCalled(); // the alarm still rings while away
 
       await act(async () => {
         jest.advanceTimersByTime(30_000);
@@ -306,8 +391,10 @@ describe('cooking mode', () => {
         jest.advanceTimersByTime(120_000);
       });
       await reopenAndResume(row);
+      expect(screen.getByTestId('timer-done-modal')).toBeTruthy();
       expect(screen.getByText('Hết giờ bước 1!')).toBeTruthy(); // ended while away
-      expect(Vibration.vibrate).not.toHaveBeenCalled(); // the notification already rang
+      fireEvent.press(screen.getByTestId('timer-done-confirm-btn'));
+      expect(screen.queryByTestId('timer-done-modal')).toBeNull();
     });
   });
 
@@ -356,7 +443,7 @@ describe('cooking mode', () => {
       await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenLastCalledWith(SESSION_KEY, expect.stringContaining('"completed":[]')));
     });
 
-    it('starts over on request, dropping the session and its alarms', async () => {
+    it('starts over on request, dropping the session', async () => {
       await openCooking();
       fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu nấu' }));
       await screen.findByTestId('cooking-mode');
@@ -371,7 +458,6 @@ describe('cooking mode', () => {
       expect(screen.getByTestId('step-counter')).toHaveTextContent('Bước 1/2');
       expect(progressNow()).toBe(0);
       expect(AsyncStorage.removeItem).toHaveBeenCalledWith(SESSION_KEY);
-      await waitFor(() => expect(jest.mocked(Notifications).cancelScheduledNotificationAsync).toHaveBeenCalledWith('cook:001-thit-kho:2'));
     });
   });
 

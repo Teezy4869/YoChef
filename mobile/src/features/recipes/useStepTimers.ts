@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { IDLE, isActive, pause, resume, settle, start, type TimerState } from './timer';
+import {
+  adjustRemaining,
+  IDLE,
+  isActive,
+  pause,
+  resume,
+  setRemaining,
+  settle,
+  start,
+  type TimerState,
+} from './timer';
 
 const TICK_MS = 250;
 type Timers = Record<number, TimerState>;
@@ -70,6 +80,10 @@ export function useStepTimers(onDone: (stepNumber: number) => void, now: () => n
     pause: (step: number) => update(step, (s, t) => pause(s, t)),
     resume: (step: number) => update(step, (s, t) => resume(s, t)),
     reset: (step: number) => update(step, () => IDLE),
+    adjust: (step: number, deltaSeconds: number) =>
+      update(step, (s, t) => adjustRemaining(s, deltaSeconds, t)),
+    setRemaining: (step: number, newSeconds: number) =>
+      update(step, (s, t) => setRemaining(s, newSeconds, t)),
     running: Object.entries(timers)
       .filter(([, s]) => isActive(s))
       .map(([k]) => Number(k)),

@@ -3,16 +3,20 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
 );
 
-// Local notifications have no native side under Jest; tests drive these fakes (permission undetermined by default).
-jest.mock('expo-notifications', () => ({
-  AndroidImportance: { HIGH: 6 },
-  SchedulableTriggerInputTypes: { DATE: 'date', TIME_INTERVAL: 'timeInterval' },
-  setNotificationHandler: jest.fn(),
-  setNotificationChannelAsync: jest.fn(async () => null),
-  getPermissionsAsync: jest.fn(async () => ({ granted: false, canAskAgain: true, status: 'undetermined' })),
-  requestPermissionsAsync: jest.fn(async () => ({ granted: true, canAskAgain: true, status: 'granted' })),
-  scheduleNotificationAsync: jest.fn(async (request) => request.identifier),
-  cancelScheduledNotificationAsync: jest.fn(async () => undefined),
+// Mock expo-audio for Jest unit tests
+jest.mock('expo-audio', () => ({
+  useAudioPlayer: jest.fn(() => ({
+    play: jest.fn(),
+    pause: jest.fn(),
+    seekTo: jest.fn(),
+    loop: false,
+  })),
+  createAudioPlayer: jest.fn(() => ({
+    play: jest.fn(),
+    pause: jest.fn(),
+    seekTo: jest.fn(),
+    loop: false,
+  })),
 }));
 
 // The first test of a suite on a cold Jest cache needs well over the default 1 s for findBy*/waitFor.
