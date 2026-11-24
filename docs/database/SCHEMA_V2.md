@@ -328,7 +328,7 @@ RLS theo `phase4_03`:
 - UPDATE: chủ sở hữu, khi nội dung chưa bị `rejected`. Moderator không sửa được nội dung của người khác.
 - DELETE: chủ sở hữu khi chưa bị `rejected`, hoặc `is_super_admin()`.
 - RLS của `cooking_photos` giống hệt bảng trên. Quyền với file ở §6.
-- Advisor `multiple_permissive_policies` (hiệu năng) báo 3 policy SELECT cho `authenticated` (mỗi bảng): **chấp nhận**. PostgreSQL gộp các policy permissive bằng OR thành một điều kiện, nên gộp tay cũng chạy cùng biểu thức; policy công khai phải tách riêng vì `anon` không có quyền trên schema `private` (`docs/evidence/phase-3/v2_state.log`, mục 3.4).
+- Advisor `multiple_permissive_policies` (hiệu năng) báo 3 policy SELECT cho `authenticated` (mỗi bảng): **chấp nhận**. PostgreSQL gộp các policy permissive bằng OR thành một điều kiện, nên gộp tay cũng chạy cùng biểu thức; policy công khai phải tách riêng vì `anon` không có quyền trên schema `private`.
 
 **Cách app dùng (ảnh):** chụp hoặc chọn ảnh, mã hóa lại bằng `expo-image-manipulator` (cạnh dài tối đa 1600 px, JPEG 0,8; ảnh mã hóa mới không mang EXIF), tải lên `<user id>/<thời điểm>-<chuỗi ngẫu nhiên>.jpg` với `upsert: false`, rồi thêm dòng; nếu thêm dòng lỗi thì xóa file vừa tải. Xóa ảnh: xóa dòng trước, rồi xóa file. Lưới ảnh dùng `createSignedUrls` (hạn 1 giờ), mỗi lần 12 ảnh.
 

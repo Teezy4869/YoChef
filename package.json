@@ -14,13 +14,13 @@
     "db:push": "node scripts/sb.mjs db push",
     "db:list": "node scripts/sb.mjs migration list",
     "db:advisors": "node scripts/sb.mjs db advisors",
-    "db:verify": "node scripts/db_verify.mjs --log docs/evidence/phase-4/db_verify.log",
+    "db:verify": "node scripts/db_verify.mjs",
     "seed:build": "node supabase/seed/import_recipes.mjs",
-    "smoke:live": "node --env-file=app/.env scripts/live_smoke.mjs --log docs/evidence/phase-0/live_smoke.log",
-    "smoke:auth": "node --env-file=app/.env --env-file-if-exists=.env.smoke scripts/live_auth_smoke.mjs --log docs/evidence/phase-1/live_auth_smoke.log",
-    "smoke:recipes": "node --env-file=app/.env scripts/live_recipes_smoke.mjs --log docs/evidence/phase-2/live_recipes_smoke.log",
-    "smoke:user": "node --env-file=app/.env --env-file-if-exists=.env.smoke scripts/live_user_smoke.mjs --log docs/evidence/phase-4/live_user_smoke.log",
-    "smoke:admin": "node --env-file=app/.env --env-file-if-exists=.env.smoke scripts/live_admin_smoke.mjs --log docs/evidence/phase-4/live_admin_smoke.log"
+    "smoke:live": "node --env-file=app/.env scripts/live_smoke.mjs",
+    "smoke:auth": "node --env-file=app/.env --env-file-if-exists=.env.smoke scripts/live_auth_smoke.mjs",
+    "smoke:recipes": "node --env-file=app/.env scripts/live_recipes_smoke.mjs",
+    "smoke:user": "node --env-file=app/.env --env-file-if-exists=.env.smoke scripts/live_user_smoke.mjs",
+    "smoke:admin": "node --env-file=app/.env --env-file-if-exists=.env.smoke scripts/live_admin_smoke.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.3.15",

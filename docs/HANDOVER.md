@@ -3,7 +3,7 @@
 Dành cho người nhận dự án. Các ô `<...>` là phần **người bàn giao điền** hoặc **người nhận tự tạo**.
 **Không bao giờ ghi giá trị bí mật (key, mật khẩu) vào file này**, chỉ ghi nơi lưu chúng.
 
-Tài liệu đi kèm: `README.md` (lệnh nhanh), `AGENTS.md` (quy tắc bắt buộc), `docs/database/SCHEMA_V2.md` (schema), `docs/reports/PHASE_0_COMPLETION.md` (hiện trạng và bằng chứng).
+Tài liệu đi kèm: `README.md` (lệnh nhanh), `AGENTS.md` (quy tắc bắt buộc), `docs/database/SCHEMA_V2.md` (schema).
 
 ---
 
@@ -24,10 +24,10 @@ Không có backend Node riêng, không dùng Docker.
 | Phase | Trạng thái |
 |---|---|
 | 0. Nền móng (repo, schema, dữ liệu 250 công thức, test 3 tầng) | **Xong**, tag `phase-0-complete` |
-| 1. Khung app, theme, Auth, hồ sơ | **Xong**, tag `phase-1-complete`; `smoke:auth` 26/26. Xem `docs/reports/PHASE_1_PROGRESS.md` |
-| 2. Recipe core (tìm kiếm, chi tiết, khẩu phần, chế độ nấu) | Đã merge vào `main`, migration đã lên v2, `smoke:recipes` 26/26. 2.1–2.5 đã chạy trên máy thật; 2.6–2.12 (làm tròn A2, thông báo hẹn giờ, phiên nấu, giữ màn hình sáng) chờ kiểm trên máy thật. Xem `docs/reports/PHASE_2_CHANGES.md` |
-| 3. Yêu thích, đi chợ, đánh giá, bình luận, ảnh nấu ăn, duyệt nội dung tối thiểu | Đã merge vào `main`, 6 migration đã lên v2, `smoke:user` 100/100 lúc đóng Phase 3 (nay 113/113 vì có thêm 4.2). Chờ kiểm trên máy thật (gồm EXIF ảnh) rồi mới gắn tag `phase-3-complete`. Xem `docs/reports/PHASE_3_REPORT.md` |
-| 4. Admin: RBAC và nhật ký, báo cáo vi phạm và kiểm duyệt, CMS công thức, dinh dưỡng (USDA), video YouTube | Đã merge vào `main`, 5 migration đã lên v2, 3 Edge Function đã deploy; `smoke:admin` 68/68, `smoke:user` 113/113. Chờ chủ dự án kiểm admin web trên trình duyệt và app trên máy thật, và chạy lịch làm mới video (mục 8), rồi mới gắn tag `phase-4-complete`. Xem `docs/reports/PHASE_4_REPORT.md` |
+| 1. Khung app, theme, Auth, hồ sơ | **Xong**, tag `phase-1-complete`; `smoke:auth` 26/26. |
+| 2. Recipe core (tìm kiếm, chi tiết, khẩu phần, chế độ nấu) | Đã merge vào `main`, migration đã lên v2, `smoke:recipes` 26/26. 2.1–2.5 đã chạy trên máy thật; 2.6–2.12 (làm tròn A2, thông báo hẹn giờ, phiên nấu, giữ màn hình sáng) chờ kiểm trên máy thật. |
+| 3. Yêu thích, đi chợ, đánh giá, bình luận, ảnh nấu ăn, duyệt nội dung tối thiểu | Đã merge vào `main`, 6 migration đã lên v2, `smoke:user` 100/100 lúc đóng Phase 3 (nay 113/113 vì có thêm 4.2). Chờ kiểm trên máy thật (gồm EXIF ảnh) rồi mới gắn tag `phase-3-complete`. |
+| 4. Admin: RBAC và nhật ký, báo cáo vi phạm và kiểm duyệt, CMS công thức, dinh dưỡng (USDA), video YouTube | Đã merge vào `main`, 5 migration đã lên v2, 3 Edge Function đã deploy; `smoke:admin` 68/68, `smoke:user` 113/113. Chờ chủ dự án kiểm admin web trên trình duyệt và app trên máy thật, và chạy lịch làm mới video (mục 8), rồi mới gắn tag `phase-4-complete`. |
 
 App đã có đăng nhập, hồ sơ, tìm kiếm, chi tiết công thức, chế độ nấu, yêu thích, đi chợ, đánh giá, bình luận, ảnh nấu ăn màn duyệt nội dung cho moderator, nút báo cáo vi phạm, mục dinh dưỡng và nút xem video. Admin web (`admin/`) có đăng nhập theo vai trò, Nhân sự, Nhật ký, Kiểm duyệt, Công thức (CMS), Dinh dưỡng và video; hiện chỉ chạy local.
 Chi tiết lộ trình: gói tài liệu gốc `YoChef_born_again/03_PHASE_0_REBUILD_GUIDE.md` §3.
@@ -158,14 +158,14 @@ Ba tầng kiểm thử (một bước chỉ xong khi tầng 3 xanh cho phần ch
 | 3. Live, admin và tích hợp | `npm run smoke:admin` | `.env.smoke` có thêm super admin S (`SMOKE_EMAIL_SUPER`, `SMOKE_PASSWORD_SUPER`) và editor E (`SMOKE_EMAIL_EDITOR`, `SMOKE_PASSWORD_EDITOR`), cùng A và M. S được gán `super_admin` bằng SQL; E do S gán trong smoke. Cần 3 Edge Function đã deploy và có secret. Mỗi lần chạy tốn khoảng 101 đơn vị hạn mức YouTube và để lại dòng trong nhật ký admin |
 | 3. Live, tính năng người dùng | `npm run smoke:user` | `.env.smoke` có thêm user B (`SMOKE_EMAIL_B`, `SMOKE_PASSWORD_B`) và moderator M (`SMOKE_EMAIL_MOD`, `SMOKE_PASSWORD_MOD`). Cả 3 là tài khoản test tạo bằng Add user + Auto Confirm; M chỉ có vai trò `moderator` |
 
-Kết quả mong đợi hiện tại: `check` exit 0 (app 177/177, admin 38/38); `test:db` 132/132 (có zip dữ liệu); `smoke:live` 19/19; `smoke:recipes` 26/26; `smoke:auth` 26/26; `smoke:user` 113/113; `smoke:admin` 68/68. Log mẫu: `docs/evidence/phase-0/` … `phase-4/`.
+Kết quả mong đợi hiện tại: `check` exit 0 (app 177/177, admin 38/38); `test:db` 132/132 (có zip dữ liệu); `smoke:live` 19/19; `smoke:recipes` 26/26; `smoke:auth` 26/26; `smoke:user` 113/113; `smoke:admin` 68/68.
 
 Kiểm tra bổ sung:
 
 ```bash
 npm run db:list       # local và remote phải khớp
 npm run db:verify     # schema v2 giống hệt schema dựng từ migration (SCHEMA MATCHES)
-npm run db:advisors   # chỉ còn các cảnh báo đã ghi trong docs/evidence/*/v2_state.log
+npm run db:advisors   # chỉ còn các cảnh báo dự kiến đã chấp nhận
 ```
 
 ## 10. Chạy ứng dụng

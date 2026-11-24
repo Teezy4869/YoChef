@@ -8,7 +8,7 @@
 |---|---|
 | Schema, RLS, ánh xạ import | `docs/database/SCHEMA_V2.md` |
 | Schema đang chạy | `supabase/migrations/` (không có baseline, không có snapshot viết tay) |
-| Bằng chứng đã kiểm | `docs/evidence/` và `docs/reports/` |
+| Hiện trạng & Bàn giao | `docs/HANDOVER.md` |
 | Yêu cầu nghiệp vụ | gói `YoChef_born_again`: `10_product_and_architecture/product/app-in4.md`, `20_phase_specs/` (dùng như **yêu cầu**, không phải kết quả) |
 
 ## Stack (đã chốt ở Phase 0, chỉ nâng cấp có chủ đích)

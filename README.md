@@ -62,7 +62,7 @@ npx supabase storage cp -r supabase/.seed-out/recipe-images ss:/// --linked --pr
 | 3. Live (Công thức) | `npm run smoke:recipes` | Phase 2, khách, chỉ đọc: RPC `search_recipes` (bỏ dấu, lọc, phân trang), chi tiết một request, các quy tắc `NULL`. Cần migration `20261113120000` đã lên v2 |
 | 3. Live (Auth) | `npm run smoke:auth` | User thật trên v2: đăng nhập, trigger tạo profile, RLS khi đã đăng nhập, bucket `avatars`, đăng xuất. Cần thêm `.env.smoke` (`SMOKE_EMAIL`, `SMOKE_PASSWORD`); lần đầu chạy với `-- --signup` |
 
-Một bước chỉ được coi là xong khi tầng 3 xanh cho phần chạm tới database (L2). Log bằng chứng lưu ở `docs/evidence/`.
+Một bước chỉ được coi là xong khi tầng 3 xanh cho phần chạm tới database (L2).
 
 ## Quy tắc
 
