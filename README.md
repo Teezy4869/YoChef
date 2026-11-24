@@ -1,73 +1,84 @@
-# YoChef (v2)
+# YoChef
 
-Ứng dụng nấu ăn Việt Nam: app di động (Expo) và admin web (Vite), dùng chung backend Supabase.
-Đây là bản build lại từ Phase 0. Bối cảnh và kế hoạch nằm trong gói `YoChef_born_again`
-(`01_PROJECT_CONTEXT.md`, `03_PHASE_0_REBUILD_GUIDE.md`).
+Ứng dụng nấu ăn món Việt: tra cứu công thức chuẩn, tùy chỉnh khẩu phần, hỗ trợ nấu từng bước kèm hẹn giờ thông minh, quản lý danh sách đi chợ và tương tác cộng đồng. Dự án gồm ứng dụng di động và trang quản trị web.
 
-## Cấu trúc
+---
 
-| Thư mục | Nội dung |
-|---|---|
-| `mobile/` | Mobile app: Expo SDK 58, React Native 0.88.1, React 19.3, TypeScript strict |
-| `admin/` | Admin web: Vite 6, React 18, React Router 7, Tailwind 3 |
-| `supabase/` | `migrations/` (nguồn sự thật duy nhất của schema), `functions/`, `seed/`, `tests/` |
-| `docs/` | Tài liệu dự án, gồm `docs/database/SCHEMA_V2.md` (Phase 0.3) |
-| `scripts/` | Script tiện ích, ví dụ live smoke (Phase 0.6) |
+## 🛠 Công nghệ sử dụng
 
-`mobile/` và `admin/` là hai package npm độc lập (không dùng workspaces, để Metro không bị ảnh hưởng
-bởi hoisting). Root chỉ chứa Supabase CLI và các lệnh gộp.
+- **Mobile App (`mobile/`)**: Expo SDK 58, React Native 0.88.1, React 19.3, React Navigation 7, TypeScript.
+- **Admin Web (`admin/`)**: React 18, Vite 6, React Router 7, Tailwind CSS 3.
+- **Backend (`supabase/`)**: Supabase (PostgreSQL 17, Auth, Storage, Edge Functions).
 
-## Lệnh
+---
+
+## 📋 Yêu cầu môi trường
+
+- **Node.js** >= 22
+- **npm** >= 11
+
+---
+
+## 🚀 Cài đặt & Cấu hình
+
+### 1. Cài đặt dependencies
+
+Cài đặt toàn bộ dependencies cho dự án gốc, mobile app và admin web:
 
 ```bash
-npm run install:all   # cài dependency cho root, app, admin
-npm run check         # typecheck + lint + test cho cả app và admin
-npm --prefix app start
+npm run install:all
+```
+
+### 2. Thiết lập biến môi trường
+
+Tạo file `.env` từ các template có sẵn:
+
+```bash
+cp mobile/.env.example mobile/.env
+cp admin/.env.example admin/.env
+```
+
+Cập nhật thông tin Supabase (`URL` và `Publishable Key`) vào cả hai file:
+
+- `mobile/.env`: `EXPO_PUBLIC_SUPABASE_URL` và `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `admin/.env`: `VITE_SUPABASE_URL` và `VITE_SUPABASE_PUBLISHABLE_KEY`
+
+---
+
+## 💻 Hướng dẫn chạy ứng dụng
+
+### 1. Chạy Mobile App
+
+```bash
+npm --prefix mobile start
+```
+
+- Quét mã QR bằng ứng dụng **Expo Go** trên điện thoại.
+- Hoặc nhấn `a` để mở trên Android Emulator, `i` trên iOS Simulator, `w` trên trình duyệt web.
+
+### 2. Chạy Admin Web
+
+```bash
 npm --prefix admin run dev
-npm --prefix admin run build
 ```
 
-Yêu cầu: Node.js >= 22 (đang dùng 24.18.0), npm 11. Không cần Docker.
+Truy cập giao diện quản trị tại: `http://localhost:5173`
 
-## Database (Supabase v2, project `bdhphjwhagygbwtfhhxn`)
+---
 
-```bash
-npx supabase login                       # một lần, trên máy chủ dự án
-npx supabase link --project-ref bdhphjwhagygbwtfhhxn
-npm run db:list        # migration list, lịch sử phải khớp repo
-npm run db:verify      # schema thật trên v2 phải giống hệt schema dựng từ migration
-npm run db:push        # chỉ sau khi test:db xanh và chủ dự án duyệt
-npm run db:advisors
-```
+## 🧪 Kiểm tra mã nguồn (Tests & Checks)
 
-Các lệnh `db:*` (`scripts/sb.mjs`) luôn thêm `--linked --project-ref bdhphjwhagygbwtfhhxn`, nên không thể
-đẩy nhầm sang project khác dù `supabase link` bị đổi. Mọi script smoke cũng từ chối URL khác v2, và app
-từ chối URL của project cũ `ihfuftmpsfgtwvmtfdja`. Ref v2 nằm ở một chỗ duy nhất: `scripts/lib/v2.mjs`.
-
-Nạp lại 250 công thức (idempotent, zip nằm ngoài repo, kiểm tra sha256):
-
-```bash
-npm run seed:build -- --zip <đường dẫn>/recipes_001_250_release_candidate.zip
-node scripts/sb.mjs db query -f supabase/.seed-out/seed.sql
-npx supabase storage cp -r supabase/.seed-out/recipe-images ss:/// --linked --project-ref bdhphjwhagygbwtfhhxn --content-type image/webp --experimental -j 4
-```
-
-## Ba tầng kiểm thử (K8)
-
-| Tầng | Lệnh | Chứng minh |
-|---|---|---|
-| 1. Unit / UI | `npm run check` | typecheck, lint, test của app và admin |
-| 2. Database cục bộ | `npm run test:db` | Migration thật trên PGlite (PostgreSQL 17): RLS, grant, trigger, seed |
-| 3. Live | `npm run smoke:live` | REST và Storage thật của v2, vai trò khách, publishable key trong `mobile/.env` |
-| 3. Live (Công thức) | `npm run smoke:recipes` | Phase 2, khách, chỉ đọc: RPC `search_recipes` (bỏ dấu, lọc, phân trang), chi tiết một request, các quy tắc `NULL`. Cần migration `20261113120000` đã lên v2 |
-| 3. Live (Auth) | `npm run smoke:auth` | User thật trên v2: đăng nhập, trigger tạo profile, RLS khi đã đăng nhập, bucket `avatars`, đăng xuất. Cần thêm `.env.smoke` (`SMOKE_EMAIL`, `SMOKE_PASSWORD`); lần đầu chạy với `-- --signup` |
-
-Một bước chỉ được coi là xong khi tầng 3 xanh cho phần chạm tới database (L2).
-
-## Quy tắc
-
-- Phiên bản dependency được ghim chính xác (`.npmrc`: `save-exact=true`) và khóa bằng `package-lock.json`.
-  Chỉ nâng cấp có chủ đích, trong commit riêng.
-- Schema chỉ thay đổi qua migration trong `supabase/migrations/`. Không sửa schema trên Dashboard.
-- Không commit `.env`; chỉ commit `.env.example` chứa placeholder.
-- Không đưa service-role key, secret key hay mật khẩu database vào app, git hoặc chat.
+- **Kiểm tra toàn bộ (Typecheck + Lint + Tests)**:
+  ```bash
+  npm run check
+  ```
+- **Kiểm tra riêng thư mục mobile**:
+  ```bash
+  npm --prefix mobile run typecheck
+  npm --prefix mobile run lint
+  npm --prefix mobile test
+  ```
+- **Kiểm tra database migrations**:
+  ```bash
+  npm run test:db
+  ```
