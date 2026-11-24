@@ -1,0 +1,12 @@
+-- =============================================================================
+-- YoChef v2: Local Development Seed
+-- =============================================================================
+-- This seed file is executed automatically by `supabase db reset` or local setup.
+--
+-- For the full 250-recipe production dataset, build the seed artefacts:
+--   npm run seed:build -- --zip <path_to_zip>
+--   npx supabase db query --linked -f supabase/.seed-out/seed.sql
+--   npx supabase storage cp -r supabase/.seed-out/recipe-images ss:/// --linked --content-type image/webp
+--
+-- See docs/HANDOVER.md §8 and supabase/seed/import_recipes.mjs for details.
+-- =============================================================================
