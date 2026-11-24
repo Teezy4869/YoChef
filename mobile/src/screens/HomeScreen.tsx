@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -7,6 +8,8 @@ import { AppText } from '@/components/AppText';
 import { Banner } from '@/components/Banner';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
+import { useAuth } from '@/features/auth/AuthProvider';
+import { matchRecipesFromPantry, type PantryMatchRecipe } from '@/features/pantry/pantryApi';
 import { fetchCategories, coverUrl } from '@/features/recipes/recipeApi';
 import { RecipeCard } from '@/features/recipes/RecipeCard';
 import { useRecipeSearch } from '@/features/recipes/useRecipeSearch';
@@ -27,7 +30,19 @@ export const SEARCH_DEBOUNCE_MS = 350;
 
 export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
   const supabase = useSupabase();
+  const { status } = useAuth();
+  const signedIn = status === 'signedIn';
+
   const [filters, setFilters] = useState<SearchFilters>(EMPTY_FILTERS);
+  const [pantrySelected, setPantrySelected] = useState(false);
+  const pantryOnly = signedIn && pantrySelected;
+  const [pantryReloadTick, setPantryReloadTick] = useState(0);
+  const [pantryResult, setPantryResult] = useState<{
+    key: string;
+    error: string | null;
+    items: PantryMatchRecipe[];
+    total: number;
+  } | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
 
   // Typing is debounced; chips apply at once.
@@ -47,7 +62,45 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
     };
   }, [supabase]);
 
-  const set = (patch: Partial<SearchFilters>) => setFilters((f) => ({ ...f, ...patch }));
+  useFocusEffect(
+    useCallback(() => {
+      if (pantryOnly) setPantryReloadTick((n) => n + 1);
+    }, [pantryOnly]),
+  );
+
+  const pantryKey = `${signedIn ? '1' : '0'}:${pantryReloadTick}`;
+
+  useEffect(() => {
+    if (!pantryOnly) return;
+    let active = true;
+    matchRecipesFromPantry(supabase, { limit: 40, offset: 0 }).then(
+      (res) => active && setPantryResult({ key: pantryKey, error: null, items: res.items, total: res.total }),
+      (e: unknown) =>
+        active &&
+        setPantryResult({
+          key: pantryKey,
+          error: e instanceof Error ? e.message : 'Không gợi ý được món từ tủ lạnh.',
+          items: [],
+          total: 0,
+        }),
+    );
+    return () => {
+      active = false;
+    };
+  }, [supabase, pantryOnly, pantryKey]);
+
+  const currentPantry = pantryOnly && pantryResult?.key === pantryKey ? pantryResult : null;
+  const pantryState = {
+    loading: pantryOnly && currentPantry === null,
+    error: currentPantry?.error ?? null,
+    items: currentPantry?.items ?? [],
+    total: currentPantry?.total ?? 0,
+  };
+
+  const set = (patch: Partial<SearchFilters>) => {
+    setPantrySelected(false);
+    setFilters((f) => ({ ...f, ...patch }));
+  };
   const hasFilters =
     filters.query.trim() !== '' || filters.categorySlug !== null || filters.difficulty !== null || filters.maxTotalMinutes !== null;
 
@@ -68,36 +121,68 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
       />
       {categories.length > 0 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          <Chip label="Tất cả" selected={filters.categorySlug === null} onPress={() => set({ categorySlug: null })} />
+          <Chip
+            label="Tất cả"
+            selected={!pantryOnly && filters.categorySlug === null}
+            onPress={() => {
+              setPantrySelected(false);
+              set({ categorySlug: null });
+            }}
+          />
+          {signedIn ? (
+            <Chip
+              label="Nấu từ tủ lạnh"
+              selected={pantryOnly}
+              onPress={() => setPantrySelected((v) => !v)}
+            />
+          ) : null}
           {categories.map((c) => (
             <Chip
               key={c.slug}
               label={c.name}
-              selected={filters.categorySlug === c.slug}
+              selected={!pantryOnly && filters.categorySlug === c.slug}
               onPress={() => set({ categorySlug: filters.categorySlug === c.slug ? null : c.slug })}
             />
           ))}
         </ScrollView>
+      ) : signedIn ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+          <Chip
+            label="Nấu từ tủ lạnh"
+            selected={pantryOnly}
+            onPress={() => setPantrySelected((v) => !v)}
+          />
+        </ScrollView>
       ) : null}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-        {DIFFICULTIES.map((d) => (
-          <Chip
-            key={d}
-            label={DIFFICULTY_LABEL[d]}
-            selected={filters.difficulty === d}
-            onPress={() => set({ difficulty: filters.difficulty === d ? null : d })}
-          />
-        ))}
-        {TIME_OPTIONS.map((m) => (
-          <Chip
-            key={m}
-            label={`Dưới ${m} phút`}
-            selected={filters.maxTotalMinutes === m}
-            onPress={() => set({ maxTotalMinutes: filters.maxTotalMinutes === m ? null : m })}
-          />
-        ))}
-      </ScrollView>
-      {!search.loading && !search.error ? (
+
+      {!pantryOnly ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+          {DIFFICULTIES.map((d) => (
+            <Chip
+              key={d}
+              label={DIFFICULTY_LABEL[d]}
+              selected={filters.difficulty === d}
+              onPress={() => set({ difficulty: filters.difficulty === d ? null : d })}
+            />
+          ))}
+          {TIME_OPTIONS.map((m) => (
+            <Chip
+              key={m}
+              label={`Dưới ${m} phút`}
+              selected={filters.maxTotalMinutes === m}
+              onPress={() => set({ maxTotalMinutes: filters.maxTotalMinutes === m ? null : m })}
+            />
+          ))}
+        </ScrollView>
+      ) : null}
+
+      {pantryOnly ? (
+        !pantryState.loading && !pantryState.error ? (
+          <AppText variant="caption" tone="muted" accessibilityLiveRegion="polite" testID="pantry-match-count">
+            {`${pantryState.total} món gợi ý từ tủ lạnh của bạn`}
+          </AppText>
+        ) : null
+      ) : !search.loading && !search.error ? (
         <AppText variant="caption" tone="muted" accessibilityLiveRegion="polite" testID="result-count">
           {search.total} công thức
         </AppText>
@@ -106,7 +191,55 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
   );
 
   let body;
-  if (search.loading) {
+  if (pantryOnly) {
+    if (pantryState.loading) {
+      body = (
+        <View style={styles.center} testID="pantry-match-loading">
+          <ActivityIndicator color={colors.primary} size="large" accessibilityLabel="Đang tìm món từ tủ lạnh" />
+        </View>
+      );
+    } else if (pantryState.error) {
+      body = (
+        <View style={styles.center} testID="pantry-match-error">
+          <Banner tone="error" message={pantryState.error} />
+          <Button title="Thử lại" onPress={() => setPantryReloadTick((n) => n + 1)} />
+        </View>
+      );
+    } else if (pantryState.items.length === 0) {
+      body = (
+        <View style={styles.center} testID="pantry-match-empty">
+          <AppText variant="heading" align="center">
+            Chưa có món nào khớp với tủ lạnh
+          </AppText>
+          <AppText tone="muted" align="center">
+            Hãy thêm nguyên liệu đang có vào mục Đi chợ → Tủ lạnh để YoChef gợi ý món nấu ngay.
+          </AppText>
+          <Button title="Xem tất cả công thức" variant="secondary" onPress={() => setPantrySelected(false)} />
+        </View>
+      );
+    } else {
+      body = (
+        <FlatList
+          data={pantryState.items}
+          keyExtractor={(m) => m.recipe.id}
+          contentContainerStyle={styles.list}
+          renderItem={({ item }) => (
+            <RecipeCard
+              recipe={item.recipe}
+              imageUri={coverUrl(supabase, item.recipe.coverImagePath)}
+              pantryBadge={
+                item.missingCount === 0
+                  ? 'Đủ nguyên liệu'
+                  : `Có ${item.matchedCount}/${item.requiredCount} · Thiếu ${item.missingCount} món`
+              }
+              pantryTone={item.missingCount === 0 ? 'success' : 'info'}
+              onPress={() => navigation.navigate('RecipeDetail', { slug: item.recipe.slug })}
+            />
+          )}
+        />
+      );
+    }
+  } else if (search.loading) {
     body = (
       <View style={styles.center} testID="recipes-loading">
         <ActivityIndicator color={colors.primary} size="large" accessibilityLabel="Đang tải công thức" />

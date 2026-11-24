@@ -14,6 +14,7 @@ const NOTE_MAX = 200;
 
 export type ShoppingItem = {
   id: string;
+  ingredientId: string | null;
   label: string;
   /** null: unknown or to taste, never 0. */
   quantity: number | null;
@@ -23,11 +24,12 @@ export type ShoppingItem = {
   sortOrder: number;
 };
 
-const ITEM_COLUMNS = 'id,label,quantity,unit,note,is_checked,sort_order';
+const ITEM_COLUMNS = 'id,ingredient_id,label,quantity,unit,note,is_checked,sort_order';
 
 function toItem(r: Record<string, unknown>): ShoppingItem {
   return {
     id: String(r.id),
+    ingredientId: asText(r.ingredient_id),
     label: String(r.label),
     quantity: asNumber(r.quantity),
     unit: asText(r.unit),
@@ -107,9 +109,12 @@ async function appendItems(client: YoChefClient, userId: string, items: NewItem[
   }
 }
 
-/** The recipe's ingredients at `servings`, rounded exactly as the recipe page shows them. */
-export function itemsFromRecipe(recipe: RecipeDetail, servings: number): NewItem[] {
-  return recipe.ingredients.map((i) => {
+export function itemsFromLines(
+  lines: RecipeDetail['ingredients'],
+  defaultServings: number | null,
+  servings: number,
+): NewItem[] {
+  return lines.map((i) => {
     const note = joinMeta([
       i.preparationNote,
       i.quantityNote,
@@ -120,15 +125,30 @@ export function itemsFromRecipe(recipe: RecipeDetail, servings: number): NewItem
     return {
       ingredient_id: i.ingredientId,
       label: i.name.slice(0, LABEL_MAX),
-      quantity: shownQuantity(i.quantity, i.basis, recipe.defaultServings, servings),
+      quantity: shownQuantity(i.quantity, i.basis, defaultServings, servings),
       unit: i.unit,
       note: note ? note.slice(0, NOTE_MAX) : null,
     };
   });
 }
 
+/** The recipe's ingredients at `servings`, rounded exactly as the recipe page shows them. */
+export function itemsFromRecipe(recipe: RecipeDetail, servings: number): NewItem[] {
+  return itemsFromLines(recipe.ingredients, recipe.defaultServings, servings);
+}
+
 export function addRecipe(client: YoChefClient, userId: string, recipe: RecipeDetail, servings: number) {
   return appendItems(client, userId, itemsFromRecipe(recipe, servings));
+}
+
+export function addIngredientLines(
+  client: YoChefClient,
+  userId: string,
+  lines: RecipeDetail['ingredients'],
+  defaultServings: number | null,
+  servings: number,
+) {
+  return appendItems(client, userId, itemsFromLines(lines, defaultServings, servings));
 }
 
 export type ManualInput = { label: string; quantity: string; unit: string };

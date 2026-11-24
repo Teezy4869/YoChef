@@ -68,10 +68,27 @@ export function createFakeSupabase(initial: Session | null = null) {
   // Catalog fixtures, mirrored from what public.search_recipes() returns.
   const catalog = {
     categories: [] as { slug: string; name: string }[],
+    ingredients: [] as { id: string; name: string; slug: string; aliases: string[]; common_units: string[] }[],
     recipes: [] as Record<string, unknown>[], // search rows (snake_case, as the RPC returns)
     details: {} as Record<string, unknown>, // slug -> detail row
   };
-  const fold = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').toLowerCase();
+  const fold = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').toLowerCase();
+
+  const convertFakeUnit = (qty: number, fromU: string | null, toU: string | null): number | null => {
+    const f = (fromU ?? '').trim().toLowerCase();
+    const t = (toU ?? '').trim().toLowerCase();
+    if (!f || !t) return null;
+    if (f === t) return qty;
+    const factors: Record<string, [string, number]> = {
+      g: ['m', 1], gam: ['m', 1], lạng: ['m', 100], kg: ['m', 1000],
+      ml: ['v', 1], l: ['v', 1000], lít: ['v', 1000], lit: ['v', 1000],
+      'muỗng cà phê': ['v', 5], 'thìa cà phê': ['v', 5], 'muỗng canh': ['v', 15], 'thìa canh': ['v', 15],
+    };
+    const fd = factors[f];
+    const td = factors[t];
+    if (!fd || !td || fd[0] !== td[0]) return null;
+    return Math.round(((qty * fd[1]) / td[1]) * 10000) / 10000;
+  };
 
   const rpc = jest.fn(async (fn: string, args: Record<string, unknown> = {}) => {
     if (fn === 'get_my_profile') {
@@ -99,6 +116,88 @@ export function createFakeSupabase(initial: Session | null = null) {
       const limit = Number(args.p_limit ?? 20);
       return { data: rows.slice(offset, offset + limit).map((r) => ({ ...r, total_count: rows.length })), error: null };
     }
+    if (fn === 'add_or_merge_pantry_items') {
+      if (!session) return { data: null, error: { message: 'Authentication required', code: '42501' } };
+      const uid = session.user.id;
+      const pantryRows = (tables.user_pantry ??= []);
+      const items = Array.isArray(args.p_items) ? (args.p_items as Record<string, unknown>[]) : [];
+      for (const it of items) {
+        const ingId = String(it.ingredient_id ?? '');
+        const qty = Number(it.quantity);
+        const unit = String(it.unit ?? '').trim();
+        if (!ingId || !(qty > 0) || !unit) return { data: null, error: { message: 'invalid item', code: '22023' } };
+        const existing = pantryRows.find((r) => r.user_id === uid && r.ingredient_id === ingId);
+        if (!existing) {
+          pantryRows.push({
+            id: `user_pantry-${++seq}`,
+            user_id: uid,
+            ingredient_id: ingId,
+            quantity: qty,
+            unit,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+        } else {
+          const conv = convertFakeUnit(qty, unit, String(existing.unit));
+          if (conv !== null) existing.quantity = Number(existing.quantity) + conv;
+          else {
+            existing.quantity = qty;
+            existing.unit = unit;
+          }
+          existing.updated_at = new Date().toISOString();
+        }
+      }
+      if (Array.isArray(args.p_shopping_item_ids) && args.p_shopping_item_ids.length > 0) {
+        const gone = new Set(args.p_shopping_item_ids.map(String));
+        const myLists = new Set((tables.shopping_lists ?? []).filter((l) => l.user_id === uid).map((l) => l.id));
+        tables.shopping_list_items = (tables.shopping_list_items ?? []).filter(
+          (i) => !(myLists.has(i.shopping_list_id) && gone.has(String(i.id))),
+        );
+      }
+      return { data: null, error: null };
+    }
+    if (fn === 'deduct_pantry_ingredients') {
+      if (!session) return { data: null, error: { message: 'Authentication required', code: '42501' } };
+      const uid = session.user.id;
+      const pantryRows = (tables.user_pantry ??= []);
+      const items = Array.isArray(args.p_items) ? (args.p_items as Record<string, unknown>[]) : [];
+      for (const it of items) {
+        const ingId = String(it.ingredient_id ?? '');
+        const qty = Number(it.quantity);
+        const unit = it.unit ? String(it.unit) : null;
+        if (!ingId || !(qty > 0)) continue;
+        const idx = pantryRows.findIndex((r) => r.user_id === uid && r.ingredient_id === ingId);
+        if (idx < 0) continue;
+        const row = pantryRows[idx];
+        const ded = unit ? convertFakeUnit(qty, unit, String(row.unit)) : qty;
+        if (ded !== null && ded > 0) {
+          if (Number(row.quantity) <= ded) pantryRows.splice(idx, 1);
+          else row.quantity = Number(row.quantity) - ded;
+        }
+      }
+      return { data: null, error: null };
+    }
+    if (fn === 'match_recipes_from_pantry') {
+      const uid = session?.user.id;
+      const owned = new Set((tables.user_pantry ?? []).filter((p) => p.user_id === uid).map((p) => p.ingredient_id));
+      const matched = catalog.recipes
+        .map((r) => {
+          const det = catalog.details[String(r.slug)] as { recipe_ingredients?: { is_optional?: boolean; ingredient?: { id?: string } }[] } | undefined;
+          const ings = det?.recipe_ingredients ?? [];
+          const req = [...new Set(ings.filter((i) => !i.is_optional).map((i) => i.ingredient?.id).filter(Boolean))];
+          const pool = req.length > 0 ? req : [...new Set(ings.map((i) => i.ingredient?.id).filter(Boolean))];
+          const hits = pool.filter((id) => owned.has(id));
+          return {
+            ...r,
+            matched_count: hits.length,
+            required_count: pool.length,
+            missing_count: Math.max(0, pool.length - hits.length),
+          };
+        })
+        .filter((x) => x.matched_count > 0)
+        .sort((a, b) => (a.missing_count === 0 ? -1 : 1) - (b.missing_count === 0 ? -1 : 1) || a.missing_count - b.missing_count);
+      return { data: matched.map((m) => ({ ...m, total_count: matched.length })), error: null };
+    }
     return { data: null, error: { message: `unknown rpc ${fn}` } };
   });
 
@@ -124,6 +223,7 @@ export function createFakeSupabase(initial: Session | null = null) {
     favorites: ['user_id', 'recipe_id'],
     ratings: ['user_id', 'recipe_id'],
     content_reports: ['reporter_id', 'target_table', 'target_id'],
+    user_pantry: ['user_id', 'ingredient_id'],
   };
   // public.recipe_rating_summary: no row for a recipe without ratings.
   const ratingSummary = (): Row[] => {
@@ -164,6 +264,13 @@ export function createFakeSupabase(initial: Session | null = null) {
   };
   decorate.comments = withAuthor;
   decorate.cooking_photos = withAuthor;
+  decorate.user_pantry = (r: Row) => {
+    const ing = catalog.ingredients.find((i) => i.id === r.ingredient_id);
+    return {
+      ...r,
+      ingredient: ing ? { id: ing.id, name: ing.name, common_units: ing.common_units } : null,
+    };
+  };
 
   function userQuery(table: string, op: 'select' | 'insert' | 'update' | 'delete', payload?: Row | Row[]) {
     const filters: ((r: Row) => boolean)[] = [];
@@ -250,7 +357,7 @@ export function createFakeSupabase(initial: Session | null = null) {
   }
 
   const USER_TABLES = new Set([
-    'favorites', 'shopping_lists', 'shopping_list_items', 'ratings', 'recipe_rating_summary', 'comments', 'cooking_photos',
+    'favorites', 'shopping_lists', 'shopping_list_items', 'user_pantry', 'ratings', 'recipe_rating_summary', 'comments', 'cooking_photos',
     'user_roles', 'content_reports', 'recipe_nutrition', 'recipe_videos',
   ]);
 
@@ -270,6 +377,7 @@ export function createFakeSupabase(initial: Session | null = null) {
       const eqs: Record<string, unknown> = {};
       const rows = () => {
         if (table === 'categories') return catalog.categories;
+        if (table === 'ingredients') return catalog.ingredients;
         if (table === 'recipes') {
           const d = catalog.details[String(eqs.slug)];
           return d ? [d] : [];

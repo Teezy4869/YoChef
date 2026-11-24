@@ -1,23 +1,28 @@
-import { useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import type { RootStackScreenProps } from '@/app/navigation/types';
 import { AppText } from '@/components/AppText';
 import { Banner } from '@/components/Banner';
 import { Button } from '@/components/Button';
 import { Screen } from '@/components/Screen';
+import { useAuth } from '@/features/auth/AuthProvider';
 import { CommentSection } from '@/features/community/CommentSection';
 import { CookingPhotoSection } from '@/features/community/CookingPhotoSection';
 import { FavoriteButton } from '@/features/favorites/FavoriteButton';
 import { NutritionSection } from '@/features/nutrition/NutritionSection';
+import { checkRecipeAvailability } from '@/features/pantry/pantryApi';
+import { usePantry } from '@/features/pantry/usePantry';
 import { VideoButton } from '@/features/videos/VideoButton';
 import { RatingSection } from '@/features/ratings/RatingSection';
 import { AddToShoppingButton } from '@/features/shopping/AddToShoppingButton';
+import { addIngredientLines } from '@/features/shopping/shoppingApi';
 import { formatSeconds, joinMeta, timeLabel } from '@/features/recipes/format';
 import { coverUrl } from '@/features/recipes/recipeApi';
 import { IngredientRows } from '@/features/recipes/IngredientRows';
 import { clampServings, MAX_SERVINGS, MIN_SERVINGS } from '@/features/recipes/servings';
-import { DIFFICULTY_LABEL, type RecipeDetail, type ServingBasis } from '@/features/recipes/types';
+import { DIFFICULTY_LABEL, type IngredientLine, type RecipeDetail, type ServingBasis } from '@/features/recipes/types';
 import { useRecipeDetail } from '@/features/recipes/useRecipeDetail';
 import { useSupabase } from '@/lib/supabase';
 import { colors, radius, spacing, touchTarget } from '@/theme/tokens';
@@ -74,9 +79,64 @@ function RecipeDetailView({
   imageUri: string | null;
   onCook: (servings: number) => void;
 }) {
+  const supabase = useSupabase();
+  const { status, session } = useAuth();
+  const userId = status === 'signedIn' && session ? session.user.id : null;
+  const pantry = usePantry(supabase, userId);
+  const { reload: reloadPantry } = pantry;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (userId) reloadPantry();
+    }, [userId, reloadPantry]),
+  );
+
   const base = recipe.defaultServings;
   const [servings, setServings] = useState(base ?? MIN_SERVINGS);
   const canScale = base !== null;
+  const [shopNotice, setShopNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+  const [showMissingModal, setShowMissingModal] = useState(false);
+  const [addingMissing, setAddingMissing] = useState(false);
+
+  const availability = useMemo(
+    () => (userId && !pantry.loading && !pantry.error ? checkRecipeAvailability(recipe, servings, pantry.items) : null),
+    [userId, pantry.loading, pantry.error, pantry.items, recipe, servings],
+  );
+
+  const addSingleMissing = async (line: IngredientLine) => {
+    if (!userId) return;
+    setShopNotice(null);
+    try {
+      await addIngredientLines(supabase, userId, [line], base, servings);
+      setShopNotice({ tone: 'success', text: `Đã thêm "${line.name}" vào danh sách đi chợ.` });
+    } catch (e) {
+      setShopNotice({ tone: 'error', text: e instanceof Error ? e.message : 'Không thêm được vào đi chợ.' });
+    }
+  };
+
+  const addAllMissingAndClose = async () => {
+    if (!userId || !availability) return;
+    setAddingMissing(true);
+    try {
+      const lines = availability.missingOrInsufficient.map((m) => m.line);
+      await addIngredientLines(supabase, userId, lines, base, servings);
+      setShowMissingModal(false);
+      setShopNotice({ tone: 'success', text: `Đã thêm ${lines.length} nguyên liệu còn thiếu vào danh sách đi chợ.` });
+    } catch (e) {
+      setShopNotice({ tone: 'error', text: e instanceof Error ? e.message : 'Không thêm được vào đi chợ.' });
+      setShowMissingModal(false);
+    } finally {
+      setAddingMissing(false);
+    }
+  };
+
+  const handleStartCook = () => {
+    if (availability && availability.missingOrInsufficient.length > 0) {
+      setShowMissingModal(true);
+      return;
+    }
+    onCook(servings);
+  };
 
   const meta = joinMeta([
     recipe.categoryName,
@@ -134,14 +194,21 @@ function RecipeDetailView({
           </AppText>
         ) : null}
 
-        <IngredientRows ingredients={recipe.ingredients} defaultServings={base} servings={servings} />
+        <IngredientRows
+          ingredients={recipe.ingredients}
+          defaultServings={base}
+          servings={servings}
+          availability={availability?.lines}
+          onAddMissing={userId ? addSingleMissing : undefined}
+        />
+        {shopNotice ? <Banner tone={shopNotice.tone} message={shopNotice.text} /> : null}
         <AddToShoppingButton recipe={recipe} servings={servings} />
       </View>
 
       <View style={styles.block}>
         <AppText variant="title">Cách làm</AppText>
         {recipe.steps.length > 0 ? (
-          <Button title="Bắt đầu nấu" onPress={() => onCook(servings)} />
+          <Button title="Bắt đầu nấu" onPress={handleStartCook} />
         ) : null}
         <VideoButton recipeId={recipe.id} />
         {recipe.steps.length === 0 ? (
@@ -195,6 +262,50 @@ function RecipeDetailView({
           ) : null}
         </View>
       ) : null}
+
+      {showMissingModal && availability ? (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowMissingModal(false)}
+          testID="missing-ingredients-modal"
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <AppText variant="title">Tủ lạnh chưa đủ nguyên liệu</AppText>
+              <AppText tone="muted">
+                Nguyên liệu trong tủ của bạn chưa đủ để nấu món này. Bạn cần mua thêm:
+              </AppText>
+              <View style={styles.missingList}>
+                {availability.missingOrInsufficient.map((m) => (
+                  <AppText key={m.line.sortOrder} variant="label">
+                    {`• ${m.line.name}${m.status === 'insufficient' ? ' (chưa đủ lượng)' : ''}`}
+                  </AppText>
+                ))}
+              </View>
+              <View style={styles.modalActions}>
+                <Button
+                  title="Vẫn tiếp tục nấu"
+                  onPress={() => {
+                    setShowMissingModal(false);
+                    onCook(servings);
+                  }}
+                  testID="continue-cook-btn"
+                />
+                <Button
+                  title="Thêm đồ thiếu vào Đi chợ"
+                  variant="secondary"
+                  loading={addingMissing}
+                  onPress={addAllMissingAndClose}
+                  testID="add-missing-shopping-btn"
+                />
+                <Button title="Đóng" variant="ghost" onPress={() => setShowMissingModal(false)} />
+              </View>
+            </View>
+          </View>
+        </Modal>
+      ) : null}
     </ScrollView>
   );
 }
@@ -226,4 +337,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  modalCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  missingList: { gap: spacing.xs, paddingVertical: spacing.xs },
+  modalActions: { gap: spacing.xs },
 });

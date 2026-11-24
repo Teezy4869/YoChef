@@ -9,10 +9,14 @@ import { DIFFICULTY_LABEL, type RecipeSummary } from './types';
 export function RecipeCard({
   recipe,
   imageUri,
+  pantryBadge,
+  pantryTone = 'info',
   onPress,
 }: {
   recipe: RecipeSummary;
   imageUri: string | null;
+  pantryBadge?: string;
+  pantryTone?: 'success' | 'info';
   onPress: () => void;
 }) {
   const meta = joinMeta([
@@ -50,6 +54,13 @@ export function RecipeCard({
             {meta}
           </AppText>
         ) : null}
+        {pantryBadge ? (
+          <View style={[styles.badge, pantryTone === 'success' ? styles.badgeSuccess : styles.badgeInfo]}>
+            <AppText variant="caption" tone={pantryTone === 'success' ? 'success' : 'default'}>
+              {pantryBadge}
+            </AppText>
+          </View>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -69,4 +80,13 @@ const styles = StyleSheet.create({
   image: { width: 96, height: 96, borderRadius: radius.sm, backgroundColor: colors.surfaceMuted },
   noImage: { alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1, gap: spacing.xxs, justifyContent: 'center' },
+  badge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    marginTop: spacing.xxs,
+  },
+  badgeSuccess: { backgroundColor: colors.successSoft },
+  badgeInfo: { backgroundColor: colors.primarySoft },
 });

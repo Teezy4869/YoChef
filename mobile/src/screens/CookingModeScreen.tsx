@@ -1,6 +1,6 @@
 import { useAudioPlayer } from 'expo-audio';
 import { useKeepAwake } from 'expo-keep-awake';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Vibration, View } from 'react-native';
 
 import type { RootStackScreenProps } from '@/app/navigation/types';
@@ -9,6 +9,9 @@ import { Banner } from '@/components/Banner';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { Screen } from '@/components/Screen';
+import { useAuth } from '@/features/auth/AuthProvider';
+import { DeductPantryModal } from '@/features/pantry/DeductPantryModal';
+import { usePantry } from '@/features/pantry/usePantry';
 import { formatClock, formatSeconds } from '@/features/recipes/format';
 import { IngredientRows } from '@/features/recipes/IngredientRows';
 import { clearSession, FRESH_SESSION, loadSession, saveSession, type CookingSession } from '@/features/recipes/cookingSession';
@@ -110,10 +113,16 @@ function CookingRun({
   from: CookingSession;
 }) {
   useKeepAwake(); // hands are busy: the screen stays on while cooking, released on leaving
+  const supabase = useSupabase();
+  const { status, session } = useAuth();
+  const userId = status === 'signedIn' && session ? session.user.id : null;
+  const pantry = usePantry(supabase, userId);
+
   const steps = recipe.steps;
   const [index, setIndex] = useState(from.stepIndex);
   const [completed, setCompleted] = useState(from.completed);
   const [showIngredients, setShowIngredients] = useState(false);
+  const [showDeductModal, setShowDeductModal] = useState(false);
   const [customDurations, setCustomDurations] = useState<Record<number, number>>({});
   const [editingStep, setEditingStep] = useState<number | null>(null);
   const audioSource = require('../../assets/sounds/alarm.mp3');
@@ -136,9 +145,24 @@ function CookingRun({
   }, [slug, currentStepNumber, completed, timers.all]);
 
   const finish = () => {
+    setShowDeductModal(false);
     player.pause();
     clearSession(slug);
     onExit();
+  };
+
+  const hasPantryMatch = useMemo(() => {
+    if (!userId || pantry.items.length === 0) return false;
+    const owned = new Set(pantry.items.map((p) => p.ingredientId));
+    return recipe.ingredients.some((i) => i.ingredientId !== null && owned.has(i.ingredientId));
+  }, [userId, pantry.items, recipe.ingredients]);
+
+  const handleFinishPress = () => {
+    if (hasPantryMatch) {
+      setShowDeductModal(true);
+      return;
+    }
+    finish();
   };
   const next = () => {
     setCompleted((c) => (c.includes(currentStepNumber) ? c : [...c, currentStepNumber]));
@@ -379,7 +403,7 @@ function CookingRun({
         </View>
         <View style={styles.navButton}>
           {isLast ? (
-            <Button title="Hoàn thành" onPress={finish} />
+            <Button title="Hoàn thành" onPress={handleFinishPress} />
           ) : (
             <Button title="Bước tiếp" onPress={next} />
           )}
@@ -393,6 +417,18 @@ function CookingRun({
         onSave={handleSaveModal}
         onClose={() => setEditingStep(null)}
       />
+
+      {showDeductModal ? (
+        <DeductPantryModal
+          visible
+          client={supabase}
+          recipe={recipe}
+          servings={effectiveServings}
+          pantryItems={pantry.items}
+          onSkip={finish}
+          onDone={finish}
+        />
+      ) : null}
 
       {activeDoneStep ? (
         <Modal

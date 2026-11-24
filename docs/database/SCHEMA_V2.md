@@ -371,6 +371,15 @@ Hợp đồng chi tiết: `phase4_08_nutrition_data_contract.md`. Nguồn dữ l
   - Báo cáo không xóa được qua client, nên dữ liệu test của smoke tích lại (mỗi lần chạy một báo cáo đã đóng).
 - `moderation_actions` (**đã làm ở 3.6**): `id`, `actor_id` (không FK, để lịch sử còn nguyên khi tài khoản bị xóa và không bị cascade sửa), `target_table` (`comments`, `cooking_photos`), `target_id` (không FK, để lịch sử còn sau khi nội dung bị xóa), `from_status`, `to_status`, `reason` (NULL hoặc 1–500 ký tự), `created_at`. Chỉ được thêm: client không có quyền ghi, và trigger `private.forbid_change()` chặn UPDATE và DELETE với mọi vai trò, kể cả owner. Chỉ `is_moderator()` đọc được (RLS). Chỉ RPC `moderate_community_content` ghi vào bảng.
 
+### 5.8 Tủ lạnh người dùng (`20261124155148_user_pantry.sql`)
+- `user_pantry`: `id`, `user_id` (FK `profiles` cascade), `ingredient_id` (FK `ingredients` on delete restrict, not null), `quantity` (numeric > 0), `unit` (1–50 ký tự, not null), `created_at`, `updated_at`. Unique `(user_id, ingredient_id)` để cộng dồn tồn kho.
+- **Grant & RLS:** `authenticated` có SELECT, DELETE, INSERT `(user_id, ingredient_id, quantity, unit)`, UPDATE `(quantity, unit)`, chỉ cho dòng `user_id = auth.uid()`. `anon` không có quyền nào.
+- **Hàm & RPC:**
+  - `public.convert_pantry_qty(p_qty, p_from_unit, p_to_unit)`: quy đổi đơn vị cơ bản (khối lượng `g`/`lạng`/`kg`, thể tích `ml`/`lít`/`muỗng`).
+  - `public.add_or_merge_pantry_items(p_items, p_shopping_item_ids)`: thêm hoặc cộng dồn nguyên liệu vào tủ lạnh (quy đổi nếu cùng hệ đơn vị) và tùy chọn xóa các món tương ứng ở `shopping_list_items` trong cùng 1 giao dịch.
+  - `public.deduct_pantry_ingredients(p_items)`: trừ tồn kho theo công thức trong 1 giao dịch; không cho phép âm (lượng còn `<= 0` tự động xóa khỏi tủ).
+  - `public.match_recipes_from_pantry(p_limit, p_offset)`: tìm và xếp hạng công thức `published` theo tỷ lệ đáp ứng nguyên liệu bắt buộc trong tủ lạnh của người gọi.
+
 ## 6. Storage
 
 | Bucket | Public | Đường dẫn | Ghi | Migration |
