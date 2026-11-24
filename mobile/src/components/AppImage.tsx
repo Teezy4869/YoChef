@@ -1,4 +1,5 @@
 import { Image, type ImageContentFit } from 'expo-image';
+import { useState } from 'react';
 import { StyleSheet, View, type ImageStyle, type StyleProp, type ViewStyle } from 'react-native';
 
 import { colors } from '@/theme/tokens';
@@ -27,7 +28,8 @@ export function AppImage({
   fallbackIcon = 'restaurant-outline',
   fallbackText,
 }: AppImageProps) {
-  if (!uri) {
+  const [failedUri, setFailedUri] = useState<string | null>(null);
+  if (!uri || failedUri === uri) {
     return (
       <View
         style={[styles.fallback, style]}
@@ -51,6 +53,10 @@ export function AppImage({
       style={[styles.image, style]}
       contentFit={contentFit}
       transition={200}
+      onError={(e) => {
+        if (__DEV__) console.warn('[AppImage] load failed:', uri, e.error);
+        setFailedUri(uri);
+      }}
       accessibilityLabel={accessibilityLabel}
       testID={testID}
     />

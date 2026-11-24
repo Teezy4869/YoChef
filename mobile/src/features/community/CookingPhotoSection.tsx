@@ -155,11 +155,18 @@ export function CookingPhotoSection({ recipeId }: { recipeId: string }) {
               <View key={p.id} style={styles.tile} testID="photo-tile">
                 {p.url ? (
                   <Pressable
+                    style={styles.photoButton}
                     accessibilityRole="button"
                     accessibilityLabel={`Xem lớn ${label}`}
                     onPress={() => setLightbox({ url: p.url!, caption: p.caption, author })}
                   >
-                    <AppImage uri={p.url} style={styles.photo} accessibilityLabel={label} />
+                    <AppImage
+                      uri={p.url}
+                      style={styles.photo}
+                      accessibilityLabel={label}
+                      fallbackIcon="image-outline"
+                      fallbackText="Không tải được ảnh"
+                    />
                   </Pressable>
                 ) : (
                   <View style={[styles.photo, styles.missing]} accessible accessibilityLabel={label}>
@@ -265,6 +272,7 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   tile: { width: '47%', gap: spacing.xxs },
+  photoButton: { width: '100%' },
   photo: { width: '100%', aspectRatio: 1, borderRadius: radius.md, backgroundColor: colors.surfaceMuted },
   missing: { alignItems: 'center', justifyContent: 'center', padding: spacing.sm, gap: spacing.xs },
   pendingBadge: {

@@ -9,8 +9,9 @@ export async function pickAvatar(): Promise<PickedImage | null> {
     allowsEditing: true,
     aspect: [1, 1],
     quality: 0.8,
+    base64: true,
   });
   if (result.canceled || result.assets.length === 0) return null;
   const asset = result.assets[0];
-  return { uri: asset.uri, mimeType: asset.mimeType, fileSize: asset.fileSize };
+  return { uri: asset.uri, mimeType: asset.mimeType, fileSize: asset.fileSize, base64: asset.base64 };
 }

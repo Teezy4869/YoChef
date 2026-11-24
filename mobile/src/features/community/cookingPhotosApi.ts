@@ -3,6 +3,7 @@
 // carries the review status. RLS on the rows and on storage decides who sees
 // what, so a signed URL is only issued for a photo the reader may see.
 import { asText, fail, one } from '@/features/recipes/recipeApi';
+import { base64ToArrayBuffer } from '@/lib/base64';
 import type { YoChefClient } from '@/lib/supabase';
 
 import type { CommentStatus } from './commentsApi';
@@ -50,7 +51,13 @@ export async function fetchCookingPhotos(
     const paths = shown.map((r) => String(r.storage_path));
     const signed = await client.storage.from(PHOTO_BUCKET).createSignedUrls(paths, SIGNED_URL_SECONDS);
     if (signed.error) fail(signed.error, 'Không tải được ảnh món đã nấu.');
-    for (const s of signed.data ?? []) if (s.path && s.signedUrl && !s.error) urls.set(s.path, s.signedUrl);
+    for (const s of signed.data ?? []) {
+      if (s.path && s.signedUrl && !s.error) {
+        urls.set(s.path, s.signedUrl);
+      } else if (__DEV__) {
+        console.warn('[cookingPhotos] sign failed:', s.path, s.error);
+      }
+    }
   }
 
   const photos = shown.map((row) => ({
@@ -87,10 +94,11 @@ export async function addCookingPhoto(
   const caption = cleanCaption(captionText);
   let bytes: ArrayBuffer;
   try {
-    bytes = await readBytes(photo.uri);
+    bytes = photo.base64 ? base64ToArrayBuffer(photo.base64) : await readBytes(photo.uri);
   } catch {
     throw new Error('Không đọc được ảnh đã chọn.');
   }
+  if (bytes.byteLength === 0) throw new Error('Không đọc được ảnh đã chọn.');
   if (bytes.byteLength > PHOTO_MAX_BYTES) throw new Error('Ảnh lớn hơn 5 MB. Hãy chọn ảnh khác.');
 
   const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.jpg`;

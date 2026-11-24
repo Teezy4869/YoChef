@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 export const PHOTO_MAX_EDGE = 1600;
 export type PhotoSource = 'camera' | 'library';
 /** Always a freshly encoded JPEG on the device. */
-export type PickedPhoto = { uri: string };
+export type PickedPhoto = { uri: string; base64?: string | null };
 
 /**
  * Takes or picks a photo, then re-encodes it: long edge at most 1600 px, JPEG
@@ -25,6 +25,6 @@ export async function pickCookingPhoto(source: PhotoSource): Promise<PickedPhoto
     context = context.resize(width >= height ? { width: PHOTO_MAX_EDGE } : { height: PHOTO_MAX_EDGE });
   }
   const image = await context.renderAsync();
-  const saved = await image.saveAsync({ format: SaveFormat.JPEG, compress: 0.8 });
-  return { uri: saved.uri };
+  const saved = await image.saveAsync({ format: SaveFormat.JPEG, compress: 0.8, base64: true });
+  return { uri: saved.uri, base64: saved.base64 ?? null };
 }

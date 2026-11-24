@@ -1,6 +1,7 @@
 // Profile data access (Phase 1.5). The owner reads their full row, bio
 // included, through get_my_profile() (migration 20261111120000); the public
 // profiles columns never include bio.
+import { base64ToArrayBuffer } from '@/lib/base64';
 import type { YoChefClient } from '@/lib/supabase';
 
 export const AVATAR_BUCKET = 'avatars';
@@ -52,7 +53,7 @@ export async function updateMyProfile(
   if (!data || data.length !== 1) throw new ProfileError('Không tìm thấy hồ sơ để lưu.');
 }
 
-export type PickedImage = { uri: string; mimeType?: string | null; fileSize?: number | null };
+export type PickedImage = { uri: string; mimeType?: string | null; fileSize?: number | null; base64?: string | null };
 
 const EXT_BY_MIME: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 const MIME_BY_EXT: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
@@ -90,10 +91,11 @@ export async function replaceAvatar(
 
   let bytes: ArrayBuffer;
   try {
-    bytes = await readBytes(image.uri);
+    bytes = image.base64 ? base64ToArrayBuffer(image.base64) : await readBytes(image.uri);
   } catch {
     throw new ProfileError('Không đọc được ảnh đã chọn.');
   }
+  if (bytes.byteLength === 0) throw new ProfileError('Không đọc được ảnh đã chọn.');
   if (bytes.byteLength > AVATAR_MAX_BYTES) throw new ProfileError('Ảnh lớn hơn 5 MB. Hãy chọn ảnh nhỏ hơn.');
 
   const path = `${userId}/${Date.now()}.${EXT_BY_MIME[mime]}`;
