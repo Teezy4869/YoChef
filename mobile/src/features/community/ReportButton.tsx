@@ -6,7 +6,7 @@ import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { TextField } from '@/components/TextField';
 import { useSupabase } from '@/lib/supabase';
-import { spacing } from '@/theme/tokens';
+import { colors, radius, spacing } from '@/theme/tokens';
 
 import { REPORT_REASONS, submitReport, type ReportReason, type ReportTarget } from './reportsApi';
 
@@ -29,7 +29,17 @@ export function ReportButton({ userId, table, targetId }: { userId: string; tabl
     );
   }
   if (!open) {
-    return <Button title="Báo cáo" variant="ghost" fullWidth={false} accessibilityLabel={table === 'comments' ? 'Báo cáo bình luận' : 'Báo cáo ảnh'} onPress={() => setOpen(true)} />;
+    return (
+      <Button
+        title="Báo cáo"
+        icon="flag-outline"
+        variant="ghost"
+        size="sm"
+        fullWidth={false}
+        accessibilityLabel={table === 'comments' ? 'Báo cáo bình luận' : 'Báo cáo ảnh'}
+        onPress={() => setOpen(true)}
+      />
+    );
   }
 
   const send = async () => {
@@ -68,18 +78,26 @@ export function ReportButton({ userId, table, targetId }: { userId: string; tabl
       <View style={styles.reasons}>
         <Button
           title="Gửi báo cáo"
+          size="sm"
           fullWidth={false}
           loading={busy}
           disabled={busy || !reason || (reason === 'other' && details.trim() === '')}
           onPress={send}
         />
-        <Button title="Hủy" variant="ghost" fullWidth={false} disabled={busy} onPress={() => setOpen(false)} />
+        <Button title="Hủy" variant="ghost" size="sm" fullWidth={false} disabled={busy} onPress={() => setOpen(false)} />
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  box: { gap: spacing.sm },
+  box: {
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   reasons: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
 });

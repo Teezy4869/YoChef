@@ -1,7 +1,15 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
 
 import App from '@/app/App';
-import { classifyIngredientGroup, convertPantryQty } from '@/features/pantry/pantryApi';
+import {
+  addOrMergePantryItems,
+  classifyIngredientGroup,
+  convertPantryQty,
+  deductPantryIngredients,
+  fetchPantry,
+  matchRecipesFromPantry,
+} from '@/features/pantry/pantryApi';
 
 import { createFakeSupabase, fakeSession } from './helpers/fakeSupabase';
 import { detailRow } from './helpers/recipeFixtures';
@@ -92,6 +100,9 @@ describe('pantry tab & shopping transfer', () => {
     fireEvent.press(await screen.findByTestId('segment-pantry'));
     expect(await screen.findByTestId('pantry-empty')).toBeTruthy();
 
+    fireEvent.press(screen.getByTestId('open-pantry-add-btn'));
+    expect(await screen.findByTestId('pantry-add-modal')).toBeTruthy();
+
     fireEvent.changeText(screen.getByLabelText('Chọn nguyên liệu chuẩn'), 'thit bo');
     fireEvent.press(await screen.findByRole('button', { name: 'Chọn Thịt bò' }));
 
@@ -158,7 +169,7 @@ describe('recipe availability, warning modal, home matching & cooking deduction'
     // Open recipe detail
     fireEvent.press(screen.getByRole('button', { name: /^Bò né\./ }));
     await screen.findByTestId('recipe-detail');
-    expect(screen.getByText('Đã có trong tủ (500 g)')).toBeTruthy();
+    expect(await screen.findByText('Đã có trong tủ (500 g)')).toBeTruthy();
     expect(screen.getByText('Thiếu')).toBeTruthy();
 
     // Press "Bắt đầu nấu" -> warns about missing eggs
@@ -188,6 +199,7 @@ describe('recipe availability, warning modal, home matching & cooking deduction'
     const fake = setup([{ ingredient_id: ING_BEEF, quantity: 500, unit: 'g' }]);
     fireEvent.press(await screen.findByRole('button', { name: /^Bò né\./ }));
     await screen.findByTestId('recipe-detail');
+    await screen.findByText('Đã có trong tủ (500 g)');
     fireEvent.press(screen.getByRole('button', { name: 'Bắt đầu nấu' }));
     fireEvent.press(await screen.findByTestId('continue-cook-btn'));
     await screen.findByTestId('cooking-mode');
@@ -210,5 +222,45 @@ describe('recipe availability, warning modal, home matching & cooking deduction'
     fireEvent.press(screen.getByTestId('confirm-deduct-btn'));
     await screen.findByTestId('recipe-detail');
     expect(fake.tables.user_pantry).toHaveLength(0);
+  });
+});
+
+describe('AsyncStorage fallback when remote pantry migration is missing', () => {
+  it('supports add/merge, fetch, recipe matching, and deduction locally on PGRST205/PGRST202', async () => {
+    await AsyncStorage.clear();
+    const fake = createFakeSupabase(fakeSession({ id: USER }));
+    fake.catalog.ingredients = CATALOG_INGREDIENTS;
+    fake.catalog.details['001-bo-ne'] = pantryRecipeDetail();
+    fake.tables.shopping_lists = [{ id: 'l1', user_id: USER, name: 'Danh sách mua sắm', created_at: '2026-11-24T00:00:00Z' }];
+    fake.tables.shopping_list_items = [
+      { id: 's1', shopping_list_id: 'l1', ingredient_id: ING_BEEF, label: 'Thịt bò', quantity: 500, unit: 'g', note: null, is_checked: true, sort_order: 0 },
+    ];
+
+    // Simulate missing user_pantry table & RPCs on remote server
+    const missingTable = { code: 'PGRST205', message: "Could not find the table 'public.user_pantry' in the schema cache" };
+    const missingRpc = { code: 'PGRST202', message: 'Could not find the function in the schema cache' };
+    fake.rpc.mockImplementation(async () => ({ data: null, error: missingRpc }));
+
+    // Add + merge via fallback and clear shopping item
+    await addOrMergePantryItems(fake.client, [{ ingredientId: ING_BEEF, quantity: 500, unit: 'g' }], ['s1'], USER);
+    await addOrMergePantryItems(fake.client, [{ ingredientId: ING_BEEF, quantity: 0.5, unit: 'kg' }], undefined, USER);
+
+    fake.failNext('user_pantry', 'select', missingTable);
+    const localItems = await fetchPantry(fake.client, USER);
+    expect(localItems).toHaveLength(1);
+    expect(localItems[0].name).toBe('Thịt bò');
+    expect(localItems[0].quantity).toBe(1000);
+    expect(fake.tables.shopping_list_items).toHaveLength(0);
+
+    // Match recipes locally
+    const matched = await matchRecipesFromPantry(fake.client, { limit: 20, offset: 0 }, USER);
+    expect(matched.items).toHaveLength(1);
+    expect(matched.items[0].recipe.slug).toBe('001-bo-ne');
+    expect(matched.items[0].missingCount).toBe(1);
+
+    // Deduct locally and ensure depletion removes row
+    await deductPantryIngredients(fake.client, [{ ingredientId: ING_BEEF, quantity: 1, unit: 'kg' }], USER);
+    fake.failNext('user_pantry', 'select', missingTable);
+    expect(await fetchPantry(fake.client, USER)).toEqual([]);
   });
 });

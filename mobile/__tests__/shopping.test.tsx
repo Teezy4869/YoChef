@@ -111,6 +111,8 @@ describe('shopping list', () => {
     const fake = setup();
     await openShoppingTab();
     expect(await screen.findByTestId('shopping-empty')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('open-shopping-add-btn'));
+    expect(await screen.findByTestId('shopping-add-modal')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Thêm vào danh sách' }));
     expect(await screen.findByText('Nhập tên món cần mua.')).toBeTruthy();
 

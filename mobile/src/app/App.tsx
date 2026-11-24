@@ -1,3 +1,10 @@
+import {
+  BeVietnamPro_400Regular,
+  BeVietnamPro_500Medium,
+  BeVietnamPro_600SemiBold,
+  BeVietnamPro_700Bold,
+  useFonts,
+} from '@expo-google-fonts/be-vietnam-pro';
 import { StatusBar } from 'expo-status-bar';
 import { useMemo } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -18,8 +25,17 @@ export type AppProps = {
 };
 
 export default function App({ rawEnv, createClient = createSupabaseClient }: AppProps) {
+  const [fontsLoaded, fontError] = useFonts({
+    BeVietnamPro_400Regular,
+    BeVietnamPro_500Medium,
+    BeVietnamPro_600SemiBold,
+    BeVietnamPro_700Bold,
+  });
+
   const envResult = useMemo(() => validateEnv(rawEnv ?? rawEnvFromProcess()), [rawEnv]);
   const client = useMemo(() => (envResult.ok ? createClient(envResult.env) : null), [envResult, createClient]);
+
+  if (!fontsLoaded && !fontError) return null;
 
   return (
     <SafeAreaProvider>

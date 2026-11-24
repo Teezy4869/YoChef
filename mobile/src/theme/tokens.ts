@@ -1,9 +1,12 @@
-// YoChef design tokens (Phase 1.2). Light theme only (app.json userInterfaceStyle).
+import type { ViewStyle } from 'react-native';
+
+// YoChef design tokens. Light theme only (app.json userInterfaceStyle).
 // Text/background pairs meet WCAG AA (4.5:1) for body text.
 
 export const colors = {
   background: '#FAF7F2', // warm paper, matches splash and adaptive icon
   surface: '#FFFFFF',
+  surfaceElevated: '#FFFDF9',
   surfaceMuted: '#F3EDE4',
   border: '#E5DCD0',
   borderStrong: '#C9BCAB',
@@ -22,6 +25,15 @@ export const colors = {
   successSoft: '#E6F4EC',
   info: '#175CD3',
   infoSoft: '#EAF1FD',
+  warning: '#B54708',
+  warningSoft: '#FEF0C7',
+
+  star: '#D97706',
+  starSoft: '#FEF3C7',
+  scrimTop: 'rgba(31, 26, 23, 0.42)',
+  scrimBottom: 'rgba(31, 26, 23, 0.72)',
+  backdrop: 'rgba(31, 26, 23, 0.52)',
+  overlayChip: 'rgba(255, 253, 249, 0.92)',
 } as const;
 
 export const spacing = {
@@ -36,25 +48,57 @@ export const spacing = {
 } as const;
 
 export const radius = {
-  sm: 6,
-  md: 10,
+  sm: 8,
+  md: 12,
   lg: 16,
+  xl: 22,
   pill: 999,
 } as const;
 
+export const fonts = {
+  regular: 'BeVietnamPro_400Regular',
+  medium: 'BeVietnamPro_500Medium',
+  semibold: 'BeVietnamPro_600SemiBold',
+  bold: 'BeVietnamPro_700Bold',
+} as const;
+
 export const typography = {
-  display: { fontSize: 30, lineHeight: 38, fontWeight: '700' },
-  title: { fontSize: 22, lineHeight: 30, fontWeight: '700' },
-  heading: { fontSize: 17, lineHeight: 24, fontWeight: '600' },
-  body: { fontSize: 16, lineHeight: 24, fontWeight: '400' },
-  label: { fontSize: 14, lineHeight: 20, fontWeight: '600' },
-  caption: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
+  display: { fontSize: 28, lineHeight: 36, fontWeight: '700', fontFamily: fonts.bold },
+  title: { fontSize: 22, lineHeight: 30, fontWeight: '700', fontFamily: fonts.bold },
+  heading: { fontSize: 17, lineHeight: 24, fontWeight: '600', fontFamily: fonts.semibold },
+  body: { fontSize: 16, lineHeight: 24, fontWeight: '400', fontFamily: fonts.regular },
+  label: { fontSize: 14, lineHeight: 20, fontWeight: '600', fontFamily: fonts.semibold },
+  caption: { fontSize: 13, lineHeight: 18, fontWeight: '400', fontFamily: fonts.regular },
 } as const;
 
 export type TextVariant = keyof typeof typography;
 
+export const shadows: Record<'card' | 'floating' | 'sheet', ViewStyle> = {
+  card: {
+    shadowColor: '#2B1D14',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  floating: {
+    shadowColor: '#2B1D14',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  sheet: {
+    shadowColor: '#2B1D14',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.14,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+};
+
 // Minimum touch target (Apple HIG 44pt, Material 48dp).
 export const touchTarget = 48;
 
-export const theme = { colors, spacing, radius, typography, touchTarget } as const;
+export const theme = { colors, spacing, radius, fonts, typography, shadows, touchTarget } as const;
 export type Theme = typeof theme;

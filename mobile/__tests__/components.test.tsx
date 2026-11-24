@@ -1,7 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { Banner } from '@/components/Banner';
+import { BottomSheetModal } from '@/components/BottomSheetModal';
 import { Button } from '@/components/Button';
+import { EmptyState } from '@/components/EmptyState';
+import { RecipeListSkeleton } from '@/components/Skeleton';
 import { TextField } from '@/components/TextField';
 import { colors } from '@/theme/tokens';
 
@@ -31,6 +34,50 @@ describe('TextField', () => {
     fireEvent.changeText(screen.getByLabelText('Email'), 'a@b.vn');
     expect(onChangeText).toHaveBeenCalledWith('a@b.vn');
     expect(screen.getByText('Email không hợp lệ.')).toBeTruthy();
+  });
+
+  it('toggles password visibility when secureTextEntry is enabled', () => {
+    render(<TextField label="Mật khẩu" secureTextEntry value="secret" onChangeText={() => undefined} />);
+    expect(screen.getByLabelText('Mật khẩu').props.secureTextEntry).toBe(true);
+    fireEvent.press(screen.getByRole('button', { name: 'Hiện mật khẩu' }));
+    expect(screen.getByLabelText('Mật khẩu').props.secureTextEntry).toBe(false);
+    fireEvent.press(screen.getByRole('button', { name: 'Ẩn mật khẩu' }));
+    expect(screen.getByLabelText('Mật khẩu').props.secureTextEntry).toBe(true);
+  });
+});
+
+describe('EmptyState, BottomSheetModal, Skeleton', () => {
+  it('renders EmptyState with title, message and action', () => {
+    const onPress = jest.fn();
+    render(
+      <EmptyState
+        icon="heart-outline"
+        title="Trống"
+        message="Chưa có dữ liệu"
+        action={<Button title="Thử lại" onPress={onPress} />}
+      />,
+    );
+    expect(screen.getByText('Trống')).toBeTruthy();
+    expect(screen.getByText('Chưa có dữ liệu')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Thử lại' }));
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders BottomSheetModal and closes on close button', () => {
+    const onClose = jest.fn();
+    render(
+      <BottomSheetModal visible title="Tiêu đề" onClose={onClose}>
+        <Button title="Xác nhận" onPress={() => undefined} />
+      </BottomSheetModal>,
+    );
+    expect(screen.getByText('Tiêu đề')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Đóng' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders RecipeListSkeleton', () => {
+    render(<RecipeListSkeleton count={2} testID="skeleton-list" />);
+    expect(screen.getByTestId('skeleton-list')).toBeTruthy();
   });
 });
 

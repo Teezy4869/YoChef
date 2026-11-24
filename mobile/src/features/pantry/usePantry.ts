@@ -53,7 +53,7 @@ export function usePantry(client: YoChefClient, userId: string | null) {
     if (!userId) return false;
     setActionError(null);
     try {
-      await addOrMergePantryItems(client, [entry]);
+      await addOrMergePantryItems(client, [entry], undefined, userId);
       reload();
       return true;
     } catch (e) {
@@ -66,7 +66,7 @@ export function usePantry(client: YoChefClient, userId: string | null) {
     if (!userId) return false;
     setActionError(null);
     try {
-      await updatePantryItem(client, pantryId, patch);
+      await updatePantryItem(client, pantryId, patch, userId);
       reload();
       return true;
     } catch (e) {
@@ -81,7 +81,7 @@ export function usePantry(client: YoChefClient, userId: string | null) {
     const before = items;
     setResult((prev) => (prev && prev.userId === userId ? { ...prev, items: prev.items.filter((i) => i.id !== pantryId) } : prev));
     try {
-      await removePantryItem(client, pantryId);
+      await removePantryItem(client, pantryId, userId);
       return true;
     } catch (e) {
       setResult((prev) => (prev && prev.userId === userId ? { ...prev, items: before } : prev));

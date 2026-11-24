@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import type { RootStackParamList } from '@/app/navigation/types';
+import { AppIcon } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
 import { Avatar } from '@/components/Avatar';
 import { Banner } from '@/components/Banner';
@@ -11,10 +12,10 @@ import { Button } from '@/components/Button';
 import { TextField } from '@/components/TextField';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { avatarPublicUrl } from '@/features/profile/profileApi';
+import { triggerHaptic } from '@/lib/haptics';
 import { useSupabase } from '@/lib/supabase';
-import { colors, spacing } from '@/theme/tokens';
+import { colors, radius, spacing } from '@/theme/tokens';
 
-import { ReportButton } from './ReportButton';
 import {
   COMMENT_MAX,
   COMMENTS_PAGE,
@@ -26,6 +27,7 @@ import {
   postComment,
   type Comment,
 } from './commentsApi';
+import { ReportButton } from './ReportButton';
 
 type Loaded = { key: string; comments: Comment[]; hasMore: boolean; error: string | null };
 type Mode = { id: string; kind: 'edit'; text: string } | { id: string; kind: 'delete' };
@@ -69,6 +71,7 @@ export function CommentSection({ recipeId }: { recipeId: string }) {
     setBusy(true);
     try {
       await action();
+      triggerHaptic('success');
       setMode(null);
       if (success) setNotice({ tone: 'success', message: success });
       setAttempt((n) => n + 1);
@@ -89,7 +92,11 @@ export function CommentSection({ recipeId }: { recipeId: string }) {
   const draftError = lengthError(draft);
   return (
     <View style={styles.root} testID="comments">
-      <AppText variant="title">Bình luận</AppText>
+      <View style={styles.titleRow}>
+        <AppIcon name="chatbubble-ellipses-outline" size={20} tone="primary" />
+        <AppText variant="title">Bình luận</AppText>
+      </View>
+
       {userId ? (
         <View style={styles.composer}>
           <TextField
@@ -103,6 +110,7 @@ export function CommentSection({ recipeId }: { recipeId: string }) {
           />
           <Button
             title="Gửi bình luận"
+            icon="send-outline"
             fullWidth={false}
             loading={busy && mode === null}
             disabled={busy || draft.trim() === '' || draftError !== null}
@@ -110,7 +118,7 @@ export function CommentSection({ recipeId }: { recipeId: string }) {
           />
         </View>
       ) : (
-        <Button title="Đăng nhập để bình luận" variant="secondary" fullWidth={false} onPress={() => navigation.navigate('SignIn')} />
+        <Button title="Đăng nhập để bình luận" icon="chatbubble-outline" variant="secondary" fullWidth={false} onPress={() => navigation.navigate('SignIn')} />
       )}
       {notice ? <Banner tone={notice.tone} message={notice.message} /> : null}
       {current?.error ? <Banner tone="error" message={current.error} /> : null}
@@ -129,7 +137,7 @@ export function CommentSection({ recipeId }: { recipeId: string }) {
               <View style={styles.head}>
                 {/* Decorative here: the name next to it is what a screen reader needs. */}
                 <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-                  <Avatar uri={avatarPublicUrl(supabase, c.authorAvatarPath)} name={c.authorName} size={32} />
+                  <Avatar uri={avatarPublicUrl(supabase, c.authorAvatarPath)} name={c.authorName} size={34} />
                 </View>
                 <View style={styles.headText}>
                   <AppText variant="label">{c.authorName ?? 'Người dùng YoChef'}</AppText>
@@ -139,9 +147,11 @@ export function CommentSection({ recipeId }: { recipeId: string }) {
                 </View>
               </View>
               {mine && c.status === 'pending' ? (
-                <AppText variant="caption" tone="primary">
-                  Đang chờ duyệt
-                </AppText>
+                <View style={styles.pendingPill}>
+                  <AppText variant="caption" tone="primary">
+                    Đang chờ duyệt
+                  </AppText>
+                </View>
               ) : null}
               {editing ? (
                 <>
@@ -161,12 +171,13 @@ export function CommentSection({ recipeId }: { recipeId: string }) {
                   <View style={styles.actions}>
                     <Button
                       title="Lưu"
+                      size="sm"
                       fullWidth={false}
                       loading={busy}
                       disabled={busy || editing.text.trim() === '' || lengthError(editing.text) !== null}
                       onPress={() => run(() => editComment(supabase, c.id, editing.text), null)}
                     />
-                    <Button title="Hủy" variant="ghost" fullWidth={false} disabled={busy} onPress={() => setMode(null)} />
+                    <Button title="Hủy" variant="ghost" size="sm" fullWidth={false} disabled={busy} onPress={() => setMode(null)} />
                   </View>
                 </>
               ) : (
@@ -178,18 +189,20 @@ export function CommentSection({ recipeId }: { recipeId: string }) {
                   <Button
                     title="Xóa"
                     variant="danger"
+                    size="sm"
                     fullWidth={false}
                     loading={busy}
                     disabled={busy}
                     onPress={() => run(() => deleteComment(supabase, c.id), null)}
                   />
-                  <Button title="Không xóa" variant="ghost" fullWidth={false} disabled={busy} onPress={() => setMode(null)} />
+                  <Button title="Không xóa" variant="ghost" size="sm" fullWidth={false} disabled={busy} onPress={() => setMode(null)} />
                 </View>
               ) : mine && !editing ? (
                 <View style={styles.actions}>
                   <Button
                     title="Sửa"
                     variant="ghost"
+                    size="sm"
                     fullWidth={false}
                     disabled={busy}
                     accessibilityLabel="Sửa bình luận"
@@ -198,6 +211,7 @@ export function CommentSection({ recipeId }: { recipeId: string }) {
                   <Button
                     title="Xóa"
                     variant="ghost"
+                    size="sm"
                     fullWidth={false}
                     disabled={busy}
                     accessibilityLabel="Xóa bình luận"
@@ -226,10 +240,24 @@ export function CommentSection({ recipeId }: { recipeId: string }) {
 }
 
 const styles = StyleSheet.create({
-  root: { gap: spacing.sm },
+  root: { gap: spacing.md },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   composer: { gap: spacing.sm },
-  comment: { gap: spacing.xs, paddingVertical: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border },
+  comment: {
+    gap: spacing.xs,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderCurve: 'continuous',
+    backgroundColor: colors.surfaceMuted,
+  },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   headText: { flex: 1 },
+  pendingPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+  },
   actions: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm },
 });

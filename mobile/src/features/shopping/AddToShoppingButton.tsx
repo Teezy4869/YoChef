@@ -1,14 +1,16 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import type { RootStackParamList } from '@/app/navigation/types';
 import { Banner } from '@/components/Banner';
 import { Button } from '@/components/Button';
 import { useAuth } from '@/features/auth/AuthProvider';
 import type { RecipeDetail } from '@/features/recipes/types';
+import { triggerHaptic } from '@/lib/haptics';
 import { useSupabase } from '@/lib/supabase';
+import { spacing } from '@/theme/tokens';
 
 import { addRecipe } from './shoppingApi';
 
@@ -31,6 +33,7 @@ export function AddToShoppingButton({ recipe, servings }: { recipe: RecipeDetail
     setMessage(null);
     try {
       const added = await addRecipe(supabase, session.user.id, recipe, servings);
+      triggerHaptic('success');
       setMessage({ tone: 'success', text: `Đã thêm ${added.length} món vào danh sách đi chợ.` });
     } catch (e) {
       setMessage({ tone: 'error', text: e instanceof Error ? e.message : 'Có lỗi xảy ra. Vui lòng thử lại.' });
@@ -40,9 +43,19 @@ export function AddToShoppingButton({ recipe, servings }: { recipe: RecipeDetail
   };
 
   return (
-    <View testID="add-to-shopping">
-      <Button title={`Thêm vào đi chợ (${servings} người)`} variant="secondary" loading={busy} onPress={press} />
+    <View style={styles.root} testID="add-to-shopping">
+      <Button
+        title={`Thêm vào đi chợ (${servings} người)`}
+        icon="basket-outline"
+        variant="secondary"
+        loading={busy}
+        onPress={press}
+      />
       {message ? <Banner tone={message.tone} message={message.text} /> : null}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { gap: spacing.xs },
+});

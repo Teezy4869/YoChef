@@ -4,25 +4,28 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Vibration, View } from 'react-native';
 
 import type { RootStackScreenProps } from '@/app/navigation/types';
+import { AppIcon } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
-import { Banner } from '@/components/Banner';
+import { BottomSheetModal } from '@/components/BottomSheetModal';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
+import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { DeductPantryModal } from '@/features/pantry/DeductPantryModal';
 import { usePantry } from '@/features/pantry/usePantry';
+import { clearSession, FRESH_SESSION, loadSession, saveSession, type CookingSession } from '@/features/recipes/cookingSession';
 import { formatClock, formatSeconds } from '@/features/recipes/format';
 import { IngredientRows } from '@/features/recipes/IngredientRows';
-import { clearSession, FRESH_SESSION, loadSession, saveSession, type CookingSession } from '@/features/recipes/cookingSession';
 import { clampServings } from '@/features/recipes/servings';
 import { MAX_TIMER_SECONDS, MIN_TIMER_SECONDS, remainingSeconds } from '@/features/recipes/timer';
 import { TimerEditModal } from '@/features/recipes/TimerEditModal';
 import type { RecipeDetail } from '@/features/recipes/types';
 import { useRecipeDetail } from '@/features/recipes/useRecipeDetail';
 import { useStepTimers } from '@/features/recipes/useStepTimers';
+import { triggerHaptic } from '@/lib/haptics';
 import { useSupabase } from '@/lib/supabase';
-import { colors, radius, spacing } from '@/theme/tokens';
+import { colors, radius, shadows, spacing } from '@/theme/tokens';
 
 const ALARM_PATTERN = [0, 500, 250, 500, 250, 500];
 
@@ -40,17 +43,26 @@ export function CookingModeScreen({ route, navigation }: RootStackScreenProps<'C
   if (error) {
     return (
       <Screen centered testID="cooking-error">
-        <Banner tone="error" message={error} />
-        <Button title="Thử lại" onPress={retry} />
+        <EmptyState
+          icon="cloud-offline-outline"
+          tone="danger"
+          title="Không tải được công thức"
+          message={error}
+          action={<Button title="Thử lại" icon="refresh" onPress={retry} />}
+        />
       </Screen>
     );
   }
   if (notFound || !recipe || recipe.steps.length === 0) {
     return (
       <Screen centered testID="cooking-empty">
-        <AppText variant="title">Chưa thể nấu theo công thức này</AppText>
-        <AppText tone="muted">Công thức không tồn tại, chưa công bố hoặc chưa có các bước thực hiện.</AppText>
-        <Button title="Quay lại" variant="secondary" onPress={() => navigation.goBack()} />
+        <EmptyState
+          icon="restaurant-outline"
+          tone="muted"
+          title="Chưa thể nấu theo công thức này"
+          message="Công thức không tồn tại, chưa công bố hoặc chưa có các bước thực hiện."
+          action={<Button title="Quay lại" variant="secondary" onPress={() => navigation.goBack()} />}
+        />
       </Screen>
     );
   }
@@ -89,12 +101,21 @@ function CookingView(props: { recipe: RecipeDetail; servings: number | undefined
     };
     return (
       <Screen centered testID="cooking-resume">
-        <AppText variant="title">Bạn đang nấu dở món này</AppText>
-        <AppText tone="muted">
-          {`Đang ở bước ${saved.stepIndex + 1}/${steps.length}, đã xong ${saved.completed.length} bước.`}
-        </AppText>
-        <Button title="Tiếp tục nấu" onPress={() => setPhase({ kind: 'cook', from: saved })} />
-        <Button title="Nấu lại từ đầu" variant="secondary" onPress={startOver} />
+        <View style={styles.resumeCard}>
+          <View style={styles.resumeEmblem}>
+            <AppIcon name="flame" size={32} tone="primary" />
+          </View>
+          <AppText variant="title" align="center">
+            Bạn đang nấu dở món này
+          </AppText>
+          <AppText tone="muted" align="center">
+            {`Đang ở bước ${saved.stepIndex + 1}/${steps.length}, đã xong ${saved.completed.length} bước.`}
+          </AppText>
+          <View style={styles.resumeActions}>
+            <Button title="Tiếp tục nấu" icon="play" onPress={() => setPhase({ kind: 'cook', from: saved })} />
+            <Button title="Nấu lại từ đầu" variant="secondary" icon="refresh" onPress={startOver} />
+          </View>
+        </View>
       </Screen>
     );
   }
@@ -134,7 +155,10 @@ function CookingRun({
       player.pause();
     };
   }, [player]);
-  const alarm = useCallback(() => Vibration.vibrate(ALARM_PATTERN), []);
+  const alarm = useCallback(() => {
+    triggerHaptic('warning');
+    Vibration.vibrate(ALARM_PATTERN);
+  }, []);
   const timers = useStepTimers(alarm, Date.now, from.timers);
   const { slug } = recipe;
 
@@ -145,6 +169,7 @@ function CookingRun({
   }, [slug, currentStepNumber, completed, timers.all]);
 
   const finish = () => {
+    triggerHaptic('success');
     setShowDeductModal(false);
     player.pause();
     clearSession(slug);
@@ -165,6 +190,7 @@ function CookingRun({
     finish();
   };
   const next = () => {
+    triggerHaptic('light');
     setCompleted((c) => (c.includes(currentStepNumber) ? c : [...c, currentStepNumber]));
     setIndex((i) => Math.min(steps.length - 1, i + 1));
   };
@@ -184,14 +210,11 @@ function CookingRun({
   const isCustomOnly = defaultDuration === null && hasCustom;
 
   const adjustTime = (delta: number) => {
+    triggerHaptic('light');
     if (state.status === 'idle') {
       const nextDuration = Math.max(MIN_TIMER_SECONDS, Math.min(MAX_TIMER_SECONDS, duration + delta));
       setCustomDurations((prev) => ({ ...prev, [step.stepNumber]: nextDuration }));
-    } else if (state.status === 'running') {
-      timers.adjust(step.stepNumber, delta);
-      const nextDuration = Math.max(MIN_TIMER_SECONDS, Math.min(MAX_TIMER_SECONDS, duration + delta));
-      setCustomDurations((prev) => ({ ...prev, [step.stepNumber]: nextDuration }));
-    } else if (state.status === 'paused') {
+    } else if (state.status === 'running' || state.status === 'paused') {
       timers.adjust(step.stepNumber, delta);
       const nextDuration = Math.max(MIN_TIMER_SECONDS, Math.min(MAX_TIMER_SECONDS, duration + delta));
       setCustomDurations((prev) => ({ ...prev, [step.stepNumber]: nextDuration }));
@@ -248,51 +271,85 @@ function CookingRun({
   }, [activeDoneStep, player]);
 
   const otherRunning = steps.filter((s) => s.stepNumber !== step.stepNumber && timers.running.includes(s.stepNumber));
-  // Spec 21 §2: progress counts completed steps, not the step on screen.
-  const progress = completed.length / steps.length;
 
   return (
-    <Screen edges={['left', 'right', 'bottom']} testID="cooking-mode">
+    <Screen scroll={false} edges={['left', 'right', 'bottom']} testID="cooking-mode">
       <View
-        style={styles.progress}
+        style={styles.segments}
         testID="cooking-progress"
         accessibilityRole="progressbar"
         accessibilityLabel="Số bước đã xong"
         accessibilityValue={{ min: 0, max: steps.length, now: completed.length }}
       >
-        <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+        {steps.map((s, idx) => {
+          const done = completed.includes(s.stepNumber);
+          const current = idx === index;
+          return (
+            <View
+              key={s.stepNumber}
+              style={[
+                styles.segment,
+                done ? styles.segmentDone : current ? styles.segmentCurrent : null,
+              ]}
+            />
+          );
+        })}
       </View>
-      <AppText variant="caption" tone="muted">
-        {recipe.name}
-      </AppText>
-      <AppText variant="label" tone="primary" testID="step-counter">
-        {`Bước ${index + 1}/${steps.length}`}
-      </AppText>
 
-      <ScrollView contentContainerStyle={styles.body}>
-        <AppText style={styles.instruction} testID="step-instruction">
-          {step.instruction}
-        </AppText>
-
-        {stepDone ? (
-          <View style={styles.stepDone} testID="step-done">
-            <AppText variant="label" tone="success">
-              ✓ Bước này đã xong
+      <View style={styles.topRow}>
+        <View style={styles.topCopy}>
+          <AppText variant="caption" tone="muted" numberOfLines={1}>
+            {recipe.name}
+          </AppText>
+          <View style={styles.stepPill}>
+            <AppText variant="label" tone="primary" testID="step-counter">
+              {`Bước ${index + 1}/${steps.length}`}
             </AppText>
-            <Button title="Đánh dấu chưa xong" variant="ghost" onPress={unmark} />
           </View>
-        ) : null}
+        </View>
+        <Button
+          title="Xem nguyên liệu"
+          icon="list-outline"
+          variant="soft"
+          size="sm"
+          fullWidth={false}
+          onPress={() => setShowIngredients(true)}
+        />
+      </View>
+
+      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+        <View style={styles.stepCard}>
+          <AppText style={styles.instruction} testID="step-instruction">
+            {step.instruction}
+          </AppText>
+
+          {stepDone ? (
+            <View style={styles.stepDone} testID="step-done">
+              <View style={styles.doneTag}>
+                <AppIcon name="checkmark-circle" size={16} tone="success" />
+                <AppText variant="label" tone="success">
+                  Bước này đã xong
+                </AppText>
+              </View>
+              <Button title="Đánh dấu chưa xong" variant="ghost" size="sm" fullWidth={false} onPress={unmark} />
+            </View>
+          ) : null}
+        </View>
 
         {hasTimer ? (
           <View style={styles.timer} testID="timer-panel">
             <View style={styles.timerHeader}>
-              <AppText variant="caption" tone="muted">
-                {`Hẹn giờ ${formatSeconds(duration)}`}
-              </AppText>
+              <View style={styles.timerBadge}>
+                <AppIcon name="timer-outline" size={16} tone="primary" />
+                <AppText variant="caption" tone="muted">
+                  {`Hẹn giờ ${formatSeconds(duration)}`}
+                </AppText>
+              </View>
               {isModified && defaultDuration !== null ? (
                 <Button
                   title={`Về mặc định (${formatSeconds(defaultDuration)})`}
                   variant="ghost"
+                  size="sm"
                   fullWidth={false}
                   onPress={resetToDefault}
                   testID="reset-default-duration-btn"
@@ -302,6 +359,7 @@ function CookingRun({
                 <Button
                   title="Xóa hẹn giờ"
                   variant="ghost"
+                  size="sm"
                   fullWidth={false}
                   onPress={removeCustomTimer}
                   testID="remove-custom-timer-btn"
@@ -316,39 +374,50 @@ function CookingRun({
               testID="timer-clock-pressable"
               style={styles.clockTouchable}
             >
-              <AppText variant="display" accessibilityRole="timer" testID="timer-clock">
+              <AppText variant="display" tabularNums style={styles.clockText} accessibilityRole="timer" testID="timer-clock">
                 {formatClock(remainingSeconds(state, duration, timers.clock))}
               </AppText>
-              <AppText variant="caption" tone="primary" style={styles.editHint}>
-                ✎ Chạm để sửa thời gian
-              </AppText>
+              <View style={styles.editHintRow}>
+                <AppIcon name="create-outline" size={14} tone="primary" />
+                <AppText variant="caption" tone="primary">
+                  Chạm để sửa thời gian
+                </AppText>
+              </View>
             </Pressable>
 
             <View style={styles.quickAdjustRow} testID="quick-adjust-row">
-              <Button title="-1m" variant="secondary" fullWidth={false} onPress={() => adjustTime(-60)} testID="adjust-minus-60" />
-              <Button title="+30s" variant="secondary" fullWidth={false} onPress={() => adjustTime(30)} testID="adjust-plus-30" />
-              <Button title="+1m" variant="secondary" fullWidth={false} onPress={() => adjustTime(60)} testID="adjust-plus-60" />
+              <Button title="-1m" variant="secondary" size="sm" fullWidth={false} onPress={() => adjustTime(-60)} testID="adjust-minus-60" />
+              <Button title="+30s" variant="secondary" size="sm" fullWidth={false} onPress={() => adjustTime(30)} testID="adjust-plus-30" />
+              <Button title="+1m" variant="secondary" size="sm" fullWidth={false} onPress={() => adjustTime(60)} testID="adjust-plus-60" />
             </View>
 
             <View style={styles.timerButtons}>
               {state.status === 'idle' ? (
-                <Button title="Bắt đầu hẹn giờ" onPress={() => timers.start(step.stepNumber, duration)} />
+                <Button
+                  title="Bắt đầu hẹn giờ"
+                  icon="play"
+                  onPress={() => {
+                    triggerHaptic('medium');
+                    timers.start(step.stepNumber, duration);
+                  }}
+                />
               ) : null}
               {state.status === 'running' ? (
-                <Button title="Tạm dừng" variant="secondary" onPress={() => timers.pause(step.stepNumber)} />
+                <Button title="Tạm dừng" icon="pause" variant="secondary" onPress={() => timers.pause(step.stepNumber)} />
               ) : null}
               {state.status === 'paused' ? (
-                <Button title="Tiếp tục" onPress={() => timers.resume(step.stepNumber)} />
+                <Button title="Tiếp tục" icon="play" onPress={() => timers.resume(step.stepNumber)} />
               ) : null}
               {state.status !== 'idle' ? (
-                <Button title="Đặt lại" variant="ghost" onPress={() => timers.reset(step.stepNumber)} />
+                <Button title="Đặt lại" icon="refresh" variant="ghost" onPress={() => timers.reset(step.stepNumber)} />
               ) : null}
             </View>
           </View>
         ) : (
-          <View style={styles.addTimerContainer} testID="add-timer-section">
+          <View style={styles.addTimerContainer}>
             <Button
               title="+ Thêm hẹn giờ cho bước này"
+              icon="timer-outline"
               variant="secondary"
               onPress={() => setEditingStep(step.stepNumber)}
               testID="add-timer-btn"
@@ -365,6 +434,7 @@ function CookingRun({
                 return (
                   <Chip
                     key={s.stepNumber}
+                    icon="timer-outline"
                     label={`Bước ${s.stepNumber} · ${formatClock(remainingSeconds(timers.get(s.stepNumber), sDur, timers.clock))}`}
                     selected={false}
                     onPress={() => setIndex(steps.indexOf(s))}
@@ -374,28 +444,13 @@ function CookingRun({
             </View>
           </View>
         ) : null}
-
-        <Button
-          title={showIngredients ? 'Ẩn nguyên liệu' : 'Xem nguyên liệu'}
-          variant="ghost"
-          onPress={() => setShowIngredients((v) => !v)}
-        />
-        {showIngredients ? (
-          <View testID="cooking-ingredients">
-            <AppText variant="caption" tone="muted">{`Cho ${effectiveServings} người`}</AppText>
-            <IngredientRows
-              ingredients={recipe.ingredients}
-              defaultServings={recipe.defaultServings}
-              servings={effectiveServings}
-            />
-          </View>
-        ) : null}
       </ScrollView>
 
       <View style={styles.nav}>
         <View style={styles.navButton}>
           <Button
             title="Bước trước"
+            icon="arrow-back"
             variant="secondary"
             disabled={index === 0}
             onPress={() => setIndex((i) => Math.max(0, i - 1))}
@@ -403,12 +458,26 @@ function CookingRun({
         </View>
         <View style={styles.navButton}>
           {isLast ? (
-            <Button title="Hoàn thành" onPress={handleFinishPress} />
+            <Button title="Hoàn thành" icon="checkmark-circle-outline" onPress={handleFinishPress} />
           ) : (
-            <Button title="Bước tiếp" onPress={next} />
+            <Button title="Bước tiếp" rightIcon="arrow-forward" onPress={next} />
           )}
         </View>
       </View>
+
+      <BottomSheetModal
+        visible={showIngredients}
+        title="Nguyên liệu cần dùng"
+        subtitle={`Cho ${effectiveServings} người`}
+        onClose={() => setShowIngredients(false)}
+        testID="cooking-ingredients"
+      >
+        <IngredientRows
+          ingredients={recipe.ingredients}
+          defaultServings={recipe.defaultServings}
+          servings={effectiveServings}
+        />
+      </BottomSheetModal>
 
       <TimerEditModal
         visible={editingStep !== null}
@@ -422,6 +491,7 @@ function CookingRun({
         <DeductPantryModal
           visible
           client={supabase}
+          userId={userId ?? undefined}
           recipe={recipe}
           servings={effectiveServings}
           pantryItems={pantry.items}
@@ -431,16 +501,11 @@ function CookingRun({
       ) : null}
 
       {activeDoneStep ? (
-        <Modal
-          visible
-          transparent
-          animationType="fade"
-          testID="timer-done-modal"
-        >
+        <Modal visible transparent animationType="fade" testID="timer-done-modal">
           <View style={styles.doneModalBackdrop}>
             <View style={styles.doneModalCard}>
               <View style={styles.doneModalIcon}>
-                <AppText variant="title">⏰</AppText>
+                <AppIcon name="alarm" size={32} tone="primary" />
               </View>
               <AppText variant="title" style={styles.doneModalTitle}>
                 {`Hết giờ bước ${activeDoneStep.stepNumber}!`}
@@ -450,6 +515,7 @@ function CookingRun({
               </AppText>
               <Button
                 title="Xác nhận"
+                icon="checkmark"
                 onPress={() => {
                   player.pause();
                   timers.reset(activeDoneStep.stepNumber);
@@ -465,18 +531,100 @@ function CookingRun({
 }
 
 const styles = StyleSheet.create({
-  progress: { height: 6, borderRadius: 3, backgroundColor: colors.border, overflow: 'hidden' },
-  progressFill: { height: 6, backgroundColor: colors.primary },
-  body: { gap: spacing.lg, paddingVertical: spacing.md },
-  instruction: { fontSize: 22, lineHeight: 32 },
+  resumeCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderCurve: 'continuous',
+    padding: spacing.xl,
+    gap: spacing.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
+  },
+  resumeEmblem: {
+    width: 68,
+    height: 68,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resumeActions: {
+    alignSelf: 'stretch',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  segments: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  segment: {
+    flex: 1,
+    height: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.border,
+  },
+  segmentCurrent: {
+    backgroundColor: colors.primary,
+  },
+  segmentDone: {
+    backgroundColor: colors.success,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  topCopy: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  stepPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs + 1,
+    borderRadius: radius.pill,
+  },
+  body: { gap: spacing.md, paddingBottom: spacing.md },
+  stepCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderCurve: 'continuous',
+    padding: spacing.lg,
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
+  },
+  instruction: { fontSize: 21, lineHeight: 31 },
+  stepDone: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    paddingTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  doneTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   timer: {
     gap: spacing.sm,
     padding: spacing.lg,
     borderRadius: radius.lg,
+    borderCurve: 'continuous',
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',
+    ...shadows.card,
   },
   timerHeader: {
     flexDirection: 'row',
@@ -486,11 +634,23 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.xs,
   },
+  timerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   clockTouchable: {
     alignItems: 'center',
     paddingVertical: spacing.xs,
   },
-  editHint: {
+  clockText: {
+    fontSize: 40,
+    lineHeight: 48,
+  },
+  editHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
     marginTop: spacing.xs,
   },
   quickAdjustRow: {
@@ -500,12 +660,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   addTimerContainer: {
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   timerButtons: { alignSelf: 'stretch', gap: spacing.sm },
   doneModalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: colors.backdrop,
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
@@ -514,22 +674,19 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 340,
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
+    borderCurve: 'continuous',
     padding: spacing.xl,
     alignItems: 'center',
     gap: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 10,
+    ...shadows.floating,
   },
   doneModalIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 64,
+    height: 64,
+    borderRadius: radius.pill,
     backgroundColor: colors.primarySoft,
     justifyContent: 'center',
     alignItems: 'center',
@@ -541,9 +698,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
-  stepDone: { gap: spacing.xs, alignItems: 'flex-start' },
   running: { gap: spacing.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  nav: { flexDirection: 'row', gap: spacing.md },
+  nav: { flexDirection: 'row', gap: spacing.md, paddingTop: spacing.xs },
   navButton: { flex: 1 },
 });

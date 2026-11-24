@@ -6,6 +6,12 @@ export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
   hard: 'Khó',
 };
 
+export const DIFFICULTY_TONE: Record<Difficulty, 'success' | 'star' | 'danger'> = {
+  easy: 'success',
+  medium: 'star',
+  hard: 'danger',
+};
+
 /** One row of the recipe list. Unknown values are null, never 0 or ''. */
 export type RecipeSummary = {
   id: string;

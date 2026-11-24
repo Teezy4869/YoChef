@@ -26,5 +26,12 @@ export function ModerationEntry({ userId }: { userId: string }) {
   }, [supabase, userId]);
 
   if (allowed?.userId !== userId || !allowed.value) return null;
-  return <Button title="Duyệt nội dung" variant="secondary" onPress={() => navigation.navigate('Moderation')} />;
+  return (
+    <Button
+      title="Duyệt nội dung"
+      icon="shield-checkmark-outline"
+      variant="soft"
+      onPress={() => navigation.navigate('Moderation')}
+    />
+  );
 }

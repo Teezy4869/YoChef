@@ -375,12 +375,19 @@ export function createFakeSupabase(initial: Session | null = null) {
   const catalogFrom = (table: string) => ({
     select: (_cols?: string) => {
       const eqs: Record<string, unknown> = {};
+      const ins: Record<string, unknown[]> = {};
       const rows = () => {
         if (table === 'categories') return catalog.categories;
-        if (table === 'ingredients') return catalog.ingredients;
+        if (table === 'ingredients') {
+          if (ins.id) return catalog.ingredients.filter((i) => ins.id.includes(i.id));
+          return catalog.ingredients;
+        }
         if (table === 'recipes') {
-          const d = catalog.details[String(eqs.slug)];
-          return d ? [d] : [];
+          if (eqs.slug) {
+            const d = catalog.details[String(eqs.slug)];
+            return d ? [d] : [];
+          }
+          return Object.values(catalog.details);
         }
         return [];
       };
@@ -388,6 +395,7 @@ export function createFakeSupabase(initial: Session | null = null) {
         order: () => b,
         limit: () => b,
         eq: (col: string, val: unknown) => ((eqs[col] = val), b),
+        in: (col: string, vals: unknown[]) => ((ins[col] = vals), b),
         maybeSingle: async () => ({ data: rows()[0] ?? null, error: null }),
         then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
           Promise.resolve({ data: rows(), error: null }).then(resolve, reject),

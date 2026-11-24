@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
+import { AppIcon } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
 import { Banner } from '@/components/Banner';
+import { BottomSheetModal } from '@/components/BottomSheetModal';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { TextField } from '@/components/TextField';
+import { useAuth } from '@/features/auth/AuthProvider';
 import type { ShoppingItem } from '@/features/shopping/shoppingApi';
+import { triggerHaptic } from '@/lib/haptics';
 import { useSupabase } from '@/lib/supabase';
 import { colors, radius, spacing, touchTarget } from '@/theme/tokens';
 
@@ -44,6 +48,7 @@ export function MoveToPantryModal({
   onMoved: () => void;
 }) {
   const supabase = useSupabase();
+  const { session } = useAuth();
   const [catalog, setCatalog] = useState<CatalogIngredient[]>([]);
   const [drafts, setDrafts] = useState<DraftRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -131,7 +136,8 @@ export function MoveToPantryModal({
     setError(null);
     setSaving(true);
     try {
-      await addOrMergePantryItems(supabase, entries, shoppingIds);
+      await addOrMergePantryItems(supabase, entries, shoppingIds, session?.user.id);
+      triggerHaptic('success');
       onMoved();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không thể cất đồ vào tủ lạnh.');
@@ -141,98 +147,98 @@ export function MoveToPantryModal({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} testID="move-to-pantry-modal">
-      <View style={styles.backdrop}>
-        <View style={styles.card}>
-          <AppText variant="title">Cất vào tủ lạnh</AppText>
-          <AppText tone="muted">Kiểm tra nhanh số lượng và đơn vị chuẩn trước khi cộng vào tủ.</AppText>
-
-          <ScrollView contentContainerStyle={styles.list}>
-            {drafts.map((d) => {
-              const suggestions = !d.ingredient && d.query.trim()
-                ? byIdQuery.filter((c) => foldVi(c.name).includes(foldVi(d.query))).slice(0, 5)
-                : [];
-              const units = d.ingredient ? availableUnitsFor(d.ingredient.commonUnits) : [];
-
-              return (
-                <View key={d.shoppingItemId} style={styles.rowBox}>
-                  <AppText variant="heading">{d.label}</AppText>
-
-                  {!d.ingredient ? (
-                    <View style={styles.matchBox}>
-                      <TextField
-                        label="Khớp nguyên liệu chuẩn"
-                        value={d.query}
-                        onChangeText={(text) => updateDraft(d.shoppingItemId, { query: text, ingredient: null })}
-                        placeholder="Gõ để chọn nguyên liệu chuẩn..."
-                      />
-                      {suggestions.map((ing) => (
-                        <Pressable
-                          key={ing.id}
-                          accessibilityRole="button"
-                          onPress={() => {
-                            const u = availableUnitsFor(ing.commonUnits);
-                            updateDraft(d.shoppingItemId, {
-                              ingredient: ing,
-                              query: ing.name,
-                              unit: u.includes(d.unit) ? d.unit : u[0],
-                            });
-                          }}
-                          style={styles.suggestion}
-                        >
-                          <AppText>{ing.name}</AppText>
-                        </Pressable>
-                      ))}
-                    </View>
-                  ) : (
-                    <>
-                      <TextField
-                        label="Số lượng"
-                        value={d.qtyText}
-                        onChangeText={(text) => updateDraft(d.shoppingItemId, { qtyText: text })}
-                        keyboardType="decimal-pad"
-                      />
-                      <View style={styles.chips}>
-                        {units.map((u) => (
-                          <Chip
-                            key={u}
-                            label={u}
-                            selected={d.unit === u}
-                            onPress={() => updateDraft(d.shoppingItemId, { unit: u })}
-                          />
-                        ))}
-                      </View>
-                    </>
-                  )}
-                </View>
-              );
-            })}
-          </ScrollView>
-
+    <BottomSheetModal
+      visible={visible}
+      title="Cất vào tủ lạnh"
+      subtitle="Kiểm tra nhanh số lượng và đơn vị chuẩn trước khi cộng vào tủ."
+      onClose={onClose}
+      testID="move-to-pantry-modal"
+      footer={
+        <View style={styles.actions}>
           {error ? <Banner tone="error" message={error} /> : null}
-          <View style={styles.actions}>
-            <Button title="Xác nhận cất vào tủ" onPress={confirm} loading={saving} testID="confirm-move-pantry-btn" />
-            <Button title="Hủy" variant="ghost" onPress={onClose} disabled={saving} />
-          </View>
+          <Button
+            title="Xác nhận cất vào tủ"
+            icon="snow-outline"
+            onPress={confirm}
+            loading={saving}
+            testID="confirm-move-pantry-btn"
+          />
+          <Button title="Hủy" variant="ghost" onPress={onClose} disabled={saving} />
         </View>
+      }
+    >
+      <View style={styles.list}>
+        {drafts.map((d) => {
+          const suggestions = !d.ingredient && d.query.trim()
+            ? byIdQuery.filter((c) => foldVi(c.name).includes(foldVi(d.query))).slice(0, 5)
+            : [];
+          const units = d.ingredient ? availableUnitsFor(d.ingredient.commonUnits) : [];
+
+          return (
+            <View key={d.shoppingItemId} style={styles.rowBox}>
+              <AppText variant="heading">{d.label}</AppText>
+
+              {!d.ingredient ? (
+                <View style={styles.matchBox}>
+                  <TextField
+                    label="Khớp nguyên liệu chuẩn"
+                    value={d.query}
+                    onChangeText={(text) => updateDraft(d.shoppingItemId, { query: text, ingredient: null })}
+                    placeholder="Gõ để chọn nguyên liệu chuẩn..."
+                  />
+                  {suggestions.map((ing) => (
+                    <Pressable
+                      key={ing.id}
+                      accessibilityRole="button"
+                      onPress={() => {
+                        const u = availableUnitsFor(ing.commonUnits);
+                        updateDraft(d.shoppingItemId, {
+                          ingredient: ing,
+                          query: ing.name,
+                          unit: u.includes(d.unit) ? d.unit : u[0],
+                        });
+                      }}
+                      style={styles.suggestion}
+                    >
+                      <AppText>{ing.name}</AppText>
+                      <AppIcon name="checkmark-circle-outline" size={18} tone="primary" />
+                    </Pressable>
+                  ))}
+                </View>
+              ) : (
+                <>
+                  <TextField
+                    label="Số lượng"
+                    value={d.qtyText}
+                    onChangeText={(text) => updateDraft(d.shoppingItemId, { qtyText: text })}
+                    keyboardType="decimal-pad"
+                  />
+                  <View style={styles.chips}>
+                    {units.map((u) => (
+                      <Chip
+                        key={u}
+                        label={u}
+                        selected={d.unit === u}
+                        onPress={() => updateDraft(d.shoppingItemId, { unit: u })}
+                      />
+                    ))}
+                  </View>
+                </>
+              )}
+            </View>
+          );
+        })}
       </View>
-    </Modal>
+    </BottomSheetModal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: spacing.lg },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    maxHeight: '85%',
-    gap: spacing.md,
-  },
   list: { gap: spacing.md },
   rowBox: {
     padding: spacing.md,
     borderRadius: radius.md,
+    borderCurve: 'continuous',
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.background,
@@ -241,7 +247,9 @@ const styles = StyleSheet.create({
   matchBox: { gap: spacing.xs },
   suggestion: {
     minHeight: touchTarget - 6,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.sm,
     backgroundColor: colors.surface,
     borderRadius: radius.sm,

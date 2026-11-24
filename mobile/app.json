@@ -31,7 +31,9 @@
           "cameraPermission": "YoChef cần quyền dùng camera để bạn chụp ảnh món đã nấu.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-image",
+      "expo-font"
     ]
   }
 }

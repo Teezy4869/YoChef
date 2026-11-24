@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Linking, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
+import { AppIcon } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
-import { Button } from '@/components/Button';
+import { Banner } from '@/components/Banner';
 import { fail } from '@/features/recipes/recipeApi';
 import { useSupabase, type YoChefClient } from '@/lib/supabase';
-import { spacing } from '@/theme/tokens';
+import { colors, radius, spacing } from '@/theme/tokens';
 
 // Phase 4.4: RLS returns a video only while it is primary, verified within 30 days and its
 // recipe is published; the app repeats the date check. No eligible video, no section.
@@ -52,13 +53,50 @@ export function VideoButton({ recipeId }: { recipeId: string }) {
   };
   return (
     <View style={styles.root} testID="recipe-video">
-      <Button title="Xem video hướng dẫn" variant="secondary" accessibilityHint="Mở YouTube" onPress={open} />
-      <AppText variant="caption" tone="muted">
-        {current.channel ? `${current.title} · ${current.channel}` : current.title}
-      </AppText>
-      {error ? <AppText tone="danger">{error}</AppText> : null}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Xem video hướng dẫn"
+        accessibilityHint="Mở YouTube"
+        onPress={open}
+        style={({ pressed }) => [styles.card, pressed ? styles.pressed : null]}
+      >
+        <View style={styles.playBadge}>
+          <AppIcon name="logo-youtube" size={22} tone="primary" />
+        </View>
+        <View style={styles.copy}>
+          <AppText variant="label">Xem video hướng dẫn</AppText>
+          <AppText variant="caption" tone="muted" numberOfLines={2}>
+            {current.channel ? `${current.title} · ${current.channel}` : current.title}
+          </AppText>
+        </View>
+        <AppIcon name="open-outline" size={18} tone="muted" />
+      </Pressable>
+      {error ? <Banner tone="error" message={error} /> : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create({ root: { gap: spacing.xs } });
+const styles = StyleSheet.create({
+  root: { gap: spacing.xs },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderCurve: 'continuous',
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  pressed: { opacity: 0.85 },
+  playBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  copy: { flex: 1, gap: spacing.xxs },
+});

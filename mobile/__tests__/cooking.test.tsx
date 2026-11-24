@@ -435,7 +435,7 @@ describe('cooking mode', () => {
       expect(screen.queryByTestId('step-done')).toBeNull(); // step 2 is on screen, not done
 
       fireEvent.press(screen.getByRole('button', { name: 'Bước trước' }));
-      expect(screen.getByText('✓ Bước này đã xong')).toBeTruthy();
+      expect(screen.getByText('Bước này đã xong')).toBeTruthy();
       expect(progressNow()).toBe(1);
       fireEvent.press(screen.getByRole('button', { name: 'Đánh dấu chưa xong' }));
       expect(screen.queryByTestId('step-done')).toBeNull();

@@ -13,6 +13,8 @@
     "test": "jest"
   },
   "dependencies": {
+    "@expo-google-fonts/be-vietnam-pro": "0.4.1",
+    "@expo/vector-icons": "15.1.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "7.21.0",
     "@react-navigation/native": "7.5.1",
@@ -20,9 +22,13 @@
     "@supabase/supabase-js": "2.119.0",
     "expo": "58.0.23",
     "expo-audio": "58.0.12",
+    "expo-font": "58.0.12",
+    "expo-haptics": "58.0.8",
+    "expo-image": "58.0.18",
     "expo-image-manipulator": "58.0.16",
     "expo-image-picker": "58.0.10",
     "expo-keep-awake": "58.0.4",
+    "expo-linear-gradient": "58.0.4",
     "expo-status-bar": "58.0.4",
     "react": "19.3.0",
     "react-native": "0.88.1",

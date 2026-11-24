@@ -1,11 +1,15 @@
 import { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
+import { AppIcon } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
 import { Banner } from '@/components/Banner';
+import { BottomSheetModal } from '@/components/BottomSheetModal';
 import { Button } from '@/components/Button';
 import { formatQuantity, shownQuantity } from '@/features/recipes/servings';
 import type { RecipeDetail } from '@/features/recipes/types';
+import { triggerHaptic } from '@/lib/haptics';
+import type { YoChefClient } from '@/lib/supabase';
 import { colors, radius, spacing, touchTarget, typography } from '@/theme/tokens';
 
 import {
@@ -14,7 +18,6 @@ import {
   type DeductPantryInput,
   type PantryItem,
 } from './pantryApi';
-import type { YoChefClient } from '@/lib/supabase';
 
 type DeductRow = {
   key: string;
@@ -35,6 +38,7 @@ type DeductRow = {
 export function DeductPantryModal({
   visible,
   client,
+  userId,
   recipe,
   servings,
   pantryItems,
@@ -43,6 +47,7 @@ export function DeductPantryModal({
 }: {
   visible: boolean;
   client: YoChefClient;
+  userId?: string;
   recipe: RecipeDetail;
   servings: number;
   pantryItems: PantryItem[];
@@ -107,6 +112,7 @@ export function DeductPantryModal({
   const [error, setError] = useState<string | null>(null);
 
   const toggleRow = (key: string) => {
+    triggerHaptic('light');
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, selected: !r.selected } : r)));
   };
 
@@ -141,7 +147,8 @@ export function DeductPantryModal({
 
     setBusy(true);
     try {
-      await deductPantryIngredients(client, payload);
+      await deductPantryIngredients(client, payload, userId);
+      triggerHaptic('success');
       onDone();
     } catch (e) {
       const msg = e instanceof Error ? e.message : '';
@@ -156,79 +163,69 @@ export function DeductPantryModal({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onSkip} testID="deduct-pantry-modal">
-      <View style={styles.backdrop}>
-        <View style={styles.card}>
-          <AppText variant="title">{`Hoàn thành món ${recipe.name}!`}</AppText>
-          <AppText tone="muted">
-            Chọn và điều chỉnh lượng nguyên liệu thực tế bạn đã dùng để YoChef trừ khỏi Tủ lạnh:
-          </AppText>
-
-          <ScrollView contentContainerStyle={styles.list}>
-            {rows.map((r) => (
-              <View key={r.key} style={styles.row}>
-                <Pressable
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: r.selected }}
-                  accessibilityLabel={`Trừ ${r.name}`}
-                  onPress={() => toggleRow(r.key)}
-                  style={styles.checkArea}
-                >
-                  <View style={[styles.box, r.selected ? styles.boxOn : null]}>
-                    {r.selected ? <AppText tone="onPrimary">✓</AppText> : null}
-                  </View>
-                  <View style={styles.info}>
-                    <AppText variant="label">{r.name}</AppText>
-                    <AppText variant="caption" tone="muted">
-                      {`Trong tủ: ${formatQuantity(r.pantryQty, true)} ${r.pantryUnit}`}
-                    </AppText>
-                  </View>
-                </Pressable>
-
-                <View style={styles.inputWrap}>
-                  <TextInput
-                    accessibilityLabel={`Số lượng trừ ${r.name}`}
-                    value={r.qtyText}
-                    onChangeText={(t) => changeQty(r.key, t)}
-                    keyboardType="decimal-pad"
-                    placeholder="0"
-                    placeholderTextColor={colors.textMuted}
-                    style={styles.qtyInput}
-                  />
-                  <AppText variant="caption" tone="muted">
-                    {r.deductUnit}
-                  </AppText>
-                </View>
-              </View>
-            ))}
-          </ScrollView>
-
+    <BottomSheetModal
+      visible={visible}
+      title={`Hoàn thành món ${recipe.name}!`}
+      subtitle="Chọn và điều chỉnh lượng nguyên liệu thực tế bạn đã dùng để YoChef trừ khỏi Tủ lạnh:"
+      onClose={onSkip}
+      testID="deduct-pantry-modal"
+      footer={
+        <View style={styles.actions}>
           {error ? <Banner tone="error" message={error} testID="deduct-pantry-error" /> : null}
-
-          <View style={styles.actions}>
-            <Button
-              title={error ? 'Thử lại' : 'Xác nhận trừ kho'}
-              onPress={handleConfirm}
-              loading={busy}
-              testID="confirm-deduct-btn"
-            />
-            <Button title="Bỏ qua trừ kho" variant="ghost" onPress={onSkip} disabled={busy} testID="skip-deduct-btn" />
-          </View>
+          <Button
+            title={error ? 'Thử lại' : 'Xác nhận trừ kho'}
+            icon="checkmark-circle-outline"
+            onPress={handleConfirm}
+            loading={busy}
+            testID="confirm-deduct-btn"
+          />
+          <Button title="Bỏ qua trừ kho" variant="ghost" onPress={onSkip} disabled={busy} testID="skip-deduct-btn" />
         </View>
+      }
+    >
+      <View style={styles.list}>
+        {rows.map((r) => (
+          <View key={r.key} style={styles.row}>
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: r.selected }}
+              accessibilityLabel={`Trừ ${r.name}`}
+              onPress={() => toggleRow(r.key)}
+              style={styles.checkArea}
+            >
+              <View style={[styles.box, r.selected ? styles.boxOn : null]}>
+                {r.selected ? <AppIcon name="checkmark" size={14} tone="onPrimary" /> : null}
+              </View>
+              <View style={styles.info}>
+                <AppText variant="label">{r.name}</AppText>
+                <AppText variant="caption" tone="muted" tabularNums>
+                  {`Trong tủ: ${formatQuantity(r.pantryQty, true)} ${r.pantryUnit}`}
+                </AppText>
+              </View>
+            </Pressable>
+
+            <View style={styles.inputWrap}>
+              <TextInput
+                accessibilityLabel={`Số lượng trừ ${r.name}`}
+                value={r.qtyText}
+                onChangeText={(t) => changeQty(r.key, t)}
+                keyboardType="decimal-pad"
+                placeholder="0"
+                placeholderTextColor={colors.textMuted}
+                style={styles.qtyInput}
+              />
+              <AppText variant="caption" tone="muted">
+                {r.deductUnit}
+              </AppText>
+            </View>
+          </View>
+        ))}
       </View>
-    </Modal>
+    </BottomSheetModal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: spacing.lg },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    maxHeight: '85%',
-    gap: spacing.md,
-  },
   list: { gap: spacing.sm },
   row: {
     flexDirection: 'row',
@@ -237,6 +234,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.sm,
     borderRadius: radius.md,
+    borderCurve: 'continuous',
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.background,

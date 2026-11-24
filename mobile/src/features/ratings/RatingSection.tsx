@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import type { RootStackParamList } from '@/app/navigation/types';
+import { AppIcon } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
 import { Banner } from '@/components/Banner';
 import { Button } from '@/components/Button';
 import { useAuth } from '@/features/auth/AuthProvider';
+import { triggerHaptic } from '@/lib/haptics';
 import { useSupabase } from '@/lib/supabase';
-import { colors, spacing, touchTarget } from '@/theme/tokens';
+import { colors, radius, spacing, touchTarget } from '@/theme/tokens';
 
 import { fetchMyScore, fetchRatingSummary, formatAverage, removeScore, saveScore, type RatingSummary } from './ratingsApi';
 
@@ -54,6 +56,7 @@ export function RatingSection({ recipeId }: { recipeId: string }) {
       navigation.navigate('SignIn');
       return;
     }
+    triggerHaptic('light');
     setActionError(null);
     setBusy(true);
     setPending({ key: userKey, score });
@@ -72,14 +75,19 @@ export function RatingSection({ recipeId }: { recipeId: string }) {
   const summary = current?.summary;
   return (
     <View style={styles.root} testID="ratings">
-      <AppText variant="title">Đánh giá</AppText>
+      <View style={styles.head}>
+        <AppIcon name="star-outline" size={20} tone="primary" />
+        <AppText variant="title">Đánh giá</AppText>
+      </View>
       {current?.error ? <Banner tone="error" message={current.error} /> : null}
       {summary ? (
-        <AppText testID="rating-summary">
-          {summary.average !== null
-            ? `★ ${formatAverage(summary.average)} · ${summary.count} lượt đánh giá`
-            : 'Chưa có đánh giá'}
-        </AppText>
+        <View style={styles.summaryPill}>
+          <AppText variant="label" testID="rating-summary">
+            {summary.average !== null
+              ? `★ ${formatAverage(summary.average)} · ${summary.count} lượt đánh giá`
+              : 'Chưa có đánh giá'}
+          </AppText>
+        </View>
       ) : null}
       <AppText tone="muted">{userId ? (mine ? `Bạn chấm ${mine} sao` : 'Bạn chấm món này mấy sao?') : 'Đăng nhập để chấm điểm.'}</AppText>
       <View style={styles.stars} accessibilityRole="radiogroup" accessibilityLabel="Chấm điểm">
@@ -94,15 +102,19 @@ export function RatingSection({ recipeId }: { recipeId: string }) {
               disabled={busy}
               hitSlop={4}
               onPress={() => choose(n)}
-              style={styles.star}
+              style={({ pressed }) => [styles.star, on ? styles.starActive : null, pressed ? styles.starPressed : null]}
             >
-              <AppText style={[styles.starText, on ? styles.starOn : null]}>{on ? '★' : '☆'}</AppText>
+              <AppIcon
+                name={on ? 'star' : 'star-outline'}
+                size={26}
+                tone={on ? 'star' : 'muted'}
+              />
             </Pressable>
           );
         })}
       </View>
       {userId && mine !== null ? (
-        <Button title="Xóa đánh giá của tôi" variant="ghost" fullWidth={false} disabled={busy} onPress={() => choose(null)} />
+        <Button title="Xóa đánh giá của tôi" variant="ghost" size="sm" fullWidth={false} disabled={busy} onPress={() => choose(null)} />
       ) : null}
       {actionError ? <Banner tone="error" message={actionError} /> : null}
     </View>
@@ -111,8 +123,23 @@ export function RatingSection({ recipeId }: { recipeId: string }) {
 
 const styles = StyleSheet.create({
   root: { gap: spacing.sm },
+  head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  summaryPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.starSoft,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.pill,
+  },
   stars: { flexDirection: 'row', gap: spacing.xs },
-  star: { width: touchTarget, height: touchTarget, alignItems: 'center', justifyContent: 'center' },
-  starText: { fontSize: 30, lineHeight: 36, color: colors.textMuted },
-  starOn: { color: colors.primary },
+  star: {
+    width: touchTarget,
+    height: touchTarget,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  starActive: { backgroundColor: colors.starSoft },
+  starPressed: { transform: [{ scale: 0.92 }] },
 });

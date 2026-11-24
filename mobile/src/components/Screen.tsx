@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import type { ReactElement, ReactNode } from 'react';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View, type RefreshControlProps } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
 import { colors, spacing } from '@/theme/tokens';
@@ -10,20 +10,34 @@ export type ScreenProps = {
   scroll?: boolean;
   /** Vertically center the content (empty states, simple forms). */
   centered?: boolean;
+  padding?: 'default' | 'compact' | 'none';
+  refreshControl?: ReactElement<RefreshControlProps>;
   edges?: Edge[];
   testID?: string;
 };
 
-export function Screen({ children, scroll = true, centered = false, edges = ['top', 'left', 'right'], testID }: ScreenProps) {
+export function Screen({
+  children,
+  scroll = true,
+  centered = false,
+  padding = 'default',
+  refreshControl,
+  edges = ['top', 'left', 'right'],
+  testID,
+}: ScreenProps) {
+  const padStyle =
+    padding === 'none' ? styles.padNone : padding === 'compact' ? styles.padCompact : styles.padDefault;
+
   const content = scroll ? (
     <ScrollView
-      contentContainerStyle={[styles.content, centered ? styles.centered : null]}
+      contentContainerStyle={[styles.content, padStyle, centered ? styles.centered : null]}
       keyboardShouldPersistTaps="handled"
+      refreshControl={refreshControl}
     >
       {children}
     </ScrollView>
   ) : (
-    <View style={[styles.content, styles.fill, centered ? styles.centered : null]}>{children}</View>
+    <View style={[styles.content, styles.fill, padStyle, centered ? styles.centered : null]}>{children}</View>
   );
 
   return (
@@ -40,9 +54,19 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   content: {
     flexGrow: 1,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xl,
     gap: spacing.lg,
+  },
+  padDefault: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+  },
+  padCompact: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  padNone: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
   centered: { justifyContent: 'center' },
 });

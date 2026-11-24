@@ -1,16 +1,19 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import type { RootStackParamList } from '@/app/navigation/types';
+import { AppIcon } from '@/components/AppIcon';
+import { AppImage } from '@/components/AppImage';
 import { AppText } from '@/components/AppText';
 import { Banner } from '@/components/Banner';
 import { Button } from '@/components/Button';
 import { TextField } from '@/components/TextField';
 import { useAuth } from '@/features/auth/AuthProvider';
+import { triggerHaptic } from '@/lib/haptics';
 import { useSupabase } from '@/lib/supabase';
-import { colors, radius, spacing } from '@/theme/tokens';
+import { colors, radius, spacing, touchTarget } from '@/theme/tokens';
 
 import {
   addCookingPhoto,
@@ -39,6 +42,7 @@ export function CookingPhotoSection({ recipeId }: { recipeId: string }) {
   const [picked, setPicked] = useState<PickedPhoto | null>(null);
   const [caption, setCaption] = useState('');
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ url: string; caption: string | null; author: string } | null>(null);
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const userKey = `${recipeId}#${userId ?? 'guest'}`;
@@ -78,6 +82,7 @@ export function CookingPhotoSection({ recipeId }: { recipeId: string }) {
     setBusy(true);
     try {
       await action();
+      triggerHaptic('success');
       if (success) setNotice({ tone: 'success', message: success });
       setAttempt((n) => n + 1);
       return true;
@@ -104,12 +109,16 @@ export function CookingPhotoSection({ recipeId }: { recipeId: string }) {
   const captionError = captionLength(caption) > CAPTION_MAX ? `Chú thích tối đa ${CAPTION_MAX} ký tự.` : null;
   return (
     <View style={styles.root} testID="cooking-photos">
-      <AppText variant="title">Ảnh món đã nấu</AppText>
+      <View style={styles.head}>
+        <AppIcon name="camera-outline" size={20} tone="primary" />
+        <AppText variant="title">Ảnh món đã nấu</AppText>
+      </View>
+
       {!userId ? (
-        <Button title="Đăng nhập để đăng ảnh" variant="secondary" fullWidth={false} onPress={() => navigation.navigate('SignIn')} />
+        <Button title="Đăng nhập để đăng ảnh" variant="secondary" icon="camera-outline" fullWidth={false} onPress={() => navigation.navigate('SignIn')} />
       ) : picked ? (
         <View style={styles.composer} testID="photo-composer">
-          <Image source={{ uri: picked.uri }} style={styles.preview} accessibilityLabel="Ảnh sắp đăng" />
+          <AppImage uri={picked.uri} style={styles.preview} accessibilityLabel="Ảnh sắp đăng" />
           <TextField
             label="Chú thích (không bắt buộc)"
             value={caption}
@@ -119,14 +128,14 @@ export function CookingPhotoSection({ recipeId }: { recipeId: string }) {
             hint={`${captionLength(caption)}/${CAPTION_MAX}`}
           />
           <View style={styles.actions}>
-            <Button title="Đăng ảnh" fullWidth={false} loading={busy} disabled={busy || captionError !== null} onPress={post} />
+            <Button title="Đăng ảnh" icon="cloud-upload-outline" fullWidth={false} loading={busy} disabled={busy || captionError !== null} onPress={post} />
             <Button title="Bỏ ảnh này" variant="ghost" fullWidth={false} disabled={busy} onPress={() => setPicked(null)} />
           </View>
         </View>
       ) : (
         <View style={styles.actions}>
-          <Button title="Chụp ảnh" variant="secondary" fullWidth={false} disabled={busy} onPress={() => choose('camera')} />
-          <Button title="Chọn từ thư viện" variant="secondary" fullWidth={false} disabled={busy} onPress={() => choose('library')} />
+          <Button title="Chụp ảnh" icon="camera-outline" variant="secondary" size="sm" fullWidth={false} disabled={busy} onPress={() => choose('camera')} />
+          <Button title="Chọn từ thư viện" icon="images-outline" variant="secondary" size="sm" fullWidth={false} disabled={busy} onPress={() => choose('library')} />
         </View>
       )}
       {notice ? <Banner tone={notice.tone} message={notice.message} /> : null}
@@ -140,13 +149,21 @@ export function CookingPhotoSection({ recipeId }: { recipeId: string }) {
         <View style={styles.grid}>
           {current.photos.map((p) => {
             const mine = p.userId === userId;
+            const author = p.authorName ?? 'Người dùng YoChef';
             const label = [p.caption, `Ảnh của ${p.authorName ?? 'người dùng YoChef'}`].filter(Boolean).join('. ');
             return (
               <View key={p.id} style={styles.tile} testID="photo-tile">
                 {p.url ? (
-                  <Image source={{ uri: p.url }} style={styles.photo} accessibilityLabel={label} />
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Xem lớn ${label}`}
+                    onPress={() => setLightbox({ url: p.url!, caption: p.caption, author })}
+                  >
+                    <AppImage uri={p.url} style={styles.photo} accessibilityLabel={label} />
+                  </Pressable>
                 ) : (
                   <View style={[styles.photo, styles.missing]} accessible accessibilityLabel={label}>
+                    <AppIcon name="image-outline" size={24} tone="muted" />
                     <AppText variant="caption" tone="muted" align="center">
                       Không tải được ảnh
                     </AppText>
@@ -154,18 +171,21 @@ export function CookingPhotoSection({ recipeId }: { recipeId: string }) {
                 )}
                 {p.caption ? <AppText variant="caption">{p.caption}</AppText> : null}
                 <AppText variant="caption" tone="muted">
-                  {p.authorName ?? 'Người dùng YoChef'}
+                  {author}
                 </AppText>
                 {mine && p.status === 'pending' ? (
-                  <AppText variant="caption" tone="primary">
-                    Đang chờ duyệt
-                  </AppText>
+                  <View style={styles.pendingBadge}>
+                    <AppText variant="caption" tone="primary">
+                      Đang chờ duyệt
+                    </AppText>
+                  </View>
                 ) : null}
                 {mine && confirming === p.id ? (
                   <View style={styles.actions}>
                     <Button
                       title="Xóa"
                       variant="danger"
+                      size="sm"
                       fullWidth={false}
                       loading={busy}
                       disabled={busy}
@@ -173,12 +193,13 @@ export function CookingPhotoSection({ recipeId }: { recipeId: string }) {
                         if (await run(() => deleteCookingPhoto(supabase, p), null)) setConfirming(null);
                       }}
                     />
-                    <Button title="Không xóa" variant="ghost" fullWidth={false} disabled={busy} onPress={() => setConfirming(null)} />
+                    <Button title="Không xóa" variant="ghost" size="sm" fullWidth={false} disabled={busy} onPress={() => setConfirming(null)} />
                   </View>
                 ) : mine ? (
                   <Button
                     title="Xóa ảnh"
                     variant="ghost"
+                    size="sm"
                     fullWidth={false}
                     disabled={busy}
                     onPress={() => setConfirming(p.id)}
@@ -201,17 +222,80 @@ export function CookingPhotoSection({ recipeId }: { recipeId: string }) {
           onPress={() => setLimit((n) => n + PHOTOS_PAGE)}
         />
       ) : null}
+
+      {lightbox ? (
+        <Modal visible transparent animationType="fade" onRequestClose={() => setLightbox(null)} testID="photo-lightbox">
+          <View style={styles.lightboxBackdrop}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Đóng ảnh"
+              onPress={() => setLightbox(null)}
+              style={styles.lightboxClose}
+            >
+              <AppIcon name="close" size={24} tone="onPrimary" />
+            </Pressable>
+            <AppImage uri={lightbox.url} contentFit="contain" style={styles.lightboxImage} accessibilityLabel={lightbox.caption ?? lightbox.author} />
+            <View style={styles.lightboxCaption}>
+              {lightbox.caption ? (
+                <AppText tone="onPrimary" align="center">
+                  {lightbox.caption}
+                </AppText>
+              ) : null}
+              <AppText variant="caption" style={styles.lightboxAuthor} align="center">
+                {lightbox.author}
+              </AppText>
+            </View>
+          </View>
+        </Modal>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { gap: spacing.sm },
-  composer: { gap: spacing.sm },
+  root: { gap: spacing.md },
+  head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  composer: {
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceMuted,
+  },
   preview: { width: '100%', aspectRatio: 4 / 3, borderRadius: radius.md, backgroundColor: colors.surfaceMuted },
   actions: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   tile: { width: '47%', gap: spacing.xxs },
   photo: { width: '100%', aspectRatio: 1, borderRadius: radius.md, backgroundColor: colors.surfaceMuted },
-  missing: { alignItems: 'center', justifyContent: 'center', padding: spacing.sm },
+  missing: { alignItems: 'center', justifyContent: 'center', padding: spacing.sm, gap: spacing.xs },
+  pendingBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+  },
+  lightboxBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(20, 16, 14, 0.94)',
+    justifyContent: 'center',
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  lightboxClose: {
+    alignSelf: 'flex-end',
+    width: touchTarget,
+    height: touchTarget,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lightboxImage: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: radius.md,
+    backgroundColor: 'transparent',
+  },
+  lightboxCaption: { gap: spacing.xxs },
+  lightboxAuthor: { color: 'rgba(255,255,255,0.75)' },
 });

@@ -1,18 +1,22 @@
 import type { Session } from '@supabase/supabase-js';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
+import { AppIcon } from '@/components/AppIcon';
 import { AppText } from '@/components/AppText';
 import { Avatar } from '@/components/Avatar';
 import { Banner } from '@/components/Banner';
 import { Button } from '@/components/Button';
+import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { TextField } from '@/components/TextField';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { DISPLAY_NAME_MAX, validateDisplayName } from '@/features/auth/validation';
+import { useFavorites } from '@/features/favorites/FavoritesProvider';
 import { ModerationEntry } from '@/features/moderation/ModerationEntry';
+import { triggerHaptic } from '@/lib/haptics';
 import { useSupabase } from '@/lib/supabase';
-import { colors, spacing } from '@/theme/tokens';
+import { colors, radius, shadows, spacing } from '@/theme/tokens';
 
 import { pickAvatar } from './pickAvatar';
 import {
@@ -32,6 +36,7 @@ const messageOf = (e: unknown) => (e instanceof ProfileError ? e.message : 'Có 
 export function ProfileView({ session }: { session: Session }) {
   const supabase = useSupabase();
   const { signOut } = useAuth();
+  const { items: favorites } = useFavorites();
   const userId = session.user.id;
 
   const [load, setLoad] = useState<Load>({ state: 'loading' });
@@ -78,9 +83,18 @@ export function ProfileView({ session }: { session: Session }) {
   if (load.state === 'error') {
     return (
       <Screen centered testID="profile-error">
-        <Banner tone="error" message={load.message} />
-        <Button title="Thử lại" onPress={retry} />
-        <Button title="Đăng xuất" variant="ghost" onPress={() => signOut()} />
+        <EmptyState
+          icon="person-circle-outline"
+          tone="danger"
+          title="Không tải được hồ sơ"
+          message={load.message}
+          action={
+            <>
+              <Button title="Thử lại" icon="refresh" onPress={retry} />
+              <Button title="Đăng xuất" variant="ghost" onPress={() => signOut()} />
+            </>
+          }
+        />
       </Screen>
     );
   }
@@ -109,6 +123,7 @@ export function ProfileView({ session }: { session: Session }) {
       await updateMyProfile(supabase, userId, { displayName: name, bio });
       const fresh = await fetchMyProfile(supabase);
       if (fresh) setLoad({ state: 'ready', profile: fresh });
+      triggerHaptic('success');
       setEditing(false);
       setBanner({ tone: 'success', message: 'Đã lưu hồ sơ.' });
     } catch (e) {
@@ -132,6 +147,7 @@ export function ProfileView({ session }: { session: Session }) {
     try {
       const path = await replaceAvatar(supabase, userId, picked, profile.avatar_path);
       setLoad({ state: 'ready', profile: { ...profile, avatar_path: path } });
+      triggerHaptic('success');
       setBanner({ tone: 'success', message: 'Đã cập nhật ảnh đại diện.' });
     } catch (e) {
       setBanner({ tone: 'error', message: messageOf(e) });
@@ -152,20 +168,42 @@ export function ProfileView({ session }: { session: Session }) {
 
   return (
     <Screen testID="account-signed-in">
-      <View style={styles.header}>
-        <Avatar uri={avatarPublicUrl(supabase, profile.avatar_path)} name={profile.display_name ?? session.user.email ?? null} />
+      <View style={styles.heroCard}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Cập nhật ảnh đại diện"
+          disabled={busy !== null}
+          onPress={changeAvatar}
+        >
+          <Avatar
+            uri={avatarPublicUrl(supabase, profile.avatar_path)}
+            name={profile.display_name ?? session.user.email ?? null}
+            showEditBadge
+          />
+        </Pressable>
         <View style={styles.headerText}>
           <AppText variant="title" testID="profile-name">
             {profile.display_name ?? 'Chưa đặt tên'}
           </AppText>
-          <AppText tone="muted">{session.user.email}</AppText>
+          <AppText variant="caption" tone="muted">
+            {session.user.email}
+          </AppText>
+          <View style={styles.statRow}>
+            <View style={styles.statPill}>
+              <AppIcon name="heart" size={14} tone="primary" />
+              <AppText variant="caption" tone="primary" tabularNums>
+                {`${favorites.length} món yêu thích`}
+              </AppText>
+            </View>
+          </View>
         </View>
       </View>
 
       {banner ? <Banner tone={banner.tone} message={banner.message} testID="profile-banner" /> : null}
 
       {editing ? (
-        <View style={styles.section}>
+        <View style={styles.card}>
+          <AppText variant="heading">Chỉnh sửa thông tin</AppText>
           <TextField
             label="Tên hiển thị"
             value={name}
@@ -183,39 +221,90 @@ export function ProfileView({ session }: { session: Session }) {
             multiline
             maxLength={BIO_MAX + 50}
           />
-          <Button title="Lưu" onPress={save} loading={busy === 'save'} />
+          <Button title="Lưu" icon="checkmark" onPress={save} loading={busy === 'save'} />
           <Button title="Hủy" variant="ghost" onPress={() => setEditing(false)} disabled={busy === 'save'} />
         </View>
       ) : (
-        <View style={styles.section}>
-          <AppText variant="heading">Giới thiệu</AppText>
-          <AppText tone={profile.bio ? 'default' : 'muted'} testID="profile-bio">
-            {profile.bio ?? 'Chưa có giới thiệu.'}
-          </AppText>
-          <Button title="Sửa hồ sơ" onPress={startEdit} disabled={busy !== null} />
-          <Button
-            title="Đổi ảnh đại diện"
-            variant="secondary"
-            onPress={changeAvatar}
-            loading={busy === 'avatar'}
-            disabled={busy !== null && busy !== 'avatar'}
-          />
-          <ModerationEntry userId={userId} />
-          <Button
-            title="Đăng xuất"
-            variant="ghost"
-            onPress={onSignOut}
-            loading={busy === 'signout'}
-            disabled={busy !== null && busy !== 'signout'}
-          />
-        </View>
+        <>
+          <View style={styles.card}>
+            <View style={styles.cardTitleRow}>
+              <AppIcon name="reader-outline" size={18} tone="primary" />
+              <AppText variant="heading">Giới thiệu</AppText>
+            </View>
+            <AppText tone={profile.bio ? 'default' : 'muted'} testID="profile-bio">
+              {profile.bio ?? 'Chưa có giới thiệu.'}
+            </AppText>
+          </View>
+
+          <View style={styles.card}>
+            <AppText variant="heading">Tài khoản</AppText>
+            <Button title="Sửa hồ sơ" icon="create-outline" onPress={startEdit} disabled={busy !== null} />
+            <Button
+              title="Đổi ảnh đại diện"
+              icon="image-outline"
+              variant="secondary"
+              onPress={changeAvatar}
+              loading={busy === 'avatar'}
+              disabled={busy !== null && busy !== 'avatar'}
+            />
+            <ModerationEntry userId={userId} />
+            <Button
+              title="Đăng xuất"
+              icon="log-out-outline"
+              variant="ghost"
+              onPress={onSignOut}
+              loading={busy === 'signout'}
+              disabled={busy !== null && busy !== 'signout'}
+            />
+          </View>
+        </>
       )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
-  headerText: { flex: 1, gap: spacing.xxs },
-  section: { gap: spacing.md },
+  heroCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderCurve: 'continuous',
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
+  },
+  headerText: { flex: 1, gap: spacing.xs },
+  statRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginTop: spacing.xxs,
+  },
+  statPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs + 1,
+    borderRadius: radius.pill,
+  },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderCurve: 'continuous',
+    padding: spacing.lg,
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
 });

@@ -1,12 +1,14 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import type { RootStackParamList } from '@/app/navigation/types';
 import { Banner } from '@/components/Banner';
 import { Button } from '@/components/Button';
 import { useAuth } from '@/features/auth/AuthProvider';
+import { triggerHaptic } from '@/lib/haptics';
+import { spacing } from '@/theme/tokens';
 
 import { useFavorites } from './FavoritesProvider';
 
@@ -23,19 +25,25 @@ export function FavoriteButton({ recipeId }: { recipeId: string }) {
       navigation.navigate('SignIn');
       return;
     }
+    triggerHaptic('light');
     setError(await toggle(recipeId));
   };
 
   return (
-    <View testID="favorite">
+    <View style={styles.root} testID="favorite">
       <Button
-        title={on ? '♥ Đã lưu vào yêu thích' : '♡ Lưu vào yêu thích'}
+        title={on ? 'Đã lưu vào yêu thích' : 'Lưu vào yêu thích'}
+        icon={on ? 'heart' : 'heart-outline'}
         accessibilityLabel={on ? 'Bỏ khỏi yêu thích' : 'Lưu vào yêu thích'}
         accessibilityState={{ selected: on }}
-        variant={on ? 'primary' : 'secondary'}
+        variant={on ? 'soft' : 'secondary'}
         onPress={press}
       />
       {error ? <Banner tone="error" message={error} /> : null}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { gap: spacing.xs },
+});
