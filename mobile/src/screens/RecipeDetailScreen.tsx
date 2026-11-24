@@ -1,52 +1,77 @@
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
+import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import type { RootStackScreenProps } from '@/app/navigation/types';
-import { AppIcon } from '@/components/AppIcon';
-import { AppImage } from '@/components/AppImage';
-import { AppText } from '@/components/AppText';
-import { Banner } from '@/components/Banner';
-import { BottomSheetModal } from '@/components/BottomSheetModal';
-import { Button } from '@/components/Button';
-import { EmptyState } from '@/components/EmptyState';
-import { Screen } from '@/components/Screen';
-import { useAuth } from '@/features/auth/AuthProvider';
-import { CommentSection } from '@/features/community/CommentSection';
-import { CookingPhotoSection } from '@/features/community/CookingPhotoSection';
-import { FavoriteButton } from '@/features/favorites/FavoriteButton';
-import { NutritionSection } from '@/features/nutrition/NutritionSection';
-import { checkRecipeAvailability } from '@/features/pantry/pantryApi';
-import { usePantry } from '@/features/pantry/usePantry';
-import { RatingSection } from '@/features/ratings/RatingSection';
-import { formatSeconds, joinMeta, timeLabel } from '@/features/recipes/format';
-import { IngredientRows } from '@/features/recipes/IngredientRows';
-import { coverUrl } from '@/features/recipes/recipeApi';
-import { clampServings, MAX_SERVINGS, MIN_SERVINGS } from '@/features/recipes/servings';
-import { DIFFICULTY_LABEL, type IngredientLine, type RecipeDetail, type ServingBasis } from '@/features/recipes/types';
-import { useRecipeDetail } from '@/features/recipes/useRecipeDetail';
-import { AddToShoppingButton } from '@/features/shopping/AddToShoppingButton';
-import { VideoButton } from '@/features/videos/VideoButton';
-import { triggerHaptic } from '@/lib/haptics';
-import { useSupabase } from '@/lib/supabase';
-import { colors, radius, shadows, spacing, touchTarget } from '@/theme/tokens';
+import type { RootStackScreenProps } from "@/app/navigation/types";
+import { AppIcon } from "@/components/AppIcon";
+import { AppImage } from "@/components/AppImage";
+import { AppText } from "@/components/AppText";
+import { Banner } from "@/components/Banner";
+import { BottomSheetModal } from "@/components/BottomSheetModal";
+import { Button } from "@/components/Button";
+import { EmptyState } from "@/components/EmptyState";
+import { Screen } from "@/components/Screen";
+import { useAuth } from "@/features/auth/AuthProvider";
+import { CommentSection } from "@/features/community/CommentSection";
+import { CookingPhotoSection } from "@/features/community/CookingPhotoSection";
+import { FavoriteButton } from "@/features/favorites/FavoriteButton";
+import { NutritionSection } from "@/features/nutrition/NutritionSection";
+import { checkRecipeAvailability } from "@/features/pantry/pantryApi";
+import { usePantry } from "@/features/pantry/usePantry";
+import { RatingSection } from "@/features/ratings/RatingSection";
+import { formatSeconds, joinMeta, timeLabel } from "@/features/recipes/format";
+import { IngredientRows } from "@/features/recipes/IngredientRows";
+import { coverUrl } from "@/features/recipes/recipeApi";
+import {
+  clampServings,
+  MAX_SERVINGS,
+  MIN_SERVINGS,
+} from "@/features/recipes/servings";
+import {
+  DIFFICULTY_LABEL,
+  type IngredientLine,
+  type RecipeDetail,
+  type ServingBasis,
+} from "@/features/recipes/types";
+import { useRecipeDetail } from "@/features/recipes/useRecipeDetail";
+import { AddToShoppingButton } from "@/features/shopping/AddToShoppingButton";
+import { VideoButton } from "@/features/videos/VideoButton";
+import { triggerHaptic } from "@/lib/haptics";
+import { useSupabase } from "@/lib/supabase";
+import { colors, radius, shadows, spacing, touchTarget } from "@/theme/tokens";
 
 const SERVING_BASIS_LABEL: Record<ServingBasis, string> = {
-  book: 'Khẩu phần theo sách',
-  editor_estimate: 'Khẩu phần do biên tập ước tính',
-  inferred_yield: 'Khẩu phần suy ra từ thành phẩm',
+  book: "Khẩu phần theo sách",
+  editor_estimate: "Khẩu phần do biên tập ước tính",
+  inferred_yield: "Khẩu phần suy ra từ thành phẩm",
 };
 
-export function RecipeDetailScreen({ route, navigation }: RootStackScreenProps<'RecipeDetail'>) {
+export function RecipeDetailScreen({
+  route,
+  navigation,
+}: RootStackScreenProps<"RecipeDetail">) {
   const supabase = useSupabase();
-  const { loading, error, recipe, notFound, retry } = useRecipeDetail(supabase, route.params.slug);
+  const { loading, error, recipe, notFound, retry } = useRecipeDetail(
+    supabase,
+    route.params.slug,
+  );
 
   if (loading) {
     return (
       <Screen centered testID="recipe-detail-loading">
-        <ActivityIndicator color={colors.primary} size="large" accessibilityLabel="Đang tải công thức" />
+        <ActivityIndicator
+          color={colors.primary}
+          size="large"
+          accessibilityLabel="Đang tải công thức"
+        />
       </Screen>
     );
   }
@@ -62,7 +87,11 @@ export function RecipeDetailScreen({ route, navigation }: RootStackScreenProps<'
             <>
               <Button title="Thử lại" icon="refresh" onPress={retry} />
               {navigation.canGoBack() ? (
-                <Button title="Quay lại" variant="ghost" onPress={() => navigation.goBack()} />
+                <Button
+                  title="Quay lại"
+                  variant="ghost"
+                  onPress={() => navigation.goBack()}
+                />
               ) : null}
             </>
           }
@@ -80,7 +109,11 @@ export function RecipeDetailScreen({ route, navigation }: RootStackScreenProps<'
           message="Công thức này không tồn tại hoặc chưa được công bố."
           action={
             navigation.canGoBack() ? (
-              <Button title="Quay lại" variant="secondary" onPress={() => navigation.goBack()} />
+              <Button
+                title="Quay lại"
+                variant="secondary"
+                onPress={() => navigation.goBack()}
+              />
             ) : undefined
           }
         />
@@ -92,7 +125,9 @@ export function RecipeDetailScreen({ route, navigation }: RootStackScreenProps<'
     <RecipeDetailView
       recipe={recipe}
       imageUri={coverUrl(supabase, recipe.coverImagePath)}
-      onCook={(servings) => navigation.navigate('CookingMode', { slug: recipe.slug, servings })}
+      onCook={(servings) =>
+        navigation.navigate("CookingMode", { slug: recipe.slug, servings })
+      }
     />
   );
 }
@@ -110,7 +145,7 @@ function RecipeDetailView({
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { status, session } = useAuth();
-  const userId = status === 'signedIn' && session ? session.user.id : null;
+  const userId = status === "signedIn" && session ? session.user.id : null;
   const pantry = usePantry(supabase, userId);
   const { reload: reloadPantry } = pantry;
   const didMountFocus = useRef(false);
@@ -128,12 +163,18 @@ function RecipeDetailView({
   const base = recipe.defaultServings;
   const [servings, setServings] = useState(base ?? MIN_SERVINGS);
   const canScale = base !== null;
-  const [shopNotice, setShopNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+  const [shopNotice, setShopNotice] = useState<{
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
   const [showMissingModal, setShowMissingModal] = useState(false);
   const [addingMissing, setAddingMissing] = useState(false);
 
   const availability = useMemo(
-    () => (userId && !pantry.loading && !pantry.error ? checkRecipeAvailability(recipe, servings, pantry.items) : null),
+    () =>
+      userId && !pantry.loading && !pantry.error
+        ? checkRecipeAvailability(recipe, servings, pantry.items)
+        : null,
     [userId, pantry.loading, pantry.error, pantry.items, recipe, servings],
   );
 
@@ -141,12 +182,19 @@ function RecipeDetailView({
     if (!userId) return;
     setShopNotice(null);
     try {
-      const { addIngredientLines } = await import('@/features/shopping/shoppingApi');
+      const { addIngredientLines } =
+        await import("@/features/shopping/shoppingApi");
       await addIngredientLines(supabase, userId, [line], base, servings);
-      triggerHaptic('success');
-      setShopNotice({ tone: 'success', text: `Đã thêm "${line.name}" vào danh sách đi chợ.` });
+      triggerHaptic("success");
+      setShopNotice({
+        tone: "success",
+        text: `Đã thêm "${line.name}" vào danh sách đi chợ.`,
+      });
     } catch (e) {
-      setShopNotice({ tone: 'error', text: e instanceof Error ? e.message : 'Không thêm được vào đi chợ.' });
+      setShopNotice({
+        tone: "error",
+        text: e instanceof Error ? e.message : "Không thêm được vào đi chợ.",
+      });
     }
   };
 
@@ -154,14 +202,21 @@ function RecipeDetailView({
     if (!userId || !availability) return;
     setAddingMissing(true);
     try {
-      const { addIngredientLines } = await import('@/features/shopping/shoppingApi');
+      const { addIngredientLines } =
+        await import("@/features/shopping/shoppingApi");
       const lines = availability.missingOrInsufficient.map((m) => m.line);
       await addIngredientLines(supabase, userId, lines, base, servings);
-      triggerHaptic('success');
+      triggerHaptic("success");
       setShowMissingModal(false);
-      setShopNotice({ tone: 'success', text: `Đã thêm ${lines.length} nguyên liệu còn thiếu vào danh sách đi chợ.` });
+      setShopNotice({
+        tone: "success",
+        text: `Đã thêm ${lines.length} nguyên liệu còn thiếu vào danh sách đi chợ.`,
+      });
     } catch (e) {
-      setShopNotice({ tone: 'error', text: e instanceof Error ? e.message : 'Không thêm được vào đi chợ.' });
+      setShopNotice({
+        tone: "error",
+        text: e instanceof Error ? e.message : "Không thêm được vào đi chợ.",
+      });
       setShowMissingModal(false);
     } finally {
       setAddingMissing(false);
@@ -177,7 +232,9 @@ function RecipeDetailView({
   };
 
   const time = timeLabel(recipe.prepTimeMinutes, recipe.cookTimeMinutes);
-  const difficulty = recipe.difficulty ? DIFFICULTY_LABEL[recipe.difficulty] : null;
+  const difficulty = recipe.difficulty
+    ? DIFFICULTY_LABEL[recipe.difficulty]
+    : null;
   const hasStickyBar = recipe.steps.length > 0;
 
   return (
@@ -186,21 +243,32 @@ function RecipeDetailView({
         style={styles.root}
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: (hasStickyBar ? 112 : spacing.xxxl) + insets.bottom },
+          {
+            paddingBottom: (hasStickyBar ? 112 : spacing.xxxl) + insets.bottom,
+          },
         ]}
         testID="recipe-detail"
       >
         {imageUri ? (
           <View style={styles.heroWrap}>
-            <AppImage uri={imageUri} style={styles.cover} accessibilityLabel={recipe.name} />
+            <AppImage
+              uri={imageUri}
+              style={styles.cover}
+              accessibilityLabel={recipe.name}
+            />
             <LinearGradient
-              colors={[colors.scrimTop, 'transparent', colors.scrimBottom]}
+              colors={[colors.scrimTop, "transparent", colors.scrimBottom]}
               style={StyleSheet.absoluteFill}
               pointerEvents="none"
             />
           </View>
         ) : (
-          <View style={[styles.noHeroBanner, { paddingTop: insets.top + spacing.xxl }]}>
+          <View
+            style={[
+              styles.noHeroBanner,
+              { paddingTop: insets.top + spacing.xxl },
+            ]}
+          >
             <AppIcon name="restaurant-outline" size={32} tone="primary" />
           </View>
         )}
@@ -224,7 +292,11 @@ function RecipeDetailView({
           <View style={styles.overviewCard}>
             {recipe.categoryName ? (
               <View style={styles.categoryTag}>
-                <AppText variant="caption" tone="primary" style={styles.categoryTagText}>
+                <AppText
+                  variant="caption"
+                  tone="primary"
+                  style={styles.categoryTagText}
+                >
                   {recipe.categoryName}
                 </AppText>
               </View>
@@ -250,7 +322,9 @@ function RecipeDetailView({
                 ) : null}
               </View>
             ) : null}
-            {recipe.description ? <AppText>{recipe.description}</AppText> : null}
+            {recipe.description ? (
+              <AppText>{recipe.description}</AppText>
+            ) : null}
             <FavoriteButton recipeId={recipe.id} />
           </View>
 
@@ -268,14 +342,23 @@ function RecipeDetailView({
                     accessibilityLabel="Giảm khẩu phần"
                     disabled={servings <= MIN_SERVINGS}
                     onPress={() => {
-                      triggerHaptic('light');
+                      triggerHaptic("light");
                       setServings((s) => clampServings(s - 1));
                     }}
-                    style={[styles.stepBtn, servings <= MIN_SERVINGS ? styles.stepOff : null]}
+                    style={[
+                      styles.stepBtn,
+                      servings <= MIN_SERVINGS ? styles.stepOff : null,
+                    ]}
                   >
                     <AppIcon name="remove" size={18} tone="default" />
                   </Pressable>
-                  <AppText variant="heading" tabularNums accessibilityLiveRegion="polite" testID="servings-value" style={styles.servingsValue}>
+                  <AppText
+                    variant="heading"
+                    tabularNums
+                    accessibilityLiveRegion="polite"
+                    testID="servings-value"
+                    style={styles.servingsValue}
+                  >
                     {`${servings} người`}
                   </AppText>
                   <Pressable
@@ -283,10 +366,13 @@ function RecipeDetailView({
                     accessibilityLabel="Tăng khẩu phần"
                     disabled={servings >= MAX_SERVINGS}
                     onPress={() => {
-                      triggerHaptic('light');
+                      triggerHaptic("light");
                       setServings((s) => clampServings(s + 1));
                     }}
-                    style={[styles.stepBtn, servings >= MAX_SERVINGS ? styles.stepOff : null]}
+                    style={[
+                      styles.stepBtn,
+                      servings >= MAX_SERVINGS ? styles.stepOff : null,
+                    ]}
                   >
                     <AppIcon name="add" size={18} tone="default" />
                   </Pressable>
@@ -302,12 +388,19 @@ function RecipeDetailView({
                 ) : null}
               </View>
             ) : (
-              <AppText tone="muted">Chưa rõ khẩu phần gốc nên không thể điều chỉnh.</AppText>
+              <AppText tone="muted">
+                Chưa rõ khẩu phần gốc nên không thể điều chỉnh.
+              </AppText>
             )}
 
             {recipe.servingBasis || recipe.servingNote ? (
               <AppText variant="caption" tone="muted">
-                {joinMeta([recipe.servingBasis ? SERVING_BASIS_LABEL[recipe.servingBasis] : null, recipe.servingNote])}
+                {joinMeta([
+                  recipe.servingBasis
+                    ? SERVING_BASIS_LABEL[recipe.servingBasis]
+                    : null,
+                  recipe.servingNote,
+                ])}
               </AppText>
             ) : null}
 
@@ -318,7 +411,9 @@ function RecipeDetailView({
               availability={availability?.lines}
               onAddMissing={userId ? addSingleMissing : undefined}
             />
-            {shopNotice ? <Banner tone={shopNotice.tone} message={shopNotice.text} /> : null}
+            {shopNotice ? (
+              <Banner tone={shopNotice.tone} message={shopNotice.text} />
+            ) : null}
             <AddToShoppingButton recipe={recipe} servings={servings} />
           </View>
 
@@ -335,7 +430,11 @@ function RecipeDetailView({
                 {recipe.steps.map((s, idx) => {
                   const isLast = idx === recipe.steps.length - 1;
                   return (
-                    <View key={s.stepNumber} style={styles.step} testID="step-row">
+                    <View
+                      key={s.stepNumber}
+                      style={styles.step}
+                      testID="step-row"
+                    >
                       <View style={styles.stepRail}>
                         <View style={styles.badge}>
                           <AppText variant="label" tone="onPrimary" tabularNums>
@@ -348,8 +447,16 @@ function RecipeDetailView({
                         <AppText>{s.instruction}</AppText>
                         {s.timerEnabled && s.durationSeconds !== null ? (
                           <View style={styles.timerChip}>
-                            <AppIcon name="timer-outline" size={14} tone="primary" />
-                            <AppText variant="caption" tone="primary" style={styles.timerChipText}>
+                            <AppIcon
+                              name="timer-outline"
+                              size={14}
+                              tone="primary"
+                            />
+                            <AppText
+                              variant="caption"
+                              tone="primary"
+                              style={styles.timerChipText}
+                            >
                               {`Hẹn giờ ${formatSeconds(s.durationSeconds)}`}
                             </AppText>
                           </View>
@@ -397,15 +504,26 @@ function RecipeDetailView({
       </ScrollView>
 
       {hasStickyBar ? (
-        <View style={[styles.stickyBar, { paddingBottom: Math.max(spacing.md, insets.bottom) }]}>
+        <View
+          style={[
+            styles.stickyBar,
+            { paddingBottom: Math.max(spacing.md, insets.bottom) },
+          ]}
+        >
           <View style={styles.stickyMeta}>
             <AppText variant="label">{`${recipe.steps.length} bước nấu`}</AppText>
             <AppText variant="caption" tone="muted">
-              {canScale ? `Cho ${servings} người` : time ?? 'Sẵn sàng vào bếp'}
+              {canScale
+                ? `Cho ${servings} người`
+                : (time ?? "Sẵn sàng vào bếp")}
             </AppText>
           </View>
           <View style={styles.stickyAction}>
-            <Button title="Bắt đầu nấu" icon="flame-outline" onPress={handleStartCook} />
+            <Button
+              title="Bắt đầu nấu"
+              icon="flame-outline"
+              onPress={handleStartCook}
+            />
           </View>
         </View>
       ) : null}
@@ -435,14 +553,18 @@ function RecipeDetailView({
               onPress={addAllMissingAndClose}
               testID="add-missing-shopping-btn"
             />
-            <Button title="Đóng" variant="ghost" onPress={() => setShowMissingModal(false)} />
+            <Button
+              title="Đóng"
+              variant="ghost"
+              onPress={() => setShowMissingModal(false)}
+            />
           </View>
         }
       >
         <View style={styles.missingList}>
           {(availability?.missingOrInsufficient ?? []).map((m) => (
             <AppText key={m.line.sortOrder} variant="label">
-              {`• ${m.line.name}${m.status === 'insufficient' ? ' (chưa đủ lượng)' : ''}`}
+              {`• ${m.line.name}${m.status === "insufficient" ? " (chưa đủ lượng)" : ""}`}
             </AppText>
           ))}
         </View>
@@ -455,21 +577,26 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   root: { flex: 1, backgroundColor: colors.background },
   content: { gap: spacing.md },
-  heroWrap: { position: 'relative', width: '100%', aspectRatio: 16 / 10, backgroundColor: colors.surfaceMuted },
-  cover: { width: '100%', height: '100%' },
+  heroWrap: {
+    position: "relative",
+    width: "100%",
+    aspectRatio: 16 / 10,
+    backgroundColor: colors.surfaceMuted,
+  },
+  cover: { width: "100%", height: "100%" },
   noHeroBanner: {
-    width: '100%',
+    width: "100%",
     paddingBottom: spacing.xl,
     backgroundColor: colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   floatingNav: {
-    position: 'absolute',
+    position: "absolute",
     left: spacing.md,
     right: spacing.md,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     zIndex: 10,
   },
   navPill: {
@@ -477,8 +604,8 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: radius.pill,
     backgroundColor: colors.overlayChip,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     ...shadows.card,
   },
   bodyStack: {
@@ -488,7 +615,7 @@ const styles = StyleSheet.create({
   overviewCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     padding: spacing.lg,
     gap: spacing.sm,
     borderWidth: 1,
@@ -496,21 +623,21 @@ const styles = StyleSheet.create({
     ...shadows.card,
   },
   categoryTag: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     backgroundColor: colors.primarySoft,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: radius.pill,
   },
-  categoryTagText: { fontWeight: '600' },
+  categoryTagText: { fontWeight: "600" },
   metaPills: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.sm,
   },
   metaPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.xs,
     backgroundColor: colors.surfaceMuted,
     paddingHorizontal: spacing.sm,
@@ -520,7 +647,7 @@ const styles = StyleSheet.create({
   sectionCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     padding: spacing.lg,
     gap: spacing.md,
     borderWidth: 1,
@@ -528,14 +655,19 @@ const styles = StyleSheet.create({
     ...shadows.card,
   },
   sectionHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.sm,
   },
-  stepper: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
+  stepper: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    flexWrap: "wrap",
+  },
   stepperPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.sm,
     backgroundColor: colors.surfaceMuted,
     borderRadius: radius.pill,
@@ -548,24 +680,24 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   servingsValue: {
     minWidth: 74,
-    textAlign: 'center',
+    textAlign: "center",
   },
   stepOff: { opacity: 0.4 },
   timeline: { gap: spacing.xs },
-  step: { flexDirection: 'row', gap: spacing.md },
-  stepRail: { alignItems: 'center', width: 28 },
+  step: { flexDirection: "row", gap: spacing.md },
+  stepRail: { alignItems: "center", width: 28 },
   badge: {
     width: 28,
     height: 28,
     borderRadius: radius.pill,
     backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   railLine: {
     flex: 1,
@@ -575,19 +707,19 @@ const styles = StyleSheet.create({
   },
   stepBody: { flex: 1, gap: spacing.xs, paddingBottom: spacing.md },
   timerChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.xs,
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     backgroundColor: colors.primarySoft,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: radius.pill,
   },
-  timerChipText: { fontWeight: '600' },
+  timerChipText: { fontWeight: "600" },
   sourceBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: spacing.sm,
     padding: spacing.md,
     borderRadius: radius.md,
@@ -595,12 +727,12 @@ const styles = StyleSheet.create({
   },
   sourceCopy: { flex: 1, gap: spacing.xxs },
   stickyBar: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.md,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
@@ -616,7 +748,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   missingList: { gap: spacing.sm },
-  missingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  missingRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   missingName: { flex: 1 },
   modalActions: { gap: spacing.xs },
 });

@@ -1,10 +1,19 @@
-import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import type { ReactNode } from "react";
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+} from "react-native";
 
-import { colors, radius, shadows, spacing, touchTarget } from '@/theme/tokens';
+import { colors, radius, shadows, spacing, touchTarget } from "@/theme/tokens";
 
-import { AppIcon } from './AppIcon';
-import { AppText } from './AppText';
+import { AppIcon } from "./AppIcon";
+import { AppText } from "./AppText";
 
 export type BottomSheetModalProps = {
   visible: boolean;
@@ -33,12 +42,22 @@ export function BottomSheetModal({
   if (!visible) return null;
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose} testID={testID}>
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      testID={testID}
+    >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={[styles.backdrop, isWide ? styles.backdropWide : null]}
       >
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="none" />
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityRole="none"
+        />
         <View style={[styles.sheet, isWide ? styles.sheetWide : null]}>
           {!isWide ? <View style={styles.handle} /> : null}
           <View style={styles.header}>
@@ -84,33 +103,33 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: colors.backdrop,
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
   },
   backdropWide: {
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: spacing.lg,
   },
   sheet: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xl,
-    maxHeight: '88%',
+    maxHeight: "88%",
     gap: spacing.md,
     ...shadows.sheet,
   },
   sheetWide: {
-    width: '100%',
+    width: "100%",
     maxWidth: 480,
     borderRadius: radius.xl,
     paddingTop: spacing.lg,
   },
   handle: {
-    alignSelf: 'center',
+    alignSelf: "center",
     width: 40,
     height: 4,
     borderRadius: radius.pill,
@@ -118,9 +137,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xxs,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
     gap: spacing.md,
   },
   headerCopy: {
@@ -132,8 +151,8 @@ const styles = StyleSheet.create({
     height: touchTarget - 10,
     borderRadius: radius.pill,
     backgroundColor: colors.surfaceMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   body: {
     gap: spacing.md,

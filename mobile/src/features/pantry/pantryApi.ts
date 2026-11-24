@@ -1,10 +1,20 @@
 // Pantry (My Fridge) data access & domain logic.
 // Strictly uses canonical catalog ingredients (ingredients table) and unit rules
 // aligned with public.convert_pantry_qty in 20261124155148_user_pantry.sql.
-import { asDifficulty, asNumber, asText, fail, one } from '@/features/recipes/recipeApi';
-import { shownQuantity } from '@/features/recipes/servings';
-import type { IngredientLine, RecipeDetail, RecipeSummary } from '@/features/recipes/types';
-import type { YoChefClient } from '@/lib/supabase';
+import {
+  asDifficulty,
+  asNumber,
+  asText,
+  fail,
+  one,
+} from "@/features/recipes/recipeApi";
+import { shownQuantity } from "@/features/recipes/servings";
+import type {
+  IngredientLine,
+  RecipeDetail,
+  RecipeSummary,
+} from "@/features/recipes/types";
+import type { YoChefClient } from "@/lib/supabase";
 
 import {
   isMissingBackendFeature,
@@ -14,20 +24,38 @@ import {
   localMatchRecipesFromPantry,
   localRemovePantryItem,
   localUpdatePantryItem,
-} from './localPantryFallback';
+} from "./localPantryFallback";
 
-export type PantryGroup = 'meat_seafood' | 'vegetables' | 'spices' | 'dry_other';
+export type PantryGroup =
+  | "meat_seafood"
+  | "vegetables"
+  | "spices"
+  | "dry_other";
 
-export const PANTRY_GROUP_ORDER: PantryGroup[] = ['meat_seafood', 'vegetables', 'spices', 'dry_other'];
+export const PANTRY_GROUP_ORDER: PantryGroup[] = [
+  "meat_seafood",
+  "vegetables",
+  "spices",
+  "dry_other",
+];
 
 export const PANTRY_GROUP_LABEL: Record<PantryGroup, string> = {
-  meat_seafood: 'Thịt, cá & Trứng',
-  vegetables: 'Rau củ quả',
-  spices: 'Gia vị & Nước chấm',
-  dry_other: 'Đồ khô & Khác',
+  meat_seafood: "Thịt, cá & Trứng",
+  vegetables: "Rau củ quả",
+  spices: "Gia vị & Nước chấm",
+  dry_other: "Đồ khô & Khác",
 };
 
-export const FALLBACK_COMMON_UNITS = ['g', 'kg', 'ml', 'lít', 'quả', 'củ', 'gói', 'phần'] as const;
+export const FALLBACK_COMMON_UNITS = [
+  "g",
+  "kg",
+  "ml",
+  "lít",
+  "quả",
+  "củ",
+  "gói",
+  "phần",
+] as const;
 
 export type CatalogIngredient = {
   id: string;
@@ -55,7 +83,11 @@ export type PantryMatchRecipe = {
   missingCount: number;
 };
 
-export type IngredientAvailabilityStatus = 'available' | 'insufficient' | 'missing' | 'optional';
+export type IngredientAvailabilityStatus =
+  | "available"
+  | "insufficient"
+  | "missing"
+  | "optional";
 
 export type IngredientAvailability = {
   line: IngredientLine;
@@ -67,40 +99,152 @@ export type IngredientAvailability = {
 export function foldVi(text: string): string {
   return text
     .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/g, 'd')
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
     .trim();
 }
 
 const MEAT_KEYWORDS = [
-  'thit', 'bo ', 'lon ', 'heo', 'ga ', 'vit', 'ngan', 'ngong', 'de ', 'cuu', 'suon', 'ba chi',
-  'ca loc', 'ca thu', 'ca hoi', 'ca chep', 'ca ro', 'ca tre', 'ca basa', 'ca ngu', 'ca nuc', 'ca moi', 'ca phe',
-  'tom', 'cua', 'ghe', 'muc', 'bach tuoc', 'ngao', 'so ', 'oc ', 'trai',
-  'trung', 'gio ', 'cha ', 'xuc xich', 'lap xuong', 'pate', 'gan ', 'tim ', 'cat ', 'luon', 'ech',
+  "thit",
+  "bo ",
+  "lon ",
+  "heo",
+  "ga ",
+  "vit",
+  "ngan",
+  "ngong",
+  "de ",
+  "cuu",
+  "suon",
+  "ba chi",
+  "ca loc",
+  "ca thu",
+  "ca hoi",
+  "ca chep",
+  "ca ro",
+  "ca tre",
+  "ca basa",
+  "ca ngu",
+  "ca nuc",
+  "ca moi",
+  "ca phe",
+  "tom",
+  "cua",
+  "ghe",
+  "muc",
+  "bach tuoc",
+  "ngao",
+  "so ",
+  "oc ",
+  "trai",
+  "trung",
+  "gio ",
+  "cha ",
+  "xuc xich",
+  "lap xuong",
+  "pate",
+  "gan ",
+  "tim ",
+  "cat ",
+  "luon",
+  "ech",
 ];
 
 const SPICE_KEYWORDS = [
-  'muoi', 'duong', 'nuoc mam', 'mam ', 'hat nem', 'bot ngot', 'mi chinh', 'tieu', 'xi dau',
-  'nuoc tuong', 'tuong ot', 'tuong ca', 'tuong ban', 'dau an', 'dau hao', 'dau me', 'giam',
-  'sa te', 'ngu vi huong', 'bot nghe', 'bot ot', 'ot bot', 'bot cari', 'ca ri', 'hoa hoi',
-  'thao qua', 'que ', 'dinh huong', 'ruou nau', 'mat ong', 'nuoc hang', 'nuoc mau', 'chao ', 'mam tom',
+  "muoi",
+  "duong",
+  "nuoc mam",
+  "mam ",
+  "hat nem",
+  "bot ngot",
+  "mi chinh",
+  "tieu",
+  "xi dau",
+  "nuoc tuong",
+  "tuong ot",
+  "tuong ca",
+  "tuong ban",
+  "dau an",
+  "dau hao",
+  "dau me",
+  "giam",
+  "sa te",
+  "ngu vi huong",
+  "bot nghe",
+  "bot ot",
+  "ot bot",
+  "bot cari",
+  "ca ri",
+  "hoa hoi",
+  "thao qua",
+  "que ",
+  "dinh huong",
+  "ruou nau",
+  "mat ong",
+  "nuoc hang",
+  "nuoc mau",
+  "chao ",
+  "mam tom",
 ];
 
 const VEG_KEYWORDS = [
-  'rau', 'cai', 'ca chua', 'ca rot', 'ca tim', 'ca phao', 'hanh', 'toi', 'ot', 'gung', 'rieng', 'nghe',
-  'sa ', 'chanh', 'tac ', 'quat', 'khoai', 'bi ', 'bau', 'muop', 'dua', 'su hao', 'su su',
-  'mang', 'nam ', 'gia do', 'do ', 'dau bap', 'dau co ve', 'dau ha lan', 'ngo ', 'bap ',
-  'xa lach', 'hung ', 'mui ', 'tia to', 'kinh gioi', 'la lot', 'la chanh', 'me chua',
-  'khe', 'chuoi', 'thom', 'xoai', 'oi ', 'tao', 'cam ', 'buoi',
+  "rau",
+  "cai",
+  "ca chua",
+  "ca rot",
+  "ca tim",
+  "ca phao",
+  "hanh",
+  "toi",
+  "ot",
+  "gung",
+  "rieng",
+  "nghe",
+  "sa ",
+  "chanh",
+  "tac ",
+  "quat",
+  "khoai",
+  "bi ",
+  "bau",
+  "muop",
+  "dua",
+  "su hao",
+  "su su",
+  "mang",
+  "nam ",
+  "gia do",
+  "do ",
+  "dau bap",
+  "dau co ve",
+  "dau ha lan",
+  "ngo ",
+  "bap ",
+  "xa lach",
+  "hung ",
+  "mui ",
+  "tia to",
+  "kinh gioi",
+  "la lot",
+  "la chanh",
+  "me chua",
+  "khe",
+  "chuoi",
+  "thom",
+  "xoai",
+  "oi ",
+  "tao",
+  "cam ",
+  "buoi",
 ];
 
 export function classifyIngredientGroup(name: string): PantryGroup {
   const f = ` ${foldVi(name)} `;
-  if (SPICE_KEYWORDS.some((kw) => f.includes(kw))) return 'spices';
-  if (VEG_KEYWORDS.some((kw) => f.includes(kw))) return 'vegetables';
-  if (MEAT_KEYWORDS.some((kw) => f.includes(kw))) return 'meat_seafood';
-  return 'dry_other';
+  if (SPICE_KEYWORDS.some((kw) => f.includes(kw))) return "spices";
+  if (VEG_KEYWORDS.some((kw) => f.includes(kw))) return "vegetables";
+  if (MEAT_KEYWORDS.some((kw) => f.includes(kw))) return "meat_seafood";
+  return "dry_other";
 }
 
 export function availableUnitsFor(commonUnits: string[]): string[] {
@@ -109,25 +253,30 @@ export function availableUnitsFor(commonUnits: string[]): string[] {
   return unique.length > 0 ? unique : [...FALLBACK_COMMON_UNITS];
 }
 
-const UNIT_FACTORS: Record<string, { group: 'mass' | 'vol'; factor: number }> = {
-  g: { group: 'mass', factor: 1 },
-  gam: { group: 'mass', factor: 1 },
-  lạng: { group: 'mass', factor: 100 },
-  kg: { group: 'mass', factor: 1000 },
-  ml: { group: 'vol', factor: 1 },
-  l: { group: 'vol', factor: 1000 },
-  lít: { group: 'vol', factor: 1000 },
-  lit: { group: 'vol', factor: 1000 },
-  'muỗng cà phê': { group: 'vol', factor: 5 },
-  'thìa cà phê': { group: 'vol', factor: 5 },
-  'muỗng canh': { group: 'vol', factor: 15 },
-  'thìa canh': { group: 'vol', factor: 15 },
-};
+const UNIT_FACTORS: Record<string, { group: "mass" | "vol"; factor: number }> =
+  {
+    g: { group: "mass", factor: 1 },
+    gam: { group: "mass", factor: 1 },
+    lạng: { group: "mass", factor: 100 },
+    kg: { group: "mass", factor: 1000 },
+    ml: { group: "vol", factor: 1 },
+    l: { group: "vol", factor: 1000 },
+    lít: { group: "vol", factor: 1000 },
+    lit: { group: "vol", factor: 1000 },
+    "muỗng cà phê": { group: "vol", factor: 5 },
+    "thìa cà phê": { group: "vol", factor: 5 },
+    "muỗng canh": { group: "vol", factor: 15 },
+    "thìa canh": { group: "vol", factor: 15 },
+  };
 
-export function convertPantryQty(qty: number, fromUnit: string | null, toUnit: string | null): number | null {
+export function convertPantryQty(
+  qty: number,
+  fromUnit: string | null,
+  toUnit: string | null,
+): number | null {
   if (!Number.isFinite(qty) || qty <= 0) return null;
-  const f = (fromUnit ?? '').trim().toLowerCase();
-  const t = (toUnit ?? '').trim().toLowerCase();
+  const f = (fromUnit ?? "").trim().toLowerCase();
+  const t = (toUnit ?? "").trim().toLowerCase();
   if (!f || !t) return null;
   if (f === t) return qty;
   const fromDef = UNIT_FACTORS[f];
@@ -138,11 +287,13 @@ export function convertPantryQty(qty: number, fromUnit: string | null, toUnit: s
 
 function toCatalogIngredient(r: Record<string, unknown>): CatalogIngredient {
   const aliases = Array.isArray(r.aliases) ? r.aliases.map(String) : [];
-  const commonUnits = Array.isArray(r.common_units) ? r.common_units.map(String) : [];
+  const commonUnits = Array.isArray(r.common_units)
+    ? r.common_units.map(String)
+    : [];
   return {
     id: String(r.id),
     name: String(r.name),
-    slug: String(r.slug ?? ''),
+    slug: String(r.slug ?? ""),
     aliases,
     commonUnits,
   };
@@ -155,7 +306,9 @@ function toPantryItem(r: Record<string, unknown>): PantryItem | null {
   const qty = asNumber(r.quantity);
   const unit = asText(r.unit);
   if (!ingId || !name || qty === null || qty <= 0 || !unit) return null;
-  const rawUnits = Array.isArray(ing?.common_units) ? (ing.common_units as unknown[]).map(String) : [];
+  const rawUnits = Array.isArray(ing?.common_units)
+    ? (ing.common_units as unknown[]).map(String)
+    : [];
   return {
     id: String(r.id),
     ingredientId: ingId,
@@ -164,28 +317,37 @@ function toPantryItem(r: Record<string, unknown>): PantryItem | null {
     quantity: qty,
     unit,
     group: classifyIngredientGroup(name),
-    updatedAt: String(r.updated_at ?? r.created_at ?? ''),
+    updatedAt: String(r.updated_at ?? r.created_at ?? ""),
   };
 }
 
-export async function fetchCatalogIngredients(client: YoChefClient): Promise<CatalogIngredient[]> {
+export async function fetchCatalogIngredients(
+  client: YoChefClient,
+): Promise<CatalogIngredient[]> {
   const { data, error } = await client
-    .from('ingredients')
-    .select('id,name,slug,aliases,common_units')
-    .order('name', { ascending: true });
-  if (error) fail(error, 'Không tải được danh mục nguyên liệu.');
-  return ((data ?? []) as unknown as Record<string, unknown>[]).map(toCatalogIngredient);
+    .from("ingredients")
+    .select("id,name,slug,aliases,common_units")
+    .order("name", { ascending: true });
+  if (error) fail(error, "Không tải được danh mục nguyên liệu.");
+  return ((data ?? []) as unknown as Record<string, unknown>[]).map(
+    toCatalogIngredient,
+  );
 }
 
-export async function fetchPantry(client: YoChefClient, userId: string): Promise<PantryItem[]> {
+export async function fetchPantry(
+  client: YoChefClient,
+  userId: string,
+): Promise<PantryItem[]> {
   const { data, error } = await client
-    .from('user_pantry')
-    .select('id,ingredient_id,quantity,unit,updated_at,created_at,ingredient:ingredients(id,name,common_units)')
-    .eq('user_id', userId)
-    .order('updated_at', { ascending: false });
+    .from("user_pantry")
+    .select(
+      "id,ingredient_id,quantity,unit,updated_at,created_at,ingredient:ingredients(id,name,common_units)",
+    )
+    .eq("user_id", userId)
+    .order("updated_at", { ascending: false });
   if (error) {
     if (isMissingBackendFeature(error)) return localFetchPantry(userId);
-    fail(error, 'Không tải được tủ lạnh.');
+    fail(error, "Không tải được tủ lạnh.");
   }
   return ((data ?? []) as unknown as Record<string, unknown>[])
     .map(toPantryItem)
@@ -210,15 +372,16 @@ export async function addOrMergePantryItems(
     quantity: i.quantity,
     unit: i.unit.trim(),
   }));
-  const { error } = await client.rpc('add_or_merge_pantry_items', {
+  const { error } = await client.rpc("add_or_merge_pantry_items", {
     p_items: payload,
-    p_shopping_item_ids: shoppingItemIds && shoppingItemIds.length > 0 ? shoppingItemIds : null,
+    p_shopping_item_ids:
+      shoppingItemIds && shoppingItemIds.length > 0 ? shoppingItemIds : null,
   });
   if (error) {
     if (userId && isMissingBackendFeature(error)) {
       return localAddOrMergePantryItems(client, userId, items, shoppingItemIds);
     }
-    fail(error, 'Không cập nhật được tủ lạnh.');
+    fail(error, "Không cập nhật được tủ lạnh.");
   }
 }
 
@@ -229,26 +392,34 @@ export async function updatePantryItem(
   userId?: string,
 ): Promise<void> {
   const { data, error } = await client
-    .from('user_pantry')
+    .from("user_pantry")
     .update({ quantity: patch.quantity, unit: patch.unit.trim() })
-    .eq('id', pantryId)
-    .select('id');
+    .eq("id", pantryId)
+    .select("id");
   if (error) {
     if (userId && isMissingBackendFeature(error)) {
       return localUpdatePantryItem(userId, pantryId, patch);
     }
-    fail(error, 'Không cập nhật được nguyên liệu trong tủ.');
+    fail(error, "Không cập nhật được nguyên liệu trong tủ.");
   }
-  if (!data || data.length !== 1) fail(null, 'Không cập nhật được nguyên liệu trong tủ.');
+  if (!data || data.length !== 1)
+    fail(null, "Không cập nhật được nguyên liệu trong tủ.");
 }
 
-export async function removePantryItem(client: YoChefClient, pantryId: string, userId?: string): Promise<void> {
-  const { error } = await client.from('user_pantry').delete().eq('id', pantryId);
+export async function removePantryItem(
+  client: YoChefClient,
+  pantryId: string,
+  userId?: string,
+): Promise<void> {
+  const { error } = await client
+    .from("user_pantry")
+    .delete()
+    .eq("id", pantryId);
   if (error) {
     if (userId && isMissingBackendFeature(error)) {
       return localRemovePantryItem(userId, pantryId);
     }
-    fail(error, 'Không xóa được nguyên liệu khỏi tủ.');
+    fail(error, "Không xóa được nguyên liệu khỏi tủ.");
   }
 }
 
@@ -272,12 +443,14 @@ export async function deductPantryIngredients(
       unit: i.unit,
     }));
   if (payload.length === 0) return;
-  const { error } = await client.rpc('deduct_pantry_ingredients', { p_items: payload });
+  const { error } = await client.rpc("deduct_pantry_ingredients", {
+    p_items: payload,
+  });
   if (error) {
     if (userId && isMissingBackendFeature(error)) {
       return localDeductPantryIngredients(userId, items);
     }
-    fail(error, 'Không trừ được nguyên liệu trong tủ lạnh.');
+    fail(error, "Không trừ được nguyên liệu trong tủ lạnh.");
   }
 }
 
@@ -286,7 +459,7 @@ export async function matchRecipesFromPantry(
   page: { limit?: number; offset?: number } = {},
   userId?: string,
 ): Promise<{ items: PantryMatchRecipe[]; total: number }> {
-  const { data, error } = await client.rpc('match_recipes_from_pantry', {
+  const { data, error } = await client.rpc("match_recipes_from_pantry", {
     p_limit: page.limit ?? 20,
     p_offset: page.offset ?? 0,
   });
@@ -294,10 +467,11 @@ export async function matchRecipesFromPantry(
     if (userId && isMissingBackendFeature(error)) {
       return localMatchRecipesFromPantry(client, userId, page);
     }
-    fail(error, 'Không gợi ý được món ăn từ tủ lạnh.');
+    fail(error, "Không gợi ý được món ăn từ tủ lạnh.");
   }
   const rows = (data ?? []) as Record<string, unknown>[];
-  const total = rows.length > 0 ? (asNumber(rows[0].total_count) ?? rows.length) : 0;
+  const total =
+    rows.length > 0 ? (asNumber(rows[0].total_count) ?? rows.length) : 0;
   const items: PantryMatchRecipe[] = rows.map((row) => ({
     recipe: {
       id: String(row.id),
@@ -332,30 +506,46 @@ export function checkRecipeAvailability(
   for (const item of pantry) byIng.set(item.ingredientId, item);
 
   const lines: IngredientAvailability[] = recipe.ingredients.map((line) => {
-    const neededQty = shownQuantity(line.quantity, line.basis, recipe.defaultServings, servings);
-    const pantryItem = line.ingredientId ? (byIng.get(line.ingredientId) ?? null) : null;
+    const neededQty = shownQuantity(
+      line.quantity,
+      line.basis,
+      recipe.defaultServings,
+      servings,
+    );
+    const pantryItem = line.ingredientId
+      ? (byIng.get(line.ingredientId) ?? null)
+      : null;
 
     if (!pantryItem) {
       return {
         line,
-        status: line.isOptional ? 'optional' : 'missing',
+        status: line.isOptional ? "optional" : "missing",
         neededQty,
         pantryItem: null,
       };
     }
 
     if (neededQty === null) {
-      return { line, status: 'available', neededQty: null, pantryItem };
+      return { line, status: "available", neededQty: null, pantryItem };
     }
 
-    const neededInPantry = convertPantryQty(neededQty, line.unit, pantryItem.unit);
-    if (neededInPantry !== null && pantryItem.quantity + 1e-6 < neededInPantry) {
-      return { line, status: 'insufficient', neededQty, pantryItem };
+    const neededInPantry = convertPantryQty(
+      neededQty,
+      line.unit,
+      pantryItem.unit,
+    );
+    if (
+      neededInPantry !== null &&
+      pantryItem.quantity + 1e-6 < neededInPantry
+    ) {
+      return { line, status: "insufficient", neededQty, pantryItem };
     }
 
-    return { line, status: 'available', neededQty, pantryItem };
+    return { line, status: "available", neededQty, pantryItem };
   });
 
-  const missingOrInsufficient = lines.filter((x) => x.status === 'missing' || x.status === 'insufficient');
+  const missingOrInsufficient = lines.filter(
+    (x) => x.status === "missing" || x.status === "insufficient",
+  );
   return { lines, missingOrInsufficient };
 }

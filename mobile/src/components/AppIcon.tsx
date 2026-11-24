@@ -1,12 +1,21 @@
-import { Ionicons } from '@expo/vector-icons';
-import type { ComponentProps } from 'react';
-import type { StyleProp, TextStyle } from 'react-native';
+import { Ionicons } from "@expo/vector-icons";
+import type { ComponentProps } from "react";
+import type { StyleProp, TextStyle } from "react-native";
 
-import { colors } from '@/theme/tokens';
+import { colors } from "@/theme/tokens";
 
-export type IconName = ComponentProps<typeof Ionicons>['name'];
+export type IconName = ComponentProps<typeof Ionicons>["name"];
 
-export type IconTone = 'default' | 'muted' | 'primary' | 'danger' | 'success' | 'warning' | 'info' | 'star' | 'onPrimary';
+export type IconTone =
+  | "default"
+  | "muted"
+  | "primary"
+  | "danger"
+  | "success"
+  | "warning"
+  | "info"
+  | "star"
+  | "onPrimary";
 
 const TONE_COLOR: Record<IconTone, string> = {
   default: colors.text,
@@ -30,7 +39,15 @@ export type AppIconProps = {
   style?: StyleProp<TextStyle>;
 };
 
-export function AppIcon({ name, size = 20, tone = 'default', color, accessibilityLabel, testID, style }: AppIconProps) {
+export function AppIcon({
+  name,
+  size = 20,
+  tone = "default",
+  color,
+  accessibilityLabel,
+  testID,
+  style,
+}: AppIconProps) {
   return (
     <Ionicons
       name={name}

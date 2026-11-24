@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   adjustRemaining,
@@ -10,7 +10,7 @@ import {
   settle,
   start,
   type TimerState,
-} from './timer';
+} from "./timer";
 
 const TICK_MS = 250;
 type Timers = Record<number, TimerState>;
@@ -22,7 +22,11 @@ type Timers = Record<number, TimerState>;
  * The ref is the source of truth and state mirrors it for rendering, so side
  * effects (onDone) never run inside a state updater.
  */
-export function useStepTimers(onDone: (stepNumber: number) => void, now: () => number = Date.now, initial: Timers = {}) {
+export function useStepTimers(
+  onDone: (stepNumber: number) => void,
+  now: () => number = Date.now,
+  initial: Timers = {},
+) {
   const ref = useRef<Timers>(initial);
   const [timers, setTimers] = useState<Timers>(initial);
   const [clock, setClock] = useState(() => now());
@@ -62,7 +66,10 @@ export function useStepTimers(onDone: (stepNumber: number) => void, now: () => n
 
   /** Applies `fn` to one step and returns its new state (callers schedule alarms from it). */
   const update = useCallback(
-    (step: number, fn: (s: TimerState, t: number) => TimerState): TimerState => {
+    (
+      step: number,
+      fn: (s: TimerState, t: number) => TimerState,
+    ): TimerState => {
       const t = now();
       setClock(t);
       const next = fn(ref.current[step] ?? IDLE, t);
@@ -76,7 +83,8 @@ export function useStepTimers(onDone: (stepNumber: number) => void, now: () => n
     all: timers,
     clock,
     get: (step: number): TimerState => timers[step] ?? IDLE,
-    start: (step: number, durationSeconds: number) => update(step, (_s, t) => start(durationSeconds, t)),
+    start: (step: number, durationSeconds: number) =>
+      update(step, (_s, t) => start(durationSeconds, t)),
     pause: (step: number) => update(step, (s, t) => pause(s, t)),
     resume: (step: number) => update(step, (s, t) => resume(s, t)),
     reset: (step: number) => update(step, () => IDLE),

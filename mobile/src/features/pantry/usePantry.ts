@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from "react";
 
-import { RecipeError } from '@/features/recipes/recipeApi';
-import type { YoChefClient } from '@/lib/supabase';
+import { RecipeError } from "@/features/recipes/recipeApi";
+import type { YoChefClient } from "@/lib/supabase";
 
 import {
   addOrMergePantryItems,
@@ -10,11 +10,18 @@ import {
   updatePantryItem,
   type PantryEntryInput,
   type PantryItem,
-} from './pantryApi';
+} from "./pantryApi";
 
-type Result = { userId: string; attempt: number; items: PantryItem[]; error: string | null };
+type Result = {
+  userId: string;
+  attempt: number;
+  items: PantryItem[];
+  error: string | null;
+};
 const messageOf = (e: unknown) =>
-  e instanceof RecipeError || e instanceof Error ? e.message : 'Có lỗi xảy ra. Vui lòng thử lại.';
+  e instanceof RecipeError || e instanceof Error
+    ? e.message
+    : "Có lỗi xảy ra. Vui lòng thử lại.";
 
 /**
  * Signed-in user's pantry state. Reloads without flashing a spinner when returning
@@ -62,7 +69,10 @@ export function usePantry(client: YoChefClient, userId: string | null) {
     }
   };
 
-  const updateItem = async (pantryId: string, patch: { quantity: number; unit: string }): Promise<boolean> => {
+  const updateItem = async (
+    pantryId: string,
+    patch: { quantity: number; unit: string },
+  ): Promise<boolean> => {
     if (!userId) return false;
     setActionError(null);
     try {
@@ -79,12 +89,18 @@ export function usePantry(client: YoChefClient, userId: string | null) {
     if (!userId) return false;
     setActionError(null);
     const before = items;
-    setResult((prev) => (prev && prev.userId === userId ? { ...prev, items: prev.items.filter((i) => i.id !== pantryId) } : prev));
+    setResult((prev) =>
+      prev && prev.userId === userId
+        ? { ...prev, items: prev.items.filter((i) => i.id !== pantryId) }
+        : prev,
+    );
     try {
       await removePantryItem(client, pantryId, userId);
       return true;
     } catch (e) {
-      setResult((prev) => (prev && prev.userId === userId ? { ...prev, items: before } : prev));
+      setResult((prev) =>
+        prev && prev.userId === userId ? { ...prev, items: before } : prev,
+      );
       setActionError(messageOf(e));
       return false;
     }

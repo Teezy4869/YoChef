@@ -1,87 +1,100 @@
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { LinearGradient } from "expo-linear-gradient";
+import { Pressable, StyleSheet, View } from "react-native";
 
-import type { RootStackParamList } from '@/app/navigation/types';
-import { AppIcon } from '@/components/AppIcon';
-import { AppImage } from '@/components/AppImage';
-import { AppText } from '@/components/AppText';
-import { useAuth } from '@/features/auth/AuthProvider';
-import { useFavorites } from '@/features/favorites/FavoritesProvider';
-import { triggerHaptic } from '@/lib/haptics';
-import { colors, radius, shadows, spacing } from '@/theme/tokens';
+import type { RootStackParamList } from "@/app/navigation/types";
+import { AppIcon } from "@/components/AppIcon";
+import { AppImage } from "@/components/AppImage";
+import { AppText } from "@/components/AppText";
+import { useAuth } from "@/features/auth/AuthProvider";
+import { useFavorites } from "@/features/favorites/FavoritesProvider";
+import { triggerHaptic } from "@/lib/haptics";
+import { colors, radius, shadows, spacing } from "@/theme/tokens";
 
-import { joinMeta, servingsLabel, timeLabel } from './format';
-import { DIFFICULTY_LABEL, DIFFICULTY_TONE, type Difficulty, type RecipeSummary } from './types';
+import { joinMeta, servingsLabel, timeLabel } from "./format";
+import {
+  DIFFICULTY_LABEL,
+  DIFFICULTY_TONE,
+  type Difficulty,
+  type RecipeSummary,
+} from "./types";
 
 const DIFFICULTY_TRAFFIC_COLOR: Record<Difficulty, string> = {
-  easy: '#16A34A',
-  medium: '#CA8A04',
-  hard: '#DC2626',
+  easy: "#16A34A",
+  medium: "#CA8A04",
+  hard: "#DC2626",
 };
 
 const DIFFICULTY_PILL_BG: Record<Difficulty, string> = {
-  easy: '#DCFCE7',
-  medium: '#FEF9C3',
-  hard: '#FEE2E2',
+  easy: "#DCFCE7",
+  medium: "#FEF9C3",
+  hard: "#FEE2E2",
 };
 
 const DIFFICULTY_PILL_BORDER: Record<Difficulty, string> = {
-  easy: '#86EFAC',
-  medium: '#FDE047',
-  hard: '#FCA5A5',
+  easy: "#86EFAC",
+  medium: "#FDE047",
+  hard: "#FCA5A5",
 };
 
 const DIFFICULTY_TEXT_COLOR: Record<Difficulty, string> = {
-  easy: '#15803D',
-  medium: '#A16207',
-  hard: '#DC2626',
+  easy: "#15803D",
+  medium: "#A16207",
+  hard: "#DC2626",
 };
 
 export function RecipeCard({
   recipe,
   imageUri,
   pantryBadge,
-  pantryTone = 'info',
-  variant = 'default',
+  pantryTone = "info",
+  variant = "default",
   onPress,
 }: {
   recipe: RecipeSummary;
   imageUri: string | null;
   pantryBadge?: string;
-  pantryTone?: 'success' | 'info';
-  variant?: 'default' | 'compact';
+  pantryTone?: "success" | "info";
+  variant?: "default" | "compact";
   onPress: () => void;
 }) {
   const { status } = useAuth();
   const { isFavorite, toggle } = useFavorites();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const favorited = status === 'signedIn' && isFavorite(recipe.id);
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const favorited = status === "signedIn" && isFavorite(recipe.id);
 
   const time = timeLabel(recipe.prepTimeMinutes, recipe.cookTimeMinutes);
   const servings = servingsLabel(recipe.defaultServings);
-  const difficulty = recipe.difficulty ? DIFFICULTY_LABEL[recipe.difficulty] : null;
-  const difficultyTone = recipe.difficulty ? DIFFICULTY_TONE[recipe.difficulty] : null;
+  const difficulty = recipe.difficulty
+    ? DIFFICULTY_LABEL[recipe.difficulty]
+    : null;
+  const difficultyTone = recipe.difficulty
+    ? DIFFICULTY_TONE[recipe.difficulty]
+    : null;
   const meta = joinMeta([time, servings, difficulty]);
 
   const handleToggleFavorite = () => {
-    triggerHaptic('light');
-    if (status !== 'signedIn') {
-      navigation.navigate('SignIn');
+    triggerHaptic("light");
+    if (status !== "signedIn") {
+      navigation.navigate("SignIn");
       return;
     }
     void toggle(recipe.id);
   };
 
-  if (variant === 'compact') {
+  if (variant === "compact") {
     return (
       <View style={styles.cardWrap}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${recipe.name}. ${meta}`}
           onPress={onPress}
-          style={({ pressed }) => [styles.compactCard, pressed ? styles.pressed : null]}
+          style={({ pressed }) => [
+            styles.compactCard,
+            pressed ? styles.pressed : null,
+          ]}
         >
           <AppImage
             uri={imageUri}
@@ -91,25 +104,43 @@ export function RecipeCard({
             fallbackText="Chưa có ảnh"
           />
           <View style={styles.compactBody}>
-            <AppText variant="heading" numberOfLines={1} style={styles.compactTitle}>
+            <AppText
+              variant="heading"
+              numberOfLines={1}
+              style={styles.compactTitle}
+            >
               {recipe.name}
             </AppText>
             {recipe.categoryName || time ? (
               <View style={styles.compactMetaRow}>
                 {recipe.categoryName ? (
-                  <AppText variant="caption" tone="primary" numberOfLines={1} style={styles.compactCategory}>
+                  <AppText
+                    variant="caption"
+                    tone="primary"
+                    numberOfLines={1}
+                    style={styles.compactCategory}
+                  >
                     {recipe.categoryName}
                   </AppText>
                 ) : null}
                 {recipe.categoryName && time ? (
-                  <AppText variant="caption" tone="muted" style={styles.compactDot}>
+                  <AppText
+                    variant="caption"
+                    tone="muted"
+                    style={styles.compactDot}
+                  >
                     ·
                   </AppText>
                 ) : null}
                 {time ? (
                   <View style={styles.compactMetaItem}>
                     <AppIcon name="time-outline" size={12} tone="muted" />
-                    <AppText variant="caption" tone="muted" numberOfLines={1} style={styles.compactMetaText}>
+                    <AppText
+                      variant="caption"
+                      tone="muted"
+                      numberOfLines={1}
+                      style={styles.compactMetaText}
+                    >
                       {time}
                     </AppText>
                   </View>
@@ -127,8 +158,18 @@ export function RecipeCard({
                     },
                   ]}
                 >
-                  <AppIcon name="flame-outline" size={11} color={DIFFICULTY_TRAFFIC_COLOR[recipe.difficulty]} />
-                  <AppText variant="caption" style={[styles.compactDifficultyText, { color: DIFFICULTY_TEXT_COLOR[recipe.difficulty] }]}>
+                  <AppIcon
+                    name="flame-outline"
+                    size={11}
+                    color={DIFFICULTY_TRAFFIC_COLOR[recipe.difficulty]}
+                  />
+                  <AppText
+                    variant="caption"
+                    style={[
+                      styles.compactDifficultyText,
+                      { color: DIFFICULTY_TEXT_COLOR[recipe.difficulty] },
+                    ]}
+                  >
                     {difficulty}
                   </AppText>
                 </View>
@@ -140,16 +181,23 @@ export function RecipeCard({
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={favorited ? `Bỏ ${recipe.name} khỏi yêu thích` : `Lưu ${recipe.name} vào yêu thích`}
+          accessibilityLabel={
+            favorited
+              ? `Bỏ ${recipe.name} khỏi yêu thích`
+              : `Lưu ${recipe.name} vào yêu thích`
+          }
           accessibilityState={{ selected: favorited }}
           onPress={handleToggleFavorite}
           hitSlop={6}
-          style={({ pressed }) => [styles.compactFavBtn, pressed ? styles.favPressed : null]}
+          style={({ pressed }) => [
+            styles.compactFavBtn,
+            pressed ? styles.favPressed : null,
+          ]}
         >
           <AppIcon
-            name={favorited ? 'heart' : 'heart-outline'}
+            name={favorited ? "heart" : "heart-outline"}
             size={18}
-            tone={favorited ? 'primary' : 'default'}
+            tone={favorited ? "primary" : "default"}
           />
         </Pressable>
       </View>
@@ -174,7 +222,11 @@ export function RecipeCard({
           />
           {imageUri ? (
             <LinearGradient
-              colors={['rgba(31,26,23,0.08)', 'transparent', 'rgba(31,26,23,0.45)']}
+              colors={[
+                "rgba(31,26,23,0.08)",
+                "transparent",
+                "rgba(31,26,23,0.45)",
+              ]}
               style={StyleSheet.absoluteFill}
               pointerEvents="none"
             />
@@ -213,10 +265,17 @@ export function RecipeCard({
               ) : null}
               {difficulty && recipe.difficulty ? (
                 <View style={styles.metaChip}>
-                  <AppIcon name="flame-outline" size={14} color={DIFFICULTY_TRAFFIC_COLOR[recipe.difficulty]} />
+                  <AppIcon
+                    name="flame-outline"
+                    size={14}
+                    color={DIFFICULTY_TRAFFIC_COLOR[recipe.difficulty]}
+                  />
                   <AppText
                     variant="caption"
-                    style={[styles.difficultyText, { color: DIFFICULTY_TRAFFIC_COLOR[recipe.difficulty] }]}
+                    style={[
+                      styles.difficultyText,
+                      { color: DIFFICULTY_TRAFFIC_COLOR[recipe.difficulty] },
+                    ]}
                   >
                     {difficulty}
                   </AppText>
@@ -226,13 +285,27 @@ export function RecipeCard({
           ) : null}
 
           {pantryBadge ? (
-            <View style={[styles.badge, pantryTone === 'success' ? styles.badgeSuccess : styles.badgeInfo]}>
+            <View
+              style={[
+                styles.badge,
+                pantryTone === "success"
+                  ? styles.badgeSuccess
+                  : styles.badgeInfo,
+              ]}
+            >
               <AppIcon
-                name={pantryTone === 'success' ? 'checkmark-circle' : 'basket-outline'}
+                name={
+                  pantryTone === "success"
+                    ? "checkmark-circle"
+                    : "basket-outline"
+                }
                 size={14}
-                tone={pantryTone === 'success' ? 'success' : 'primary'}
+                tone={pantryTone === "success" ? "success" : "primary"}
               />
-              <AppText variant="caption" tone={pantryTone === 'success' ? 'success' : 'primary'}>
+              <AppText
+                variant="caption"
+                tone={pantryTone === "success" ? "success" : "primary"}
+              >
                 {pantryBadge}
               </AppText>
             </View>
@@ -242,16 +315,23 @@ export function RecipeCard({
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={favorited ? `Bỏ ${recipe.name} khỏi yêu thích` : `Lưu ${recipe.name} vào yêu thích`}
+        accessibilityLabel={
+          favorited
+            ? `Bỏ ${recipe.name} khỏi yêu thích`
+            : `Lưu ${recipe.name} vào yêu thích`
+        }
         accessibilityState={{ selected: favorited }}
         onPress={handleToggleFavorite}
         hitSlop={6}
-        style={({ pressed }) => [styles.favBtn, pressed ? styles.favPressed : null]}
+        style={({ pressed }) => [
+          styles.favBtn,
+          pressed ? styles.favPressed : null,
+        ]}
       >
         <AppIcon
-          name={favorited ? 'heart' : 'heart-outline'}
+          name={favorited ? "heart" : "heart-outline"}
           size={19}
-          tone={favorited ? 'primary' : 'default'}
+          tone={favorited ? "primary" : "default"}
         />
       </Pressable>
     </View>
@@ -260,15 +340,15 @@ export function RecipeCard({
 
 const styles = StyleSheet.create({
   cardWrap: {
-    position: 'relative',
+    position: "relative",
   },
   card: {
     borderRadius: radius.lg,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    overflow: 'hidden',
+    overflow: "hidden",
     ...shadows.card,
   },
   pressed: {
@@ -276,17 +356,17 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.992 }],
   },
   mediaWrap: {
-    position: 'relative',
-    width: '100%',
+    position: "relative",
+    width: "100%",
     aspectRatio: 16 / 7.5,
     backgroundColor: colors.surfaceMuted,
   },
   image: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   categoryPill: {
-    position: 'absolute',
+    position: "absolute",
     left: spacing.sm,
     bottom: spacing.sm,
     backgroundColor: colors.overlayChip,
@@ -295,19 +375,19 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   categoryText: {
-    fontWeight: '600',
+    fontWeight: "600",
     color: colors.text,
   },
   favBtn: {
-    position: 'absolute',
+    position: "absolute",
     top: spacing.sm,
     right: spacing.sm,
     width: 38,
     height: 38,
     borderRadius: radius.pill,
     backgroundColor: colors.overlayChip,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     ...shadows.card,
   },
   favPressed: {
@@ -323,12 +403,12 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   compactCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.sm,
     padding: spacing.xs,
     borderRadius: radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -343,20 +423,20 @@ const styles = StyleSheet.create({
   compactBody: {
     flex: 1,
     gap: 3,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   compactTitle: {
     fontSize: 15,
     lineHeight: 20,
   },
   compactMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.xs,
   },
   compactMetaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 3,
   },
   compactDot: {
@@ -366,7 +446,7 @@ const styles = StyleSheet.create({
   compactCategory: {
     fontSize: 12,
     lineHeight: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     flexShrink: 1,
   },
   compactMetaText: {
@@ -374,13 +454,13 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   compactDifficultyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 1,
   },
   compactDifficultyPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 3,
     backgroundColor: colors.primarySoft,
     borderWidth: 1,
@@ -391,42 +471,42 @@ const styles = StyleSheet.create({
   compactDifficultyText: {
     fontSize: 11,
     lineHeight: 15,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   compactFavSpacer: {
     width: 36,
   },
   compactFavBtn: {
-    position: 'absolute',
+    position: "absolute",
     right: spacing.xs,
-    top: '50%',
+    top: "50%",
     marginTop: -18,
     width: 36,
     height: 36,
     borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   metaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
     gap: spacing.md,
     marginTop: spacing.xxs,
   },
   metaChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.xs,
   },
   difficultyText: {
-    fontWeight: '600',
+    fontWeight: "600",
   },
   badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.xs,
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: radius.sm,

@@ -1,8 +1,16 @@
-import { Text, type TextProps } from 'react-native';
+import { Text, type TextProps } from "react-native";
 
-import { colors, typography, type TextVariant } from '@/theme/tokens';
+import { colors, typography, type TextVariant } from "@/theme/tokens";
 
-type Tone = 'default' | 'muted' | 'primary' | 'danger' | 'success' | 'warning' | 'info' | 'onPrimary';
+type Tone =
+  | "default"
+  | "muted"
+  | "primary"
+  | "danger"
+  | "success"
+  | "warning"
+  | "info"
+  | "onPrimary";
 
 const toneColor: Record<Tone, string> = {
   default: colors.text,
@@ -18,12 +26,22 @@ const toneColor: Record<Tone, string> = {
 export type AppTextProps = TextProps & {
   variant?: TextVariant;
   tone?: Tone;
-  align?: 'auto' | 'left' | 'center' | 'right';
+  align?: "auto" | "left" | "center" | "right";
   tabularNums?: boolean;
 };
 
-export function AppText({ variant = 'body', tone = 'default', align, tabularNums = false, style, ...rest }: AppTextProps) {
-  const role = variant === 'display' || variant === 'title' || variant === 'heading' ? 'header' : undefined;
+export function AppText({
+  variant = "body",
+  tone = "default",
+  align,
+  tabularNums = false,
+  style,
+  ...rest
+}: AppTextProps) {
+  const role =
+    variant === "display" || variant === "title" || variant === "heading"
+      ? "header"
+      : undefined;
   return (
     <Text
       accessibilityRole={role}
@@ -32,7 +50,7 @@ export function AppText({ variant = 'body', tone = 'default', align, tabularNums
         typography[variant],
         { color: toneColor[tone] },
         align ? { textAlign: align } : null,
-        tabularNums ? { fontVariant: ['tabular-nums'] } : null,
+        tabularNums ? { fontVariant: ["tabular-nums"] } : null,
         style,
       ]}
     />

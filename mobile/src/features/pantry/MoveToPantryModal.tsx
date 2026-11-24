@@ -1,18 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useState } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
 
-import { AppIcon } from '@/components/AppIcon';
-import { AppText } from '@/components/AppText';
-import { Banner } from '@/components/Banner';
-import { BottomSheetModal } from '@/components/BottomSheetModal';
-import { Button } from '@/components/Button';
-import { Chip } from '@/components/Chip';
-import { TextField } from '@/components/TextField';
-import { useAuth } from '@/features/auth/AuthProvider';
-import type { ShoppingItem } from '@/features/shopping/shoppingApi';
-import { triggerHaptic } from '@/lib/haptics';
-import { useSupabase } from '@/lib/supabase';
-import { colors, radius, spacing, touchTarget } from '@/theme/tokens';
+import { AppIcon } from "@/components/AppIcon";
+import { AppText } from "@/components/AppText";
+import { Banner } from "@/components/Banner";
+import { BottomSheetModal } from "@/components/BottomSheetModal";
+import { Button } from "@/components/Button";
+import { Chip } from "@/components/Chip";
+import { TextField } from "@/components/TextField";
+import { useAuth } from "@/features/auth/AuthProvider";
+import type { ShoppingItem } from "@/features/shopping/shoppingApi";
+import { triggerHaptic } from "@/lib/haptics";
+import { useSupabase } from "@/lib/supabase";
+import { colors, radius, spacing, touchTarget } from "@/theme/tokens";
 
 import {
   addOrMergePantryItems,
@@ -20,7 +20,7 @@ import {
   fetchCatalogIngredients,
   foldVi,
   type CatalogIngredient,
-} from './pantryApi';
+} from "./pantryApi";
 
 type DraftRow = {
   shoppingItemId: string;
@@ -69,12 +69,18 @@ export function MoveToPantryModal({
               rows.find((c) => foldVi(c.name) === foldVi(item.label)) ??
               null;
             const units = matched ? availableUnitsFor(matched.commonUnits) : [];
-            const defaultUnit = item.unit && units.includes(item.unit) ? item.unit : (units[0] ?? item.unit ?? 'g');
+            const defaultUnit =
+              item.unit && units.includes(item.unit)
+                ? item.unit
+                : (units[0] ?? item.unit ?? "g");
             return {
               shoppingItemId: item.id,
               label: item.label,
               ingredient: matched,
-              qtyText: item.quantity !== null ? String(item.quantity).replace('.', ',') : '1',
+              qtyText:
+                item.quantity !== null
+                  ? String(item.quantity).replace(".", ",")
+                  : "1",
               unit: defaultUnit,
               query: matched ? matched.name : item.label,
             };
@@ -88,10 +94,19 @@ export function MoveToPantryModal({
             shoppingItemId: item.id,
             label: item.label,
             ingredient: item.ingredientId
-              ? { id: item.ingredientId, name: item.label, slug: '', aliases: [], commonUnits: item.unit ? [item.unit] : [] }
+              ? {
+                  id: item.ingredientId,
+                  name: item.label,
+                  slug: "",
+                  aliases: [],
+                  commonUnits: item.unit ? [item.unit] : [],
+                }
               : null,
-            qtyText: item.quantity !== null ? String(item.quantity).replace('.', ',') : '1',
-            unit: item.unit ?? 'g',
+            qtyText:
+              item.quantity !== null
+                ? String(item.quantity).replace(".", ",")
+                : "1",
+            unit: item.unit ?? "g",
             query: item.label,
           })),
         );
@@ -105,14 +120,17 @@ export function MoveToPantryModal({
   const byIdQuery = useMemo(() => catalog, [catalog]);
 
   const updateDraft = (id: string, patch: Partial<DraftRow>) => {
-    setDrafts((prev) => prev.map((d) => (d.shoppingItemId === id ? { ...d, ...patch } : d)));
+    setDrafts((prev) =>
+      prev.map((d) => (d.shoppingItemId === id ? { ...d, ...patch } : d)),
+    );
   };
 
   if (!visible) return null;
 
   const confirm = async () => {
     if (drafts.length === 0) return;
-    const entries: { ingredientId: string; quantity: number; unit: string }[] = [];
+    const entries: { ingredientId: string; quantity: number; unit: string }[] =
+      [];
     const shoppingIds: string[] = [];
 
     for (const d of drafts) {
@@ -120,7 +138,7 @@ export function MoveToPantryModal({
         setError(`Vui lòng chọn nguyên liệu chuẩn cho "${d.label}".`);
         return;
       }
-      const q = Number(d.qtyText.trim().replace(',', '.'));
+      const q = Number(d.qtyText.trim().replace(",", "."));
       if (!Number.isFinite(q) || q <= 0) {
         setError(`Số lượng của "${d.ingredient.name}" phải lớn hơn 0.`);
         return;
@@ -129,18 +147,29 @@ export function MoveToPantryModal({
         setError(`Vui lòng chọn đơn vị cho "${d.ingredient.name}".`);
         return;
       }
-      entries.push({ ingredientId: d.ingredient.id, quantity: q, unit: d.unit });
+      entries.push({
+        ingredientId: d.ingredient.id,
+        quantity: q,
+        unit: d.unit,
+      });
       shoppingIds.push(d.shoppingItemId);
     }
 
     setError(null);
     setSaving(true);
     try {
-      await addOrMergePantryItems(supabase, entries, shoppingIds, session?.user.id);
-      triggerHaptic('success');
+      await addOrMergePantryItems(
+        supabase,
+        entries,
+        shoppingIds,
+        session?.user.id,
+      );
+      triggerHaptic("success");
       onMoved();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không thể cất đồ vào tủ lạnh.');
+      setError(
+        e instanceof Error ? e.message : "Không thể cất đồ vào tủ lạnh.",
+      );
     } finally {
       setSaving(false);
     }
@@ -163,16 +192,26 @@ export function MoveToPantryModal({
             loading={saving}
             testID="confirm-move-pantry-btn"
           />
-          <Button title="Hủy" variant="ghost" onPress={onClose} disabled={saving} />
+          <Button
+            title="Hủy"
+            variant="ghost"
+            onPress={onClose}
+            disabled={saving}
+          />
         </View>
       }
     >
       <View style={styles.list}>
         {drafts.map((d) => {
-          const suggestions = !d.ingredient && d.query.trim()
-            ? byIdQuery.filter((c) => foldVi(c.name).includes(foldVi(d.query))).slice(0, 5)
+          const suggestions =
+            !d.ingredient && d.query.trim()
+              ? byIdQuery
+                  .filter((c) => foldVi(c.name).includes(foldVi(d.query)))
+                  .slice(0, 5)
+              : [];
+          const units = d.ingredient
+            ? availableUnitsFor(d.ingredient.commonUnits)
             : [];
-          const units = d.ingredient ? availableUnitsFor(d.ingredient.commonUnits) : [];
 
           return (
             <View key={d.shoppingItemId} style={styles.rowBox}>
@@ -183,7 +222,12 @@ export function MoveToPantryModal({
                   <TextField
                     label="Khớp nguyên liệu chuẩn"
                     value={d.query}
-                    onChangeText={(text) => updateDraft(d.shoppingItemId, { query: text, ingredient: null })}
+                    onChangeText={(text) =>
+                      updateDraft(d.shoppingItemId, {
+                        query: text,
+                        ingredient: null,
+                      })
+                    }
                     placeholder="Gõ để chọn nguyên liệu chuẩn..."
                   />
                   {suggestions.map((ing) => (
@@ -201,7 +245,11 @@ export function MoveToPantryModal({
                       style={styles.suggestion}
                     >
                       <AppText>{ing.name}</AppText>
-                      <AppIcon name="checkmark-circle-outline" size={18} tone="primary" />
+                      <AppIcon
+                        name="checkmark-circle-outline"
+                        size={18}
+                        tone="primary"
+                      />
                     </Pressable>
                   ))}
                 </View>
@@ -210,7 +258,9 @@ export function MoveToPantryModal({
                   <TextField
                     label="Số lượng"
                     value={d.qtyText}
-                    onChangeText={(text) => updateDraft(d.shoppingItemId, { qtyText: text })}
+                    onChangeText={(text) =>
+                      updateDraft(d.shoppingItemId, { qtyText: text })
+                    }
                     keyboardType="decimal-pad"
                   />
                   <View style={styles.chips}>
@@ -219,7 +269,9 @@ export function MoveToPantryModal({
                         key={u}
                         label={u}
                         selected={d.unit === u}
-                        onPress={() => updateDraft(d.shoppingItemId, { unit: u })}
+                        onPress={() =>
+                          updateDraft(d.shoppingItemId, { unit: u })
+                        }
                       />
                     ))}
                   </View>
@@ -238,7 +290,7 @@ const styles = StyleSheet.create({
   rowBox: {
     padding: spacing.md,
     borderRadius: radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.background,
@@ -247,15 +299,15 @@ const styles = StyleSheet.create({
   matchBox: { gap: spacing.xs },
   suggestion: {
     minHeight: touchTarget - 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: spacing.sm,
     backgroundColor: colors.surface,
     borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
   actions: { gap: spacing.xs },
 });

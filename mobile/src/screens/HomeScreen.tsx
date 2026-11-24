@@ -1,40 +1,59 @@
-import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import type { MainTabScreenProps } from '@/app/navigation/types';
-import { AppIcon } from '@/components/AppIcon';
-import { AppText } from '@/components/AppText';
-import { Banner } from '@/components/Banner';
-import { Button } from '@/components/Button';
-import { Chip } from '@/components/Chip';
-import { EmptyState } from '@/components/EmptyState';
-import { RecipeListSkeleton } from '@/components/Skeleton';
-import { useAuth } from '@/features/auth/AuthProvider';
-import { matchRecipesFromPantry, type PantryMatchRecipe } from '@/features/pantry/pantryApi';
-import { coverUrl, fetchCategories } from '@/features/recipes/recipeApi';
-import { RecipeCard } from '@/features/recipes/RecipeCard';
+import type { MainTabScreenProps } from "@/app/navigation/types";
+import { AppIcon } from "@/components/AppIcon";
+import { AppText } from "@/components/AppText";
+import { Banner } from "@/components/Banner";
+import { Button } from "@/components/Button";
+import { Chip } from "@/components/Chip";
+import { EmptyState } from "@/components/EmptyState";
+import { RecipeListSkeleton } from "@/components/Skeleton";
+import { useAuth } from "@/features/auth/AuthProvider";
+import {
+  matchRecipesFromPantry,
+  type PantryMatchRecipe,
+} from "@/features/pantry/pantryApi";
+import { coverUrl, fetchCategories } from "@/features/recipes/recipeApi";
+import { RecipeCard } from "@/features/recipes/RecipeCard";
 import {
   DIFFICULTY_LABEL,
   EMPTY_FILTERS,
   type Category,
   type Difficulty,
   type SearchFilters,
-} from '@/features/recipes/types';
-import { useRecipeSearch } from '@/features/recipes/useRecipeSearch';
-import { useSupabase } from '@/lib/supabase';
-import { useDebouncedValue } from '@/lib/useDebouncedValue';
-import { colors, radius, shadows, spacing, touchTarget, typography } from '@/theme/tokens';
+} from "@/features/recipes/types";
+import { useRecipeSearch } from "@/features/recipes/useRecipeSearch";
+import { useSupabase } from "@/lib/supabase";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
+import {
+  colors,
+  radius,
+  shadows,
+  spacing,
+  touchTarget,
+  typography,
+} from "@/theme/tokens";
 
-const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard'];
+const DIFFICULTIES: Difficulty[] = ["easy", "medium", "hard"];
 const TIME_OPTIONS = [30, 60];
 export const SEARCH_DEBOUNCE_MS = 350;
 
-export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
+export function HomeScreen({ navigation }: MainTabScreenProps<"Home">) {
   const supabase = useSupabase();
   const { status, session } = useAuth();
-  const signedIn = status === 'signedIn';
+  const signedIn = status === "signedIn";
   const userId = signedIn && session ? session.user.id : undefined;
 
   const [filters, setFilters] = useState<SearchFilters>(EMPTY_FILTERS);
@@ -52,7 +71,10 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
 
   // Typing is debounced; chips apply at once.
   const debouncedQuery = useDebouncedValue(filters.query, SEARCH_DEBOUNCE_MS);
-  const effective = useMemo(() => ({ ...filters, query: debouncedQuery }), [filters, debouncedQuery]);
+  const effective = useMemo(
+    () => ({ ...filters, query: debouncedQuery }),
+    [filters, debouncedQuery],
+  );
   const search = useRecipeSearch(supabase, effective);
 
   // Categories are a convenience: if they fail to load, search still works.
@@ -73,18 +95,26 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
     }, [pantryOnly]),
   );
 
-  const pantryKey = `${signedIn ? '1' : '0'}:${pantryReloadTick}`;
+  const pantryKey = `${signedIn ? "1" : "0"}:${pantryReloadTick}`;
 
   useEffect(() => {
     if (!pantryOnly) return;
     let active = true;
     matchRecipesFromPantry(supabase, { limit: 40, offset: 0 }, userId).then(
-      (res) => active && setPantryResult({ key: pantryKey, error: null, items: res.items, total: res.total }),
+      (res) =>
+        active &&
+        setPantryResult({
+          key: pantryKey,
+          error: null,
+          items: res.items,
+          total: res.total,
+        }),
       (e: unknown) =>
         active &&
         setPantryResult({
           key: pantryKey,
-          error: e instanceof Error ? e.message : 'Không gợi ý được món từ tủ lạnh.',
+          error:
+            e instanceof Error ? e.message : "Không gợi ý được món từ tủ lạnh.",
           items: [],
           total: 0,
         }),
@@ -94,7 +124,8 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
     };
   }, [supabase, pantryOnly, pantryKey, userId]);
 
-  const currentPantry = pantryOnly && pantryResult?.key === pantryKey ? pantryResult : null;
+  const currentPantry =
+    pantryOnly && pantryResult?.key === pantryKey ? pantryResult : null;
   const pantryState = {
     loading: pantryOnly && currentPantry === null,
     error: currentPantry?.error ?? null,
@@ -108,7 +139,10 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
   };
 
   const hasFilters =
-    filters.query.trim() !== '' || filters.categorySlug !== null || filters.difficulty !== null || filters.maxTotalMinutes !== null;
+    filters.query.trim() !== "" ||
+    filters.categorySlug !== null ||
+    filters.difficulty !== null ||
+    filters.maxTotalMinutes !== null;
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -148,7 +182,7 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Xóa từ khóa"
-            onPress={() => set({ query: '' })}
+            onPress={() => set({ query: "" })}
             hitSlop={6}
             style={styles.clearBtn}
           >
@@ -162,7 +196,11 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
   const filterHeader = (
     <View style={styles.filterBlock}>
       {categories.length > 0 || signedIn ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chips}
+        >
           {categories.length > 0 ? (
             <Chip
               label="Tất cả"
@@ -186,20 +224,30 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
               key={c.slug}
               label={c.name}
               selected={!pantryOnly && filters.categorySlug === c.slug}
-              onPress={() => set({ categorySlug: filters.categorySlug === c.slug ? null : c.slug })}
+              onPress={() =>
+                set({
+                  categorySlug: filters.categorySlug === c.slug ? null : c.slug,
+                })
+              }
             />
           ))}
         </ScrollView>
       ) : null}
 
       {!pantryOnly ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chips}
+        >
           {DIFFICULTIES.map((d) => (
             <Chip
               key={d}
               label={DIFFICULTY_LABEL[d]}
               selected={filters.difficulty === d}
-              onPress={() => set({ difficulty: filters.difficulty === d ? null : d })}
+              onPress={() =>
+                set({ difficulty: filters.difficulty === d ? null : d })
+              }
             />
           ))}
           {TIME_OPTIONS.map((m) => (
@@ -208,7 +256,11 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
               label={`Dưới ${m} phút`}
               icon="time-outline"
               selected={filters.maxTotalMinutes === m}
-              onPress={() => set({ maxTotalMinutes: filters.maxTotalMinutes === m ? null : m })}
+              onPress={() =>
+                set({
+                  maxTotalMinutes: filters.maxTotalMinutes === m ? null : m,
+                })
+              }
             />
           ))}
         </ScrollView>
@@ -217,15 +269,29 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
       <View style={styles.statusRow}>
         {pantryOnly ? (
           !pantryState.loading && !pantryState.error ? (
-            <AppText variant="caption" tone="muted" accessibilityLiveRegion="polite" testID="pantry-match-count">
+            <AppText
+              variant="caption"
+              tone="muted"
+              accessibilityLiveRegion="polite"
+              testID="pantry-match-count"
+            >
               {`${pantryState.total} món gợi ý từ tủ lạnh của bạn`}
             </AppText>
-          ) : <View />
+          ) : (
+            <View />
+          )
         ) : !search.loading && !search.error ? (
-          <AppText variant="caption" tone="muted" accessibilityLiveRegion="polite" testID="result-count">
+          <AppText
+            variant="caption"
+            tone="muted"
+            accessibilityLiveRegion="polite"
+            testID="result-count"
+          >
             {search.total} công thức
           </AppText>
-        ) : <View />}
+        ) : (
+          <View />
+        )}
 
         {hasFilters && !pantryOnly ? (
           <Pressable
@@ -254,20 +320,32 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
       );
     } else if (pantryState.error) {
       body = (
-        <ScrollView contentContainerStyle={styles.scrollFallback} testID="pantry-match-error">
+        <ScrollView
+          contentContainerStyle={styles.scrollFallback}
+          testID="pantry-match-error"
+        >
           {filterHeader}
           <EmptyState
             icon="alert-circle-outline"
             tone="danger"
             title="Không gợi ý được món từ tủ lạnh"
             message={pantryState.error}
-            action={<Button title="Thử lại" icon="refresh" onPress={() => setPantryReloadTick((n) => n + 1)} />}
+            action={
+              <Button
+                title="Thử lại"
+                icon="refresh"
+                onPress={() => setPantryReloadTick((n) => n + 1)}
+              />
+            }
           />
         </ScrollView>
       );
     } else if (pantryState.items.length === 0) {
       body = (
-        <ScrollView contentContainerStyle={styles.scrollFallback} testID="pantry-match-empty">
+        <ScrollView
+          contentContainerStyle={styles.scrollFallback}
+          testID="pantry-match-empty"
+        >
           {filterHeader}
           <EmptyState
             icon="snow-outline"
@@ -290,18 +368,26 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
           keyExtractor={(m) => m.recipe.id}
           ListHeaderComponent={filterHeader}
           contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+            />
+          }
           renderItem={({ item }) => (
             <RecipeCard
               recipe={item.recipe}
               imageUri={coverUrl(supabase, item.recipe.coverImagePath)}
               pantryBadge={
                 item.missingCount === 0
-                  ? 'Đủ nguyên liệu'
+                  ? "Đủ nguyên liệu"
                   : `Có ${item.matchedCount}/${item.requiredCount} · Thiếu ${item.missingCount} món`
               }
-              pantryTone={item.missingCount === 0 ? 'success' : 'info'}
-              onPress={() => navigation.navigate('RecipeDetail', { slug: item.recipe.slug })}
+              pantryTone={item.missingCount === 0 ? "success" : "info"}
+              onPress={() =>
+                navigation.navigate("RecipeDetail", { slug: item.recipe.slug })
+              }
             />
           )}
         />
@@ -316,20 +402,28 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
     );
   } else if (search.error) {
     body = (
-      <ScrollView contentContainerStyle={styles.scrollFallback} testID="recipes-error">
+      <ScrollView
+        contentContainerStyle={styles.scrollFallback}
+        testID="recipes-error"
+      >
         {filterHeader}
         <EmptyState
           icon="cloud-offline-outline"
           tone="danger"
           title="Không tải được công thức"
           message={search.error}
-          action={<Button title="Thử lại" icon="refresh" onPress={search.retry} />}
+          action={
+            <Button title="Thử lại" icon="refresh" onPress={search.retry} />
+          }
         />
       </ScrollView>
     );
   } else if (search.items.length === 0) {
     body = (
-      <ScrollView contentContainerStyle={styles.scrollFallback} testID="recipes-empty">
+      <ScrollView
+        contentContainerStyle={styles.scrollFallback}
+        testID="recipes-empty"
+      >
         {filterHeader}
         <EmptyState
           icon="search-outline"
@@ -338,7 +432,11 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
           message="Thử bỏ dấu, đổi từ khóa hoặc bỏ bớt bộ lọc."
           action={
             hasFilters ? (
-              <Button title="Xóa bộ lọc" variant="secondary" onPress={() => setFilters(EMPTY_FILTERS)} />
+              <Button
+                title="Xóa bộ lọc"
+                variant="secondary"
+                onPress={() => setFilters(EMPTY_FILTERS)}
+              />
             ) : undefined
           }
         />
@@ -352,23 +450,39 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
         ListHeaderComponent={filterHeader}
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.primary}
+          />
+        }
         renderItem={({ item }) => (
           <RecipeCard
             recipe={item}
             imageUri={coverUrl(supabase, item.coverImagePath)}
-            onPress={() => navigation.navigate('RecipeDetail', { slug: item.slug })}
+            onPress={() =>
+              navigation.navigate("RecipeDetail", { slug: item.slug })
+            }
           />
         )}
         onEndReached={search.loadMore}
         onEndReachedThreshold={0.5}
         ListFooterComponent={
           search.loadingMore ? (
-            <ActivityIndicator color={colors.primary} style={styles.footer} accessibilityLabel="Đang tải thêm" />
+            <ActivityIndicator
+              color={colors.primary}
+              style={styles.footer}
+              accessibilityLabel="Đang tải thêm"
+            />
           ) : search.moreError ? (
             <View style={styles.footer}>
               <Banner tone="error" message={search.moreError} />
-              <Button title="Tải thêm" variant="secondary" onPress={search.loadMore} />
+              <Button
+                title="Tải thêm"
+                variant="secondary"
+                onPress={search.loadMore}
+              />
             </View>
           ) : undefined
         }
@@ -377,7 +491,7 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
   }
 
   return (
-    <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.root} edges={["top", "left", "right"]}>
       {topSearchBar}
       {body}
     </SafeAreaView>
@@ -396,16 +510,16 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   brandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   brandCopy: {
     gap: spacing.xxs,
   },
   searchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.sm,
     minHeight: touchTarget,
     borderWidth: 1,
@@ -430,15 +544,19 @@ const styles = StyleSheet.create({
   },
   chips: { gap: spacing.sm, paddingVertical: spacing.xs },
   statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingTop: spacing.xxs,
   },
   resetLink: {
     paddingVertical: spacing.xxs,
   },
-  list: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.sm },
+  list: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+  },
   scrollFallback: { flexGrow: 1, padding: spacing.lg, gap: spacing.md },
   footer: { paddingVertical: spacing.lg, gap: spacing.md },
 });

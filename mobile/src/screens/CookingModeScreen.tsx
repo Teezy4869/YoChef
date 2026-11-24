@@ -1,42 +1,70 @@
-import { useAudioPlayer } from 'expo-audio';
-import { useKeepAwake } from 'expo-keep-awake';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Vibration, View } from 'react-native';
+import { useAudioPlayer } from "expo-audio";
+import { useKeepAwake } from "expo-keep-awake";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Vibration,
+  View,
+} from "react-native";
 
-import type { RootStackScreenProps } from '@/app/navigation/types';
-import { AppIcon } from '@/components/AppIcon';
-import { AppText } from '@/components/AppText';
-import { BottomSheetModal } from '@/components/BottomSheetModal';
-import { Button } from '@/components/Button';
-import { Chip } from '@/components/Chip';
-import { EmptyState } from '@/components/EmptyState';
-import { Screen } from '@/components/Screen';
-import { useAuth } from '@/features/auth/AuthProvider';
-import { DeductPantryModal } from '@/features/pantry/DeductPantryModal';
-import { usePantry } from '@/features/pantry/usePantry';
-import { clearSession, FRESH_SESSION, loadSession, saveSession, type CookingSession } from '@/features/recipes/cookingSession';
-import { formatClock, formatSeconds } from '@/features/recipes/format';
-import { IngredientRows } from '@/features/recipes/IngredientRows';
-import { clampServings } from '@/features/recipes/servings';
-import { MAX_TIMER_SECONDS, MIN_TIMER_SECONDS, remainingSeconds } from '@/features/recipes/timer';
-import { TimerEditModal } from '@/features/recipes/TimerEditModal';
-import type { RecipeDetail } from '@/features/recipes/types';
-import { useRecipeDetail } from '@/features/recipes/useRecipeDetail';
-import { useStepTimers } from '@/features/recipes/useStepTimers';
-import { triggerHaptic } from '@/lib/haptics';
-import { useSupabase } from '@/lib/supabase';
-import { colors, radius, shadows, spacing } from '@/theme/tokens';
+import type { RootStackScreenProps } from "@/app/navigation/types";
+import { AppIcon } from "@/components/AppIcon";
+import { AppText } from "@/components/AppText";
+import { BottomSheetModal } from "@/components/BottomSheetModal";
+import { Button } from "@/components/Button";
+import { Chip } from "@/components/Chip";
+import { EmptyState } from "@/components/EmptyState";
+import { Screen } from "@/components/Screen";
+import { useAuth } from "@/features/auth/AuthProvider";
+import { DeductPantryModal } from "@/features/pantry/DeductPantryModal";
+import { usePantry } from "@/features/pantry/usePantry";
+import {
+  clearSession,
+  FRESH_SESSION,
+  loadSession,
+  saveSession,
+  type CookingSession,
+} from "@/features/recipes/cookingSession";
+import { formatClock, formatSeconds } from "@/features/recipes/format";
+import { IngredientRows } from "@/features/recipes/IngredientRows";
+import { clampServings } from "@/features/recipes/servings";
+import {
+  MAX_TIMER_SECONDS,
+  MIN_TIMER_SECONDS,
+  remainingSeconds,
+} from "@/features/recipes/timer";
+import { TimerEditModal } from "@/features/recipes/TimerEditModal";
+import type { RecipeDetail } from "@/features/recipes/types";
+import { useRecipeDetail } from "@/features/recipes/useRecipeDetail";
+import { useStepTimers } from "@/features/recipes/useStepTimers";
+import { triggerHaptic } from "@/lib/haptics";
+import { useSupabase } from "@/lib/supabase";
+import { colors, radius, shadows, spacing } from "@/theme/tokens";
 
 const ALARM_PATTERN = [0, 500, 250, 500, 250, 500];
 
-export function CookingModeScreen({ route, navigation }: RootStackScreenProps<'CookingMode'>) {
+export function CookingModeScreen({
+  route,
+  navigation,
+}: RootStackScreenProps<"CookingMode">) {
   const supabase = useSupabase();
-  const { loading, error, recipe, notFound, retry } = useRecipeDetail(supabase, route.params.slug);
+  const { loading, error, recipe, notFound, retry } = useRecipeDetail(
+    supabase,
+    route.params.slug,
+  );
 
   if (loading) {
     return (
       <Screen centered testID="cooking-loading">
-        <ActivityIndicator color={colors.primary} size="large" accessibilityLabel="Đang tải công thức" />
+        <ActivityIndicator
+          color={colors.primary}
+          size="large"
+          accessibilityLabel="Đang tải công thức"
+        />
       </Screen>
     );
   }
@@ -61,43 +89,75 @@ export function CookingModeScreen({ route, navigation }: RootStackScreenProps<'C
           tone="muted"
           title="Chưa thể nấu theo công thức này"
           message="Công thức không tồn tại, chưa công bố hoặc chưa có các bước thực hiện."
-          action={<Button title="Quay lại" variant="secondary" onPress={() => navigation.goBack()} />}
+          action={
+            <Button
+              title="Quay lại"
+              variant="secondary"
+              onPress={() => navigation.goBack()}
+            />
+          }
         />
       </Screen>
     );
   }
-  return <CookingView recipe={recipe} servings={route.params.servings} onExit={() => navigation.goBack()} />;
+  return (
+    <CookingView
+      recipe={recipe}
+      servings={route.params.servings}
+      onExit={() => navigation.goBack()}
+    />
+  );
 }
 
-type Phase = { kind: 'loading' } | { kind: 'ask'; saved: CookingSession } | { kind: 'cook'; from: CookingSession };
+type Phase =
+  | { kind: "loading" }
+  | { kind: "ask"; saved: CookingSession }
+  | { kind: "cook"; from: CookingSession };
 
 /** Offers to resume an unfinished session of this recipe (spec 21) before cooking. */
-function CookingView(props: { recipe: RecipeDetail; servings: number | undefined; onExit: () => void }) {
+function CookingView(props: {
+  recipe: RecipeDetail;
+  servings: number | undefined;
+  onExit: () => void;
+}) {
   const { slug, steps } = props.recipe;
-  const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
+  const [phase, setPhase] = useState<Phase>({ kind: "loading" });
 
   useEffect(() => {
     let active = true;
-    loadSession(slug, steps.map((s) => s.stepNumber), Date.now()).then((saved) => {
-      if (active) setPhase(saved ? { kind: 'ask', saved } : { kind: 'cook', from: FRESH_SESSION });
+    loadSession(
+      slug,
+      steps.map((s) => s.stepNumber),
+      Date.now(),
+    ).then((saved) => {
+      if (active)
+        setPhase(
+          saved
+            ? { kind: "ask", saved }
+            : { kind: "cook", from: FRESH_SESSION },
+        );
     });
     return () => {
       active = false;
     };
   }, [slug, steps]);
 
-  if (phase.kind === 'loading') {
+  if (phase.kind === "loading") {
     return (
       <Screen centered testID="cooking-restoring">
-        <ActivityIndicator color={colors.primary} size="large" accessibilityLabel="Đang mở phiên nấu" />
+        <ActivityIndicator
+          color={colors.primary}
+          size="large"
+          accessibilityLabel="Đang mở phiên nấu"
+        />
       </Screen>
     );
   }
-  if (phase.kind === 'ask') {
+  if (phase.kind === "ask") {
     const { saved } = phase;
     const startOver = () => {
       clearSession(slug);
-      setPhase({ kind: 'cook', from: FRESH_SESSION });
+      setPhase({ kind: "cook", from: FRESH_SESSION });
     };
     return (
       <Screen centered testID="cooking-resume">
@@ -112,8 +172,17 @@ function CookingView(props: { recipe: RecipeDetail; servings: number | undefined
             {`Đang ở bước ${saved.stepIndex + 1}/${steps.length}, đã xong ${saved.completed.length} bước.`}
           </AppText>
           <View style={styles.resumeActions}>
-            <Button title="Tiếp tục nấu" icon="play" onPress={() => setPhase({ kind: 'cook', from: saved })} />
-            <Button title="Nấu lại từ đầu" variant="secondary" icon="refresh" onPress={startOver} />
+            <Button
+              title="Tiếp tục nấu"
+              icon="play"
+              onPress={() => setPhase({ kind: "cook", from: saved })}
+            />
+            <Button
+              title="Nấu lại từ đầu"
+              variant="secondary"
+              icon="refresh"
+              onPress={startOver}
+            />
           </View>
         </View>
       </Screen>
@@ -136,7 +205,7 @@ function CookingRun({
   useKeepAwake(); // hands are busy: the screen stays on while cooking, released on leaving
   const supabase = useSupabase();
   const { status, session } = useAuth();
-  const userId = status === 'signedIn' && session ? session.user.id : null;
+  const userId = status === "signedIn" && session ? session.user.id : null;
   const pantry = usePantry(supabase, userId);
 
   const steps = recipe.steps;
@@ -144,9 +213,11 @@ function CookingRun({
   const [completed, setCompleted] = useState(from.completed);
   const [showIngredients, setShowIngredients] = useState(false);
   const [showDeductModal, setShowDeductModal] = useState(false);
-  const [customDurations, setCustomDurations] = useState<Record<number, number>>({});
+  const [customDurations, setCustomDurations] = useState<
+    Record<number, number>
+  >({});
   const [editingStep, setEditingStep] = useState<number | null>(null);
-  const audioSource = require('../../assets/sounds/alarm.mp3');
+  const audioSource = require("../../assets/sounds/alarm.mp3");
   const player = useAudioPlayer(audioSource);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/immutability -- expo-audio player configuration property
@@ -156,7 +227,7 @@ function CookingRun({
     };
   }, [player]);
   const alarm = useCallback(() => {
-    triggerHaptic('warning');
+    triggerHaptic("warning");
     Vibration.vibrate(ALARM_PATTERN);
   }, []);
   const timers = useStepTimers(alarm, Date.now, from.timers);
@@ -169,7 +240,7 @@ function CookingRun({
   }, [slug, currentStepNumber, completed, timers.all]);
 
   const finish = () => {
-    triggerHaptic('success');
+    triggerHaptic("success");
     setShowDeductModal(false);
     player.pause();
     clearSession(slug);
@@ -179,7 +250,9 @@ function CookingRun({
   const hasPantryMatch = useMemo(() => {
     if (!userId || pantry.items.length === 0) return false;
     const owned = new Set(pantry.items.map((p) => p.ingredientId));
-    return recipe.ingredients.some((i) => i.ingredientId !== null && owned.has(i.ingredientId));
+    return recipe.ingredients.some(
+      (i) => i.ingredientId !== null && owned.has(i.ingredientId),
+    );
   }, [userId, pantry.items, recipe.ingredients]);
 
   const handleFinishPress = () => {
@@ -190,34 +263,57 @@ function CookingRun({
     finish();
   };
   const next = () => {
-    triggerHaptic('light');
-    setCompleted((c) => (c.includes(currentStepNumber) ? c : [...c, currentStepNumber]));
+    triggerHaptic("light");
+    setCompleted((c) =>
+      c.includes(currentStepNumber) ? c : [...c, currentStepNumber],
+    );
     setIndex((i) => Math.min(steps.length - 1, i + 1));
   };
   // Spec 21 §2: a completed step can be unmarked to repeat it.
-  const unmark = () => setCompleted((c) => c.filter((n) => n !== currentStepNumber));
+  const unmark = () =>
+    setCompleted((c) => c.filter((n) => n !== currentStepNumber));
   const stepDone = completed.includes(currentStepNumber);
 
   const step = steps[index];
   const isLast = index === steps.length - 1;
-  const effectiveServings = clampServings(servings ?? recipe.defaultServings ?? 1);
+  const effectiveServings = clampServings(
+    servings ?? recipe.defaultServings ?? 1,
+  );
   const state = timers.get(step.stepNumber);
-  const defaultDuration = step.timerEnabled && step.durationSeconds !== null ? step.durationSeconds : null;
+  const defaultDuration =
+    step.timerEnabled && step.durationSeconds !== null
+      ? step.durationSeconds
+      : null;
   const hasCustom = customDurations[step.stepNumber] !== undefined;
   const hasTimer = defaultDuration !== null || hasCustom;
   const duration = customDurations[step.stepNumber] ?? defaultDuration ?? 60;
-  const isModified = defaultDuration !== null && hasCustom && customDurations[step.stepNumber] !== defaultDuration;
+  const isModified =
+    defaultDuration !== null &&
+    hasCustom &&
+    customDurations[step.stepNumber] !== defaultDuration;
   const isCustomOnly = defaultDuration === null && hasCustom;
 
   const adjustTime = (delta: number) => {
-    triggerHaptic('light');
-    if (state.status === 'idle') {
-      const nextDuration = Math.max(MIN_TIMER_SECONDS, Math.min(MAX_TIMER_SECONDS, duration + delta));
-      setCustomDurations((prev) => ({ ...prev, [step.stepNumber]: nextDuration }));
-    } else if (state.status === 'running' || state.status === 'paused') {
+    triggerHaptic("light");
+    if (state.status === "idle") {
+      const nextDuration = Math.max(
+        MIN_TIMER_SECONDS,
+        Math.min(MAX_TIMER_SECONDS, duration + delta),
+      );
+      setCustomDurations((prev) => ({
+        ...prev,
+        [step.stepNumber]: nextDuration,
+      }));
+    } else if (state.status === "running" || state.status === "paused") {
       timers.adjust(step.stepNumber, delta);
-      const nextDuration = Math.max(MIN_TIMER_SECONDS, Math.min(MAX_TIMER_SECONDS, duration + delta));
-      setCustomDurations((prev) => ({ ...prev, [step.stepNumber]: nextDuration }));
+      const nextDuration = Math.max(
+        MIN_TIMER_SECONDS,
+        Math.min(MAX_TIMER_SECONDS, duration + delta),
+      );
+      setCustomDurations((prev) => ({
+        ...prev,
+        [step.stepNumber]: nextDuration,
+      }));
     }
   };
 
@@ -228,7 +324,7 @@ function CookingRun({
       delete next[step.stepNumber];
       return next;
     });
-    if (state.status !== 'idle') {
+    if (state.status !== "idle") {
       timers.reset(step.stepNumber);
     }
   };
@@ -247,19 +343,33 @@ function CookingRun({
     const sNum = editingStep;
     setCustomDurations((prev) => ({ ...prev, [sNum]: savedSeconds }));
     const sState = timers.get(sNum);
-    if (sState.status === 'running' || sState.status === 'paused') {
+    if (sState.status === "running" || sState.status === "paused") {
       timers.setRemaining(sNum, savedSeconds);
     }
     setEditingStep(null);
   };
 
   const editingTargetStep = steps.find((s) => s.stepNumber === editingStep);
-  const editingDefault = editingTargetStep?.timerEnabled && editingTargetStep.durationSeconds !== null ? editingTargetStep.durationSeconds : 60;
-  const editingDuration = editingStep !== null ? (customDurations[editingStep] ?? editingDefault) : 60;
-  const editingState = editingStep !== null ? timers.get(editingStep) : { status: 'idle' as const };
-  const modalInitial = Math.round(remainingSeconds(editingState, editingDuration, timers.clock));
+  const editingDefault =
+    editingTargetStep?.timerEnabled &&
+    editingTargetStep.durationSeconds !== null
+      ? editingTargetStep.durationSeconds
+      : 60;
+  const editingDuration =
+    editingStep !== null
+      ? (customDurations[editingStep] ?? editingDefault)
+      : 60;
+  const editingState =
+    editingStep !== null
+      ? timers.get(editingStep)
+      : { status: "idle" as const };
+  const modalInitial = Math.round(
+    remainingSeconds(editingState, editingDuration, timers.clock),
+  );
 
-  const doneSteps = steps.filter((s) => timers.get(s.stepNumber).status === 'done');
+  const doneSteps = steps.filter(
+    (s) => timers.get(s.stepNumber).status === "done",
+  );
   const activeDoneStep = doneSteps[0];
 
   useEffect(() => {
@@ -270,16 +380,27 @@ function CookingRun({
     }
   }, [activeDoneStep, player]);
 
-  const otherRunning = steps.filter((s) => s.stepNumber !== step.stepNumber && timers.running.includes(s.stepNumber));
+  const otherRunning = steps.filter(
+    (s) =>
+      s.stepNumber !== step.stepNumber && timers.running.includes(s.stepNumber),
+  );
 
   return (
-    <Screen scroll={false} edges={['left', 'right', 'bottom']} testID="cooking-mode">
+    <Screen
+      scroll={false}
+      edges={["left", "right", "bottom"]}
+      testID="cooking-mode"
+    >
       <View
         style={styles.segments}
         testID="cooking-progress"
         accessibilityRole="progressbar"
         accessibilityLabel="Số bước đã xong"
-        accessibilityValue={{ min: 0, max: steps.length, now: completed.length }}
+        accessibilityValue={{
+          min: 0,
+          max: steps.length,
+          now: completed.length,
+        }}
       >
         {steps.map((s, idx) => {
           const done = completed.includes(s.stepNumber);
@@ -289,7 +410,11 @@ function CookingRun({
               key={s.stepNumber}
               style={[
                 styles.segment,
-                done ? styles.segmentDone : current ? styles.segmentCurrent : null,
+                done
+                  ? styles.segmentDone
+                  : current
+                    ? styles.segmentCurrent
+                    : null,
               ]}
             />
           );
@@ -317,7 +442,10 @@ function CookingRun({
         />
       </View>
 
-      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.body}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.stepCard}>
           <AppText style={styles.instruction} testID="step-instruction">
             {step.instruction}
@@ -331,7 +459,13 @@ function CookingRun({
                   Bước này đã xong
                 </AppText>
               </View>
-              <Button title="Đánh dấu chưa xong" variant="ghost" size="sm" fullWidth={false} onPress={unmark} />
+              <Button
+                title="Đánh dấu chưa xong"
+                variant="ghost"
+                size="sm"
+                fullWidth={false}
+                onPress={unmark}
+              />
             </View>
           ) : null}
         </View>
@@ -374,7 +508,13 @@ function CookingRun({
               testID="timer-clock-pressable"
               style={styles.clockTouchable}
             >
-              <AppText variant="display" tabularNums style={styles.clockText} accessibilityRole="timer" testID="timer-clock">
+              <AppText
+                variant="display"
+                tabularNums
+                style={styles.clockText}
+                accessibilityRole="timer"
+                testID="timer-clock"
+              >
                 {formatClock(remainingSeconds(state, duration, timers.clock))}
               </AppText>
               <View style={styles.editHintRow}>
@@ -386,30 +526,65 @@ function CookingRun({
             </Pressable>
 
             <View style={styles.quickAdjustRow} testID="quick-adjust-row">
-              <Button title="-1m" variant="secondary" size="sm" fullWidth={false} onPress={() => adjustTime(-60)} testID="adjust-minus-60" />
-              <Button title="+30s" variant="secondary" size="sm" fullWidth={false} onPress={() => adjustTime(30)} testID="adjust-plus-30" />
-              <Button title="+1m" variant="secondary" size="sm" fullWidth={false} onPress={() => adjustTime(60)} testID="adjust-plus-60" />
+              <Button
+                title="-1m"
+                variant="secondary"
+                size="sm"
+                fullWidth={false}
+                onPress={() => adjustTime(-60)}
+                testID="adjust-minus-60"
+              />
+              <Button
+                title="+30s"
+                variant="secondary"
+                size="sm"
+                fullWidth={false}
+                onPress={() => adjustTime(30)}
+                testID="adjust-plus-30"
+              />
+              <Button
+                title="+1m"
+                variant="secondary"
+                size="sm"
+                fullWidth={false}
+                onPress={() => adjustTime(60)}
+                testID="adjust-plus-60"
+              />
             </View>
 
             <View style={styles.timerButtons}>
-              {state.status === 'idle' ? (
+              {state.status === "idle" ? (
                 <Button
                   title="Bắt đầu hẹn giờ"
                   icon="play"
                   onPress={() => {
-                    triggerHaptic('medium');
+                    triggerHaptic("medium");
                     timers.start(step.stepNumber, duration);
                   }}
                 />
               ) : null}
-              {state.status === 'running' ? (
-                <Button title="Tạm dừng" icon="pause" variant="secondary" onPress={() => timers.pause(step.stepNumber)} />
+              {state.status === "running" ? (
+                <Button
+                  title="Tạm dừng"
+                  icon="pause"
+                  variant="secondary"
+                  onPress={() => timers.pause(step.stepNumber)}
+                />
               ) : null}
-              {state.status === 'paused' ? (
-                <Button title="Tiếp tục" icon="play" onPress={() => timers.resume(step.stepNumber)} />
+              {state.status === "paused" ? (
+                <Button
+                  title="Tiếp tục"
+                  icon="play"
+                  onPress={() => timers.resume(step.stepNumber)}
+                />
               ) : null}
-              {state.status !== 'idle' ? (
-                <Button title="Đặt lại" icon="refresh" variant="ghost" onPress={() => timers.reset(step.stepNumber)} />
+              {state.status !== "idle" ? (
+                <Button
+                  title="Đặt lại"
+                  icon="refresh"
+                  variant="ghost"
+                  onPress={() => timers.reset(step.stepNumber)}
+                />
               ) : null}
             </View>
           </View>
@@ -430,7 +605,8 @@ function CookingRun({
             <AppText variant="label">Đang hẹn giờ ở bước khác</AppText>
             <View style={styles.chips}>
               {otherRunning.map((s) => {
-                const sDur = customDurations[s.stepNumber] ?? s.durationSeconds ?? 0;
+                const sDur =
+                  customDurations[s.stepNumber] ?? s.durationSeconds ?? 0;
                 return (
                   <Chip
                     key={s.stepNumber}
@@ -458,9 +634,17 @@ function CookingRun({
         </View>
         <View style={styles.navButton}>
           {isLast ? (
-            <Button title="Hoàn thành" icon="checkmark-circle-outline" onPress={handleFinishPress} />
+            <Button
+              title="Hoàn thành"
+              icon="checkmark-circle-outline"
+              onPress={handleFinishPress}
+            />
           ) : (
-            <Button title="Bước tiếp" rightIcon="arrow-forward" onPress={next} />
+            <Button
+              title="Bước tiếp"
+              rightIcon="arrow-forward"
+              onPress={next}
+            />
           )}
         </View>
       </View>
@@ -501,7 +685,12 @@ function CookingRun({
       ) : null}
 
       {activeDoneStep ? (
-        <Modal visible transparent animationType="fade" testID="timer-done-modal">
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          testID="timer-done-modal"
+        >
           <View style={styles.doneModalBackdrop}>
             <View style={styles.doneModalCard}>
               <View style={styles.doneModalIcon}>
@@ -534,10 +723,10 @@ const styles = StyleSheet.create({
   resumeCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     padding: spacing.xl,
     gap: spacing.md,
-    alignItems: 'center',
+    alignItems: "center",
     borderWidth: 1,
     borderColor: colors.border,
     ...shadows.card,
@@ -547,16 +736,16 @@ const styles = StyleSheet.create({
     height: 68,
     borderRadius: radius.pill,
     backgroundColor: colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   resumeActions: {
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
     gap: spacing.sm,
     marginTop: spacing.xs,
   },
   segments: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: spacing.xs,
   },
   segment: {
@@ -572,9 +761,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.success,
   },
   topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: spacing.md,
   },
   topCopy: {
@@ -582,7 +771,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   stepPill: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     backgroundColor: colors.primarySoft,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xxs + 1,
@@ -592,7 +781,7 @@ const styles = StyleSheet.create({
   stepCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     padding: spacing.lg,
     gap: spacing.md,
     borderWidth: 1,
@@ -601,46 +790,46 @@ const styles = StyleSheet.create({
   },
   instruction: { fontSize: 21, lineHeight: 31 },
   stepDone: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
     gap: spacing.sm,
     paddingTop: spacing.xs,
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
   doneTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.xs,
   },
   timer: {
     gap: spacing.sm,
     padding: spacing.lg,
     borderRadius: radius.lg,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    alignItems: 'center',
+    alignItems: "center",
     ...shadows.card,
   },
   timerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    flexWrap: "wrap",
     gap: spacing.xs,
   },
   timerBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.xs,
   },
   clockTouchable: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: spacing.xs,
   },
   clockText: {
@@ -648,36 +837,36 @@ const styles = StyleSheet.create({
     lineHeight: 48,
   },
   editHintRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.xs,
     marginTop: spacing.xs,
   },
   quickAdjustRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: spacing.sm,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingVertical: spacing.xs,
   },
   addTimerContainer: {
     paddingVertical: spacing.xs,
   },
-  timerButtons: { alignSelf: 'stretch', gap: spacing.sm },
+  timerButtons: { alignSelf: "stretch", gap: spacing.sm },
   doneModalBackdrop: {
     flex: 1,
     backgroundColor: colors.backdrop,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: spacing.xl,
   },
   doneModalCard: {
-    width: '100%',
+    width: "100%",
     maxWidth: 340,
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     padding: spacing.xl,
-    alignItems: 'center',
+    alignItems: "center",
     gap: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
@@ -688,18 +877,18 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: radius.pill,
     backgroundColor: colors.primarySoft,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   doneModalTitle: {
-    textAlign: 'center',
+    textAlign: "center",
   },
   doneModalDesc: {
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 22,
   },
   running: { gap: spacing.sm },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  nav: { flexDirection: 'row', gap: spacing.md, paddingTop: spacing.xs },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  nav: { flexDirection: "row", gap: spacing.md, paddingTop: spacing.xs },
   navButton: { flex: 1 },
 });

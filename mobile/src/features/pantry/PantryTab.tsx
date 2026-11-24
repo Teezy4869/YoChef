@@ -1,19 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useState } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
 
-import { AppIcon, type IconName } from '@/components/AppIcon';
-import { AppText } from '@/components/AppText';
-import { Banner } from '@/components/Banner';
-import { BottomSheetModal } from '@/components/BottomSheetModal';
-import { Button } from '@/components/Button';
-import { Chip } from '@/components/Chip';
-import { EmptyState } from '@/components/EmptyState';
-import { ListRowSkeleton } from '@/components/Skeleton';
-import { TextField } from '@/components/TextField';
-import { formatQuantity } from '@/features/recipes/servings';
-import { triggerHaptic } from '@/lib/haptics';
-import { useSupabase } from '@/lib/supabase';
-import { colors, radius, shadows, spacing, touchTarget } from '@/theme/tokens';
+import { AppIcon, type IconName } from "@/components/AppIcon";
+import { AppText } from "@/components/AppText";
+import { Banner } from "@/components/Banner";
+import { BottomSheetModal } from "@/components/BottomSheetModal";
+import { Button } from "@/components/Button";
+import { Chip } from "@/components/Chip";
+import { EmptyState } from "@/components/EmptyState";
+import { ListRowSkeleton } from "@/components/Skeleton";
+import { TextField } from "@/components/TextField";
+import { formatQuantity } from "@/features/recipes/servings";
+import { triggerHaptic } from "@/lib/haptics";
+import { useSupabase } from "@/lib/supabase";
+import { colors, radius, shadows, spacing, touchTarget } from "@/theme/tokens";
 
 import {
   availableUnitsFor,
@@ -24,16 +24,16 @@ import {
   type CatalogIngredient,
   type PantryGroup,
   type PantryItem,
-} from './pantryApi';
-import type { usePantry } from './usePantry';
+} from "./pantryApi";
+import type { usePantry } from "./usePantry";
 
 type PantryState = ReturnType<typeof usePantry>;
 
 const GROUP_ICON: Record<PantryGroup, IconName> = {
-  meat_seafood: 'fish-outline',
-  vegetables: 'leaf-outline',
-  spices: 'flask-outline',
-  dry_other: 'cube-outline',
+  meat_seafood: "fish-outline",
+  vegetables: "leaf-outline",
+  spices: "flask-outline",
+  dry_other: "cube-outline",
 };
 
 export function PantryTab({
@@ -52,22 +52,30 @@ export function PantryTab({
   const [catalogError, setCatalogError] = useState<string | null>(null);
 
   // Add-item form state: strictly selects from catalog ingredients & standard units
-  const [ingQuery, setIngQuery] = useState('');
-  const [selectedIng, setSelectedIng] = useState<CatalogIngredient | null>(null);
-  const [qtyText, setQtyText] = useState('');
-  const [selectedUnit, setSelectedUnit] = useState('');
+  const [ingQuery, setIngQuery] = useState("");
+  const [selectedIng, setSelectedIng] = useState<CatalogIngredient | null>(
+    null,
+  );
+  const [qtyText, setQtyText] = useState("");
+  const [selectedUnit, setSelectedUnit] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Pantry search & detail modal state
-  const [filterQuery, setFilterQuery] = useState('');
+  const [filterQuery, setFilterQuery] = useState("");
   const [editing, setEditing] = useState<PantryItem | null>(null);
 
   useEffect(() => {
     let active = true;
     fetchCatalogIngredients(supabase).then(
       (rows) => active && setCatalog(rows),
-      (e: unknown) => active && setCatalogError(e instanceof Error ? e.message : 'Không tải được danh mục nguyên liệu.'),
+      (e: unknown) =>
+        active &&
+        setCatalogError(
+          e instanceof Error
+            ? e.message
+            : "Không tải được danh mục nguyên liệu.",
+        ),
     );
     return () => {
       active = false;
@@ -94,47 +102,53 @@ export function PantryTab({
     setSelectedIng(ing);
     setIngQuery(ing.name);
     const units = availableUnitsFor(ing.commonUnits);
-    setSelectedUnit(units[0] ?? 'g');
+    setSelectedUnit(units[0] ?? "g");
     setFormError(null);
   };
 
   const clearPickedIngredient = () => {
     setSelectedIng(null);
-    setIngQuery('');
-    setSelectedUnit('');
+    setIngQuery("");
+    setSelectedUnit("");
   };
 
   const submitAdd = async () => {
     if (!selectedIng) {
-      setFormError('Vui lòng chọn một nguyên liệu từ danh sách gợi ý.');
+      setFormError("Vui lòng chọn một nguyên liệu từ danh sách gợi ý.");
       return;
     }
-    const parsedQty = Number(qtyText.trim().replace(',', '.'));
+    const parsedQty = Number(qtyText.trim().replace(",", "."));
     if (!Number.isFinite(parsedQty) || parsedQty <= 0) {
-      setFormError('Số lượng phải là số lớn hơn 0.');
+      setFormError("Số lượng phải là số lớn hơn 0.");
       return;
     }
     if (!selectedUnit) {
-      setFormError('Vui lòng chọn đơn vị chuẩn.');
+      setFormError("Vui lòng chọn đơn vị chuẩn.");
       return;
     }
     setFormError(null);
     setSaving(true);
-    const ok = await pantry.addItem({ ingredientId: selectedIng.id, quantity: parsedQty, unit: selectedUnit });
+    const ok = await pantry.addItem({
+      ingredientId: selectedIng.id,
+      quantity: parsedQty,
+      unit: selectedUnit,
+    });
     setSaving(false);
     if (ok) {
-      triggerHaptic('success');
+      triggerHaptic("success");
       setSelectedIng(null);
-      setIngQuery('');
-      setQtyText('');
-      setSelectedUnit('');
+      setIngQuery("");
+      setQtyText("");
+      setSelectedUnit("");
       onCloseAddSheet();
     }
   };
 
   const grouped = useMemo(() => {
     const q = foldVi(filterQuery);
-    const filtered = q ? pantry.items.filter((i) => foldVi(i.name).includes(q)) : pantry.items;
+    const filtered = q
+      ? pantry.items.filter((i) => foldVi(i.name).includes(q))
+      : pantry.items;
     const map: Record<PantryGroup, PantryItem[]> = {
       meat_seafood: [],
       vegetables: [],
@@ -159,7 +173,9 @@ export function PantryTab({
           tone="danger"
           title="Không tải được tủ lạnh"
           message={pantry.error}
-          action={<Button title="Thử lại" icon="refresh" onPress={pantry.reload} />}
+          action={
+            <Button title="Thử lại" icon="refresh" onPress={pantry.reload} />
+          }
         />
       </View>
     );
@@ -167,7 +183,9 @@ export function PantryTab({
 
   return (
     <View style={styles.root} testID="pantry-tab">
-      {pantry.actionError ? <Banner tone="error" message={pantry.actionError} /> : null}
+      {pantry.actionError ? (
+        <Banner tone="error" message={pantry.actionError} />
+      ) : null}
       {catalogError ? <Banner tone="error" message={catalogError} /> : null}
 
       {pantry.items.length > 0 ? (
@@ -185,7 +203,13 @@ export function PantryTab({
           icon="snow-outline"
           title="Tủ lạnh của bạn đang trống"
           message="Thêm nguyên liệu đang có hoặc cất từ danh sách Đi chợ sau khi mua xong."
-          action={<Button title="Thêm nguyên liệu vào tủ" icon="add" onPress={onOpenAddSheet} />}
+          action={
+            <Button
+              title="Thêm nguyên liệu vào tủ"
+              icon="add"
+              onPress={onOpenAddSheet}
+            />
+          }
           testID="pantry-empty"
         />
       ) : (
@@ -193,7 +217,11 @@ export function PantryTab({
           const groupItems = grouped[group];
           if (groupItems.length === 0) return null;
           return (
-            <View key={group} style={styles.groupCard} testID={`pantry-group-${group}`}>
+            <View
+              key={group}
+              style={styles.groupCard}
+              testID={`pantry-group-${group}`}
+            >
               <View style={styles.groupHead}>
                 <AppIcon name={GROUP_ICON[group]} size={18} tone="primary" />
                 <AppText variant="heading">{`${PANTRY_GROUP_LABEL[group]} (${groupItems.length})`}</AppText>
@@ -238,7 +266,8 @@ export function PantryTab({
             value={ingQuery}
             onChangeText={(text) => {
               setIngQuery(text);
-              if (selectedIng && text !== selectedIng.name) setSelectedIng(null);
+              if (selectedIng && text !== selectedIng.name)
+                setSelectedIng(null);
             }}
             placeholder="Gõ tên nguyên liệu (vd: Thịt bò, Trứng)..."
           />
@@ -250,7 +279,13 @@ export function PantryTab({
                   {`Đã chọn: ${selectedIng.name}`}
                 </AppText>
               </View>
-              <Button title="Đổi món" variant="ghost" size="sm" fullWidth={false} onPress={clearPickedIngredient} />
+              <Button
+                title="Đổi món"
+                variant="ghost"
+                size="sm"
+                fullWidth={false}
+                onPress={clearPickedIngredient}
+              />
             </View>
           ) : null}
 
@@ -284,7 +319,12 @@ export function PantryTab({
                 <AppText variant="label">Đơn vị chuẩn</AppText>
                 <View style={styles.chipWrap}>
                   {unitChoices.map((u) => (
-                    <Chip key={u} label={u} selected={selectedUnit === u} onPress={() => setSelectedUnit(u)} />
+                    <Chip
+                      key={u}
+                      label={u}
+                      selected={selectedUnit === u}
+                      onPress={() => setSelectedUnit(u)}
+                    />
                   ))}
                 </View>
               </View>
@@ -292,7 +332,12 @@ export function PantryTab({
           ) : null}
 
           {formError ? <Banner tone="error" message={formError} /> : null}
-          <Button title="Thêm vào tủ lạnh" icon="add" onPress={submitAdd} loading={saving} />
+          <Button
+            title="Thêm vào tủ lạnh"
+            icon="add"
+            onPress={submitAdd}
+            loading={saving}
+          />
         </View>
       </BottomSheetModal>
 
@@ -301,7 +346,10 @@ export function PantryTab({
           item={editing}
           onClose={() => setEditing(null)}
           onSave={async (qty, unit) => {
-            const ok = await pantry.updateItem(editing.id, { quantity: qty, unit });
+            const ok = await pantry.updateItem(editing.id, {
+              quantity: qty,
+              unit,
+            });
             if (ok) setEditing(null);
           }}
           onDelete={async () => {
@@ -325,7 +373,9 @@ function PantryEditModal({
   onSave: (quantity: number, unit: string) => Promise<void>;
   onDelete: () => Promise<void>;
 }) {
-  const [qtyText, setQtyText] = useState(String(item.quantity).replace('.', ','));
+  const [qtyText, setQtyText] = useState(
+    String(item.quantity).replace(".", ","),
+  );
   const units = useMemo(() => {
     const base = availableUnitsFor(item.commonUnits);
     return base.includes(item.unit) ? base : [item.unit, ...base];
@@ -335,9 +385,9 @@ function PantryEditModal({
   const [busy, setBusy] = useState(false);
 
   const handleSave = async () => {
-    const parsed = Number(qtyText.trim().replace(',', '.'));
+    const parsed = Number(qtyText.trim().replace(",", "."));
     if (!Number.isFinite(parsed) || parsed <= 0) {
-      setError('Số lượng phải lớn hơn 0.');
+      setError("Số lượng phải lớn hơn 0.");
       return;
     }
     setError(null);
@@ -360,9 +410,25 @@ function PantryEditModal({
       testID="pantry-edit-modal"
       footer={
         <View style={styles.modalActions}>
-          <Button title="Lưu thay đổi" icon="checkmark" onPress={handleSave} loading={busy} />
-          <Button title="Xóa khỏi tủ lạnh" icon="trash-outline" variant="secondary" onPress={handleDelete} disabled={busy} />
-          <Button title="Đóng" variant="ghost" onPress={onClose} disabled={busy} />
+          <Button
+            title="Lưu thay đổi"
+            icon="checkmark"
+            onPress={handleSave}
+            loading={busy}
+          />
+          <Button
+            title="Xóa khỏi tủ lạnh"
+            icon="trash-outline"
+            variant="secondary"
+            onPress={handleDelete}
+            disabled={busy}
+          />
+          <Button
+            title="Đóng"
+            variant="ghost"
+            onPress={onClose}
+            disabled={busy}
+          />
         </View>
       }
     >
@@ -377,7 +443,12 @@ function PantryEditModal({
           <AppText variant="label">Đơn vị chuẩn</AppText>
           <View style={styles.chipWrap}>
             {units.map((u) => (
-              <Chip key={u} label={u} selected={unit === u} onPress={() => setUnit(u)} />
+              <Chip
+                key={u}
+                label={u}
+                selected={unit === u}
+                onPress={() => setUnit(u)}
+              />
             ))}
           </View>
         </View>
@@ -391,30 +462,34 @@ const styles = StyleSheet.create({
   root: { gap: spacing.md },
   center: { paddingVertical: spacing.lg },
   sheetForm: { gap: spacing.md },
-  pickedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  pickedBadge: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  pickedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  pickedBadge: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   suggestionBox: {
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
     backgroundColor: colors.background,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   suggestionRow: {
     minHeight: touchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   unitBlock: { gap: spacing.xs },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
   groupCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     padding: spacing.md,
     gap: spacing.xs,
     borderWidth: 1,
@@ -422,16 +497,16 @@ const styles = StyleSheet.create({
     ...shadows.card,
   },
   groupHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.sm,
     paddingBottom: spacing.xs,
   },
   itemRow: {
     minHeight: touchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: spacing.sm,
   },
   itemDivider: {

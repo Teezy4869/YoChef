@@ -1,6 +1,9 @@
 // Display helpers. Unknown values return null so callers omit them (C5: unknown is not 0).
 
-export function totalMinutes(prep: number | null, cook: number | null): number | null {
+export function totalMinutes(
+  prep: number | null,
+  cook: number | null,
+): number | null {
   return prep !== null && cook !== null ? prep + cook : null;
 }
 
@@ -12,7 +15,10 @@ export function formatMinutes(total: number): string {
 }
 
 /** "45 phút" when both times are known; otherwise whichever is known, labelled; otherwise null. */
-export function timeLabel(prep: number | null, cook: number | null): string | null {
+export function timeLabel(
+  prep: number | null,
+  cook: number | null,
+): string | null {
   const total = totalMinutes(prep, cook);
   if (total !== null) return formatMinutes(total);
   if (cook !== null) return `Nấu ${formatMinutes(cook)}`;
@@ -38,7 +44,7 @@ export function formatClock(totalSeconds: number): string {
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   const r = s % 60;
-  const two = (n: number) => String(n).padStart(2, '0');
+  const two = (n: number) => String(n).padStart(2, "0");
   return h > 0 ? `${h}:${two(m)}:${two(r)}` : `${two(m)}:${two(r)}`;
 }
 
@@ -48,5 +54,5 @@ export function servingsLabel(servings: number | null): string | null {
 
 /** Joins the parts that exist: ["45 phút", null, "Dễ"] -> "45 phút · Dễ". */
 export function joinMeta(parts: (string | null | undefined)[]): string {
-  return parts.filter((p): p is string => !!p).join(' · ');
+  return parts.filter((p): p is string => !!p).join(" · ");
 }

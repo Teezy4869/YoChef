@@ -2,13 +2,13 @@
 // what a reader sees: approved comments of published recipes, plus the signed-in
 // user's own comments unless rejected. Status is never sent: new and edited
 // comments wait for review, which the database enforces.
-import { asText, fail, one } from '@/features/recipes/recipeApi';
-import type { YoChefClient } from '@/lib/supabase';
+import { asText, fail, one } from "@/features/recipes/recipeApi";
+import type { YoChefClient } from "@/lib/supabase";
 
 export const COMMENT_MAX = 1000;
 export const COMMENTS_PAGE = 20;
 
-export type CommentStatus = 'pending' | 'approved' | 'rejected';
+export type CommentStatus = "pending" | "approved" | "rejected";
 export type Comment = {
   id: string;
   userId: string;
@@ -20,7 +20,8 @@ export type Comment = {
 };
 
 // The FK name keeps the embed unambiguous once moderated_by also points at profiles (3.6).
-const SELECT = 'id,user_id,content,status,created_at,author:profiles!comments_user_id_fkey(display_name,avatar_path)';
+const SELECT =
+  "id,user_id,content,status,created_at,author:profiles!comments_user_id_fkey(display_name,avatar_path)";
 
 function toComment(row: Record<string, unknown>): Comment {
   const author = one(row.author);
@@ -42,15 +43,18 @@ export async function fetchComments(
   limit: number,
 ): Promise<{ comments: Comment[]; hasMore: boolean }> {
   const { data, error } = await client
-    .from('comments')
+    .from("comments")
     .select(SELECT)
-    .eq('recipe_id', recipeId)
-    .order('created_at', { ascending: false })
-    .order('id', { ascending: false })
+    .eq("recipe_id", recipeId)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .range(0, limit);
-  if (error) fail(error, 'Không tải được bình luận.');
+  if (error) fail(error, "Không tải được bình luận.");
   const rows = (data ?? []) as unknown as Record<string, unknown>[];
-  return { comments: rows.slice(0, limit).map(toComment), hasMore: rows.length > limit };
+  return {
+    comments: rows.slice(0, limit).map(toComment),
+    hasMore: rows.length > limit,
+  };
 }
 
 /** Code points, as the database's char_length counts them. */
@@ -58,41 +62,58 @@ export const commentLength = (text: string) => Array.from(text.trim()).length;
 
 function clean(text: string): string {
   const content = text.trim();
-  if (content === '') throw new Error('Bình luận không được để trống.');
-  if (commentLength(content) > COMMENT_MAX) throw new Error(`Bình luận tối đa ${COMMENT_MAX} ký tự.`);
+  if (content === "") throw new Error("Bình luận không được để trống.");
+  if (commentLength(content) > COMMENT_MAX)
+    throw new Error(`Bình luận tối đa ${COMMENT_MAX} ký tự.`);
   return content;
 }
 
-export async function postComment(client: YoChefClient, userId: string, recipeId: string, text: string): Promise<CommentStatus> {
+export async function postComment(
+  client: YoChefClient,
+  userId: string,
+  recipeId: string,
+  text: string,
+): Promise<CommentStatus> {
   const content = clean(text);
   const { data, error } = await client
-    .from('comments')
+    .from("comments")
     .insert({ user_id: userId, recipe_id: recipeId, content })
-    .select('status');
-  if (error) fail(error, 'Không gửi được bình luận.');
+    .select("status");
+  if (error) fail(error, "Không gửi được bình luận.");
   const row = (data as { status?: unknown }[] | null)?.[0];
-  return row?.status === 'approved' ? 'approved' : 'pending';
+  return row?.status === "approved" ? "approved" : "pending";
 }
 
-export async function editComment(client: YoChefClient, id: string, text: string): Promise<CommentStatus> {
+export async function editComment(
+  client: YoChefClient,
+  id: string,
+  text: string,
+): Promise<CommentStatus> {
   const content = clean(text);
-  const { data, error } = await client.from('comments').update({ content }).eq('id', id).select('id,status');
-  if (error) fail(error, 'Không sửa được bình luận.');
+  const { data, error } = await client
+    .from("comments")
+    .update({ content })
+    .eq("id", id)
+    .select("id,status");
+  if (error) fail(error, "Không sửa được bình luận.");
   // No row: it was rejected or removed meanwhile.
   const rows = (data ?? []) as { status?: unknown }[];
-  if (rows.length !== 1) throw new Error('Bình luận này không còn sửa được.');
-  return rows[0]?.status === 'approved' ? 'approved' : 'pending';
+  if (rows.length !== 1) throw new Error("Bình luận này không còn sửa được.");
+  return rows[0]?.status === "approved" ? "approved" : "pending";
 }
 
-export async function deleteComment(client: YoChefClient, id: string): Promise<void> {
-  const { error } = await client.from('comments').delete().eq('id', id);
-  if (error) fail(error, 'Không xóa được bình luận.');
+export async function deleteComment(
+  client: YoChefClient,
+  id: string,
+): Promise<void> {
+  const { error } = await client.from("comments").delete().eq("id", id);
+  if (error) fail(error, "Không xóa được bình luận.");
 }
 
 /** "14/11/2026" */
 export function formatCommentDate(iso: string): string {
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const pad = (n: number) => String(n).padStart(2, '0');
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 }

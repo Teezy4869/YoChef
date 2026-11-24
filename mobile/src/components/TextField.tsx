@@ -1,10 +1,16 @@
-import { useState, type ComponentProps, type ReactNode } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { useState, type ComponentProps, type ReactNode } from "react";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
 
-import { colors, radius, spacing, touchTarget, typography } from '@/theme/tokens';
+import {
+  colors,
+  radius,
+  spacing,
+  touchTarget,
+  typography,
+} from "@/theme/tokens";
 
-import { AppIcon, type IconName } from './AppIcon';
-import { AppText } from './AppText';
+import { AppIcon, type IconName } from "./AppIcon";
+import { AppText } from "./AppText";
 
 // React 19: ref is an ordinary prop, carried by ComponentProps<typeof TextInput>.
 export type TextFieldProps = ComponentProps<typeof TextInput> & {
@@ -48,7 +54,11 @@ export function TextField({
       >
         {leftIcon ? (
           <View style={styles.leftIcon}>
-            <AppIcon name={leftIcon} size={18} tone={focused ? 'primary' : 'muted'} />
+            <AppIcon
+              name={leftIcon}
+              size={18}
+              tone={focused ? "primary" : "muted"}
+            />
           </View>
         ) : null}
         <TextInput
@@ -67,28 +77,32 @@ export function TextField({
             onBlur?.(e);
           }}
           {...rest}
-          style={[
-            styles.input,
-            multiline ? styles.multiline : null,
-            style,
-          ]}
+          style={[styles.input, multiline ? styles.multiline : null, style]}
         />
         {isPassword ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={revealed ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+            accessibilityLabel={revealed ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
             onPress={() => setRevealed((v) => !v)}
             hitSlop={6}
             style={styles.toggleBtn}
           >
-            <AppIcon name={revealed ? 'eye-off-outline' : 'eye-outline'} size={20} tone="muted" />
+            <AppIcon
+              name={revealed ? "eye-off-outline" : "eye-outline"}
+              size={20}
+              tone="muted"
+            />
           </Pressable>
         ) : rightAccessory ? (
           <View style={styles.rightAccessory}>{rightAccessory}</View>
         ) : null}
       </View>
       {error ? (
-        <AppText variant="caption" tone="danger" accessibilityLiveRegion="polite">
+        <AppText
+          variant="caption"
+          tone="danger"
+          accessibilityLiveRegion="polite"
+        >
           {error}
         </AppText>
       ) : hint ? (
@@ -101,21 +115,21 @@ export function TextField({
 }
 
 const styles = StyleSheet.create({
-  wrapper: { gap: spacing.xs, alignSelf: 'stretch' },
+  wrapper: { gap: spacing.xs, alignSelf: "stretch" },
   label: { color: colors.text },
   fieldBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     minHeight: touchTarget,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     backgroundColor: colors.surface,
     paddingHorizontal: spacing.md,
   },
   multilineBox: {
-    alignItems: 'flex-start',
+    alignItems: "flex-start",
     minHeight: 112,
     paddingVertical: spacing.sm,
   },
@@ -130,14 +144,14 @@ const styles = StyleSheet.create({
   },
   multiline: {
     minHeight: 96,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
     paddingVertical: 0,
   },
   toggleBtn: {
     minWidth: 36,
     minHeight: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginLeft: spacing.xs,
   },
   rightAccessory: {

@@ -1,29 +1,34 @@
-import type { ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import type { ReactNode } from "react";
+import { StyleSheet, View } from "react-native";
 
-import { colors, radius, spacing } from '@/theme/tokens';
+import { colors, radius, spacing } from "@/theme/tokens";
 
-import { AppIcon, type IconName } from './AppIcon';
-import { AppText } from './AppText';
+import { AppIcon, type IconName } from "./AppIcon";
+import { AppText } from "./AppText";
 
 export function EmptyState({
   icon,
-  tone = 'primary',
+  tone = "primary",
   title,
   message,
   action,
   testID,
 }: {
   icon: IconName;
-  tone?: 'primary' | 'danger' | 'muted';
+  tone?: "primary" | "danger" | "muted";
   title: string;
   message?: string;
   action?: ReactNode;
   testID?: string;
 }) {
   const circleBg =
-    tone === 'danger' ? colors.dangerSoft : tone === 'muted' ? colors.surfaceMuted : colors.primarySoft;
-  const iconTone = tone === 'danger' ? 'danger' : tone === 'muted' ? 'muted' : 'primary';
+    tone === "danger"
+      ? colors.dangerSoft
+      : tone === "muted"
+        ? colors.surfaceMuted
+        : colors.primarySoft;
+  const iconTone =
+    tone === "danger" ? "danger" : tone === "muted" ? "muted" : "primary";
 
   return (
     <View style={styles.root} testID={testID}>
@@ -47,8 +52,8 @@ export function EmptyState({
 
 const styles = StyleSheet.create({
   root: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.xxl,
     gap: spacing.md,
@@ -57,8 +62,8 @@ const styles = StyleSheet.create({
     width: 68,
     height: 68,
     borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   copy: {
     gap: spacing.xs,
@@ -66,7 +71,7 @@ const styles = StyleSheet.create({
   },
   action: {
     marginTop: spacing.xs,
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
     gap: spacing.sm,
   },
 });

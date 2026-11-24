@@ -1,49 +1,72 @@
-import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useState } from "react";
+import { StyleSheet, View } from "react-native";
 
-import { AppIcon } from '@/components/AppIcon';
-import { AppText } from '@/components/AppText';
-import { fail } from '@/features/recipes/recipeApi';
-import { useSupabase, type YoChefClient } from '@/lib/supabase';
-import { colors, radius, spacing } from '@/theme/tokens';
+import { AppIcon } from "@/components/AppIcon";
+import { AppText } from "@/components/AppText";
+import { fail } from "@/features/recipes/recipeApi";
+import { useSupabase, type YoChefClient } from "@/lib/supabase";
+import { colors, radius, spacing } from "@/theme/tokens";
 
 // Phase 4.3: the public reads VERIFIED results of published recipes only (RLS), so a
 // missing row means "not available yet". Unknown values show as "—", never 0.
 const MACROS = [
-  ['energy_kcal', 'Năng lượng', 'kcal'],
-  ['protein_g', 'Chất đạm', 'g'],
-  ['fat_g', 'Chất béo', 'g'],
-  ['carbs_g', 'Tinh bột, đường', 'g'],
+  ["energy_kcal", "Năng lượng", "kcal"],
+  ["protein_g", "Chất đạm", "g"],
+  ["fat_g", "Chất béo", "g"],
+  ["carbs_g", "Tinh bột, đường", "g"],
 ] as const;
 
 const MICROS = [
-  ['sodium_mg', 'Natri', 'mg'],
-  ['saturated_fat_g', 'Chất béo bão hòa', 'g'],
-  ['fiber_g', 'Chất xơ', 'g'],
-  ['sugar_g', 'Đường', 'g'],
+  ["sodium_mg", "Natri", "mg"],
+  ["saturated_fat_g", "Chất béo bão hòa", "g"],
+  ["fiber_g", "Chất xơ", "g"],
+  ["sugar_g", "Đường", "g"],
 ] as const;
 
 type NutrientKey = (typeof MACROS)[number][0] | (typeof MICROS)[number][0];
 type PerServing = Partial<Record<NutrientKey, number | null>>;
 
-export async function fetchNutrition(client: YoChefClient, recipeId: string): Promise<PerServing | null> {
-  const { data, error } = await client.from('recipe_nutrition').select('per_serving').eq('recipe_id', recipeId).maybeSingle();
-  if (error) fail(error, 'Không tải được thông tin dinh dưỡng.');
-  return ((data as { per_serving?: PerServing | null } | null)?.per_serving ?? null) || null;
+export async function fetchNutrition(
+  client: YoChefClient,
+  recipeId: string,
+): Promise<PerServing | null> {
+  const { data, error } = await client
+    .from("recipe_nutrition")
+    .select("per_serving")
+    .eq("recipe_id", recipeId)
+    .maybeSingle();
+  if (error) fail(error, "Không tải được thông tin dinh dưỡng.");
+  return (
+    ((data as { per_serving?: PerServing | null } | null)?.per_serving ??
+      null) ||
+    null
+  );
 }
 
 const show = (v: number | null | undefined, unit: string) =>
-  v === null || v === undefined ? '—' : `${String(v).replace('.', ',')} ${unit}`;
+  v === null || v === undefined
+    ? "—"
+    : `${String(v).replace(".", ",")} ${unit}`;
 
 export function NutritionSection({ recipeId }: { recipeId: string }) {
   const supabase = useSupabase();
-  const [loaded, setLoaded] = useState<{ recipeId: string; value: PerServing | null; error: string | null } | null>(null);
+  const [loaded, setLoaded] = useState<{
+    recipeId: string;
+    value: PerServing | null;
+    error: string | null;
+  } | null>(null);
 
   useEffect(() => {
     let active = true;
     fetchNutrition(supabase, recipeId).then(
       (value) => active && setLoaded({ recipeId, value, error: null }),
-      (e: unknown) => active && setLoaded({ recipeId, value: null, error: e instanceof Error ? e.message : 'Có lỗi xảy ra.' }),
+      (e: unknown) =>
+        active &&
+        setLoaded({
+          recipeId,
+          value: null,
+          error: e instanceof Error ? e.message : "Có lỗi xảy ra.",
+        }),
     );
     return () => {
       active = false;
@@ -61,7 +84,9 @@ export function NutritionSection({ recipeId }: { recipeId: string }) {
       {current.error ? (
         <AppText tone="danger">{current.error}</AppText>
       ) : !current.value ? (
-        <AppText tone="muted">Chưa có thông tin dinh dưỡng cho món này.</AppText>
+        <AppText tone="muted">
+          Chưa có thông tin dinh dưỡng cho món này.
+        </AppText>
       ) : (
         <>
           <View style={styles.macroGrid}>
@@ -90,7 +115,10 @@ export function NutritionSection({ recipeId }: { recipeId: string }) {
               return (
                 <View
                   key={key}
-                  style={[styles.row, idx < MICROS.length - 1 ? styles.rowBorder : null]}
+                  style={[
+                    styles.row,
+                    idx < MICROS.length - 1 ? styles.rowBorder : null,
+                  ]}
                   accessible
                   accessibilityLabel={`${label}: ${formatted}`}
                 >
@@ -103,7 +131,8 @@ export function NutritionSection({ recipeId }: { recipeId: string }) {
             })}
           </View>
           <AppText variant="caption" tone="muted">
-            Ước tính từ dữ liệu USDA cho nguyên liệu theo sách, chỉ để tham khảo. “—” là chưa rõ.
+            Ước tính từ dữ liệu USDA cho nguyên liệu theo sách, chỉ để tham
+            khảo. “—” là chưa rõ.
           </AppText>
         </>
       )}
@@ -113,17 +142,17 @@ export function NutritionSection({ recipeId }: { recipeId: string }) {
 
 const styles = StyleSheet.create({
   root: { gap: spacing.md },
-  head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  head: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   macroGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.sm,
   },
   macroTile: {
-    width: '48%',
+    width: "48%",
     backgroundColor: colors.surfaceMuted,
     borderRadius: radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     padding: spacing.md,
     gap: spacing.xxs,
   },
@@ -134,8 +163,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     paddingVertical: spacing.sm,
   },
   rowBorder: {

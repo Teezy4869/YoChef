@@ -1,39 +1,39 @@
-import type { ViewStyle } from 'react-native';
+import type { ViewStyle } from "react-native";
 
 // YoChef design tokens. Light theme only (app.json userInterfaceStyle).
 // Text/background pairs meet WCAG AA (4.5:1) for body text.
 
 export const colors = {
-  background: '#FAF7F2', // warm paper, matches splash and adaptive icon
-  surface: '#FFFFFF',
-  surfaceElevated: '#FFFDF9',
-  surfaceMuted: '#F3EDE4',
-  border: '#E5DCD0',
-  borderStrong: '#C9BCAB',
+  background: "#FAF7F2", // warm paper, matches splash and adaptive icon
+  surface: "#FFFFFF",
+  surfaceElevated: "#FFFDF9",
+  surfaceMuted: "#F3EDE4",
+  border: "#E5DCD0",
+  borderStrong: "#C9BCAB",
 
-  text: '#1F1A17',
-  textMuted: '#655B53', // 6.2:1 on background
-  textOnPrimary: '#FFFFFF',
+  text: "#1F1A17",
+  textMuted: "#655B53", // 6.2:1 on background
+  textOnPrimary: "#FFFFFF",
 
-  primary: '#B93E0C', // 5.6:1 with white text
-  primaryPressed: '#962F06',
-  primarySoft: '#FBE7DC',
+  primary: "#B93E0C", // 5.6:1 with white text
+  primaryPressed: "#962F06",
+  primarySoft: "#FBE7DC",
 
-  danger: '#B42318',
-  dangerSoft: '#FDECEA',
-  success: '#067647',
-  successSoft: '#E6F4EC',
-  info: '#175CD3',
-  infoSoft: '#EAF1FD',
-  warning: '#B54708',
-  warningSoft: '#FEF0C7',
+  danger: "#B42318",
+  dangerSoft: "#FDECEA",
+  success: "#067647",
+  successSoft: "#E6F4EC",
+  info: "#175CD3",
+  infoSoft: "#EAF1FD",
+  warning: "#B54708",
+  warningSoft: "#FEF0C7",
 
-  star: '#D97706',
-  starSoft: '#FEF3C7',
-  scrimTop: 'rgba(31, 26, 23, 0.42)',
-  scrimBottom: 'rgba(31, 26, 23, 0.72)',
-  backdrop: 'rgba(31, 26, 23, 0.52)',
-  overlayChip: 'rgba(255, 253, 249, 0.92)',
+  star: "#D97706",
+  starSoft: "#FEF3C7",
+  scrimTop: "rgba(31, 26, 23, 0.42)",
+  scrimBottom: "rgba(31, 26, 23, 0.72)",
+  backdrop: "rgba(31, 26, 23, 0.52)",
+  overlayChip: "rgba(255, 253, 249, 0.92)",
 } as const;
 
 export const spacing = {
@@ -56,40 +56,70 @@ export const radius = {
 } as const;
 
 export const fonts = {
-  regular: 'BeVietnamPro_400Regular',
-  medium: 'BeVietnamPro_500Medium',
-  semibold: 'BeVietnamPro_600SemiBold',
-  bold: 'BeVietnamPro_700Bold',
+  regular: "BeVietnamPro_400Regular",
+  medium: "BeVietnamPro_500Medium",
+  semibold: "BeVietnamPro_600SemiBold",
+  bold: "BeVietnamPro_700Bold",
 } as const;
 
 export const typography = {
-  display: { fontSize: 28, lineHeight: 36, fontWeight: '700', fontFamily: fonts.bold },
-  title: { fontSize: 22, lineHeight: 30, fontWeight: '700', fontFamily: fonts.bold },
-  heading: { fontSize: 17, lineHeight: 24, fontWeight: '600', fontFamily: fonts.semibold },
-  body: { fontSize: 16, lineHeight: 24, fontWeight: '400', fontFamily: fonts.regular },
-  label: { fontSize: 14, lineHeight: 20, fontWeight: '600', fontFamily: fonts.semibold },
-  caption: { fontSize: 13, lineHeight: 18, fontWeight: '400', fontFamily: fonts.regular },
+  display: {
+    fontSize: 28,
+    lineHeight: 36,
+    fontWeight: "700",
+    fontFamily: fonts.bold,
+  },
+  title: {
+    fontSize: 22,
+    lineHeight: 30,
+    fontWeight: "700",
+    fontFamily: fonts.bold,
+  },
+  heading: {
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: "600",
+    fontFamily: fonts.semibold,
+  },
+  body: {
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: "400",
+    fontFamily: fonts.regular,
+  },
+  label: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "600",
+    fontFamily: fonts.semibold,
+  },
+  caption: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "400",
+    fontFamily: fonts.regular,
+  },
 } as const;
 
 export type TextVariant = keyof typeof typography;
 
-export const shadows: Record<'card' | 'floating' | 'sheet', ViewStyle> = {
+export const shadows: Record<"card" | "floating" | "sheet", ViewStyle> = {
   card: {
-    shadowColor: '#2B1D14',
+    shadowColor: "#2B1D14",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
   },
   floating: {
-    shadowColor: '#2B1D14',
+    shadowColor: "#2B1D14",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.12,
     shadowRadius: 16,
     elevation: 6,
   },
   sheet: {
-    shadowColor: '#2B1D14',
+    shadowColor: "#2B1D14",
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.14,
     shadowRadius: 20,
@@ -100,5 +130,13 @@ export const shadows: Record<'card' | 'floating' | 'sheet', ViewStyle> = {
 // Minimum touch target (Apple HIG 44pt, Material 48dp).
 export const touchTarget = 48;
 
-export const theme = { colors, spacing, radius, fonts, typography, shadows, touchTarget } as const;
+export const theme = {
+  colors,
+  spacing,
+  radius,
+  fonts,
+  typography,
+  shadows,
+  touchTarget,
+} as const;
 export type Theme = typeof theme;

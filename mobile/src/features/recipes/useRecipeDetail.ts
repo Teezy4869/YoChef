@@ -1,11 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 
-import type { YoChefClient } from '@/lib/supabase';
+import type { YoChefClient } from "@/lib/supabase";
 
-import { fetchRecipeDetail, RecipeError } from './recipeApi';
-import type { RecipeDetail } from './types';
+import { fetchRecipeDetail, RecipeError } from "./recipeApi";
+import type { RecipeDetail } from "./types";
 
-type Result = { key: string; recipe: RecipeDetail | null; error: string | null };
+type Result = {
+  key: string;
+  recipe: RecipeDetail | null;
+  error: string | null;
+};
 
 /** Loads one recipe by slug. `notFound` means it does not exist or is not published. */
 export function useRecipeDetail(client: YoChefClient, slug: string) {
@@ -22,7 +26,10 @@ export function useRecipeDetail(client: YoChefClient, slug: string) {
         setResult({
           key,
           recipe: null,
-          error: e instanceof RecipeError ? e.message : 'Có lỗi xảy ra. Vui lòng thử lại.',
+          error:
+            e instanceof RecipeError
+              ? e.message
+              : "Có lỗi xảy ra. Vui lòng thử lại.",
         }),
     );
     return () => {
@@ -35,7 +42,8 @@ export function useRecipeDetail(client: YoChefClient, slug: string) {
     loading: current === null,
     error: current?.error ?? null,
     recipe: current?.recipe ?? null,
-    notFound: current !== null && current.error === null && current.recipe === null,
+    notFound:
+      current !== null && current.error === null && current.recipe === null,
     retry: () => setAttempt((n) => n + 1),
   };
 }

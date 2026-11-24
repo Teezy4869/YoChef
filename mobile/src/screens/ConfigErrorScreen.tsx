@@ -1,9 +1,9 @@
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from "react-native";
 
-import { AppIcon } from '@/components/AppIcon';
-import { AppText } from '@/components/AppText';
-import { Screen } from '@/components/Screen';
-import { colors, radius, shadows, spacing } from '@/theme/tokens';
+import { AppIcon } from "@/components/AppIcon";
+import { AppText } from "@/components/AppText";
+import { Screen } from "@/components/Screen";
+import { colors, radius, shadows, spacing } from "@/theme/tokens";
 
 // Shown instead of the app when the environment is not safe to use (fail-closed).
 // No Supabase client exists while this screen is up, so nothing touches the network.
@@ -18,8 +18,8 @@ export function ConfigErrorScreen({ problems }: { problems: string[] }) {
           Chưa cấu hình xong
         </AppText>
         <AppText tone="muted" align="center">
-          YoChef không kết nối tới máy chủ khi cấu hình chưa hợp lệ. Người phát triển cần sửa file mobile/.env rồi
-          khởi động lại.
+          YoChef không kết nối tới máy chủ khi cấu hình chưa hợp lệ. Người phát
+          triển cần sửa file mobile/.env rồi khởi động lại.
         </AppText>
         <View style={styles.list}>
           {problems.map((p) => (
@@ -37,10 +37,10 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     padding: spacing.xl,
     gap: spacing.md,
-    alignItems: 'center',
+    alignItems: "center",
     borderWidth: 1,
     borderColor: colors.border,
     ...shadows.card,
@@ -50,11 +50,11 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: radius.pill,
     backgroundColor: colors.dangerSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   list: {
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
     gap: spacing.xs,
     padding: spacing.md,
     borderRadius: radius.md,

@@ -1,13 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { YoChefClient } from '@/lib/supabase';
+import type { YoChefClient } from "@/lib/supabase";
 
-import { PAGE_SIZE, RecipeError, searchRecipes } from './recipeApi';
-import type { RecipeSummary, SearchFilters } from './types';
+import { PAGE_SIZE, RecipeError, searchRecipes } from "./recipeApi";
+import type { RecipeSummary, SearchFilters } from "./types";
 
-type Result = { key: string; items: RecipeSummary[]; total: number; error: string | null };
+type Result = {
+  key: string;
+  items: RecipeSummary[];
+  total: number;
+  error: string | null;
+};
 
-const messageOf = (e: unknown) => (e instanceof RecipeError ? e.message : 'Có lỗi xảy ra. Vui lòng thử lại.');
+const messageOf = (e: unknown) =>
+  e instanceof RecipeError ? e.message : "Có lỗi xảy ra. Vui lòng thử lại.";
 
 /**
  * Paged recipe search. `filters` must already be debounced. A result belongs to
@@ -22,7 +28,13 @@ export function useRecipeSearch(client: YoChefClient, filters: SearchFilters) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreError, setMoreError] = useState<string | null>(null);
 
-  const key = JSON.stringify([query.trim(), categorySlug, difficulty, maxTotalMinutes, attempt]);
+  const key = JSON.stringify([
+    query.trim(),
+    categorySlug,
+    difficulty,
+    maxTotalMinutes,
+    attempt,
+  ]);
   const keyRef = useRef(key);
   const loadingMoreRef = useRef(false);
 
@@ -32,10 +44,18 @@ export function useRecipeSearch(client: YoChefClient, filters: SearchFilters) {
 
   useEffect(() => {
     let active = true;
-    const f: SearchFilters = { query, categorySlug, difficulty, maxTotalMinutes };
+    const f: SearchFilters = {
+      query,
+      categorySlug,
+      difficulty,
+      maxTotalMinutes,
+    };
     searchRecipes(client, f, { offset: 0 }).then(
-      (r) => active && setResult({ key, items: r.items, total: r.total, error: null }),
-      (e: unknown) => active && setResult({ key, items: [], total: 0, error: messageOf(e) }),
+      (r) =>
+        active &&
+        setResult({ key, items: r.items, total: r.total, error: null }),
+      (e: unknown) =>
+        active && setResult({ key, items: [], total: 0, error: messageOf(e) }),
     );
     return () => {
       active = false;
@@ -45,7 +65,13 @@ export function useRecipeSearch(client: YoChefClient, filters: SearchFilters) {
   const current = result && result.key === key ? result : null;
 
   const loadMore = useCallback(async () => {
-    if (!current || current.error || loadingMoreRef.current || current.items.length >= current.total) return;
+    if (
+      !current ||
+      current.error ||
+      loadingMoreRef.current ||
+      current.items.length >= current.total
+    )
+      return;
     loadingMoreRef.current = true;
     setLoadingMore(true);
     setMoreError(null);
@@ -60,7 +86,11 @@ export function useRecipeSearch(client: YoChefClient, filters: SearchFilters) {
       setResult((prev) => {
         if (!prev || prev.key !== startKey) return prev;
         const seen = new Set(prev.items.map((i) => i.id));
-        return { ...prev, items: [...prev.items, ...page.items.filter((i) => !seen.has(i.id))], total: page.total || prev.total };
+        return {
+          ...prev,
+          items: [...prev.items, ...page.items.filter((i) => !seen.has(i.id))],
+          total: page.total || prev.total,
+        };
       });
     } catch (e) {
       if (keyRef.current === startKey) setMoreError(messageOf(e));

@@ -1,11 +1,17 @@
-import { Image, type ImageContentFit } from 'expo-image';
-import { useState } from 'react';
-import { StyleSheet, View, type ImageStyle, type StyleProp, type ViewStyle } from 'react-native';
+import { Image, type ImageContentFit } from "expo-image";
+import { useState } from "react";
+import {
+  StyleSheet,
+  View,
+  type ImageStyle,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 
-import { colors } from '@/theme/tokens';
+import { colors } from "@/theme/tokens";
 
-import { AppIcon, type IconName } from './AppIcon';
-import { AppText } from './AppText';
+import { AppIcon, type IconName } from "./AppIcon";
+import { AppText } from "./AppText";
 
 export type AppImageProps = {
   uri: string | null | undefined;
@@ -21,11 +27,11 @@ export type AppImageProps = {
 export function AppImage({
   uri,
   style,
-  contentFit = 'cover',
+  contentFit = "cover",
   accessibilityLabel,
   testID,
   fallbackTestID,
-  fallbackIcon = 'restaurant-outline',
+  fallbackIcon = "restaurant-outline",
   fallbackText,
 }: AppImageProps) {
   const [failedUri, setFailedUri] = useState<string | null>(null);
@@ -54,7 +60,7 @@ export function AppImage({
       contentFit={contentFit}
       transition={200}
       onError={(e) => {
-        if (__DEV__) console.warn('[AppImage] load failed:', uri, e.error);
+        if (__DEV__) console.warn("[AppImage] load failed:", uri, e.error);
         setFailedUri(uri);
       }}
       accessibilityLabel={accessibilityLabel}
@@ -69,8 +75,8 @@ const styles = StyleSheet.create({
   },
   fallback: {
     backgroundColor: colors.surfaceMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     gap: 4,
     padding: 8,
   },

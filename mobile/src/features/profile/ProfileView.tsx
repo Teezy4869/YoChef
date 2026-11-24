@@ -1,24 +1,27 @@
-import type { Session } from '@supabase/supabase-js';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import type { Session } from "@supabase/supabase-js";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 
-import { AppIcon } from '@/components/AppIcon';
-import { AppText } from '@/components/AppText';
-import { Avatar } from '@/components/Avatar';
-import { Banner } from '@/components/Banner';
-import { Button } from '@/components/Button';
-import { EmptyState } from '@/components/EmptyState';
-import { Screen } from '@/components/Screen';
-import { TextField } from '@/components/TextField';
-import { useAuth } from '@/features/auth/AuthProvider';
-import { DISPLAY_NAME_MAX, validateDisplayName } from '@/features/auth/validation';
-import { useFavorites } from '@/features/favorites/FavoritesProvider';
-import { ModerationEntry } from '@/features/moderation/ModerationEntry';
-import { triggerHaptic } from '@/lib/haptics';
-import { useSupabase } from '@/lib/supabase';
-import { colors, radius, shadows, spacing } from '@/theme/tokens';
+import { AppIcon } from "@/components/AppIcon";
+import { AppText } from "@/components/AppText";
+import { Avatar } from "@/components/Avatar";
+import { Banner } from "@/components/Banner";
+import { Button } from "@/components/Button";
+import { EmptyState } from "@/components/EmptyState";
+import { Screen } from "@/components/Screen";
+import { TextField } from "@/components/TextField";
+import { useAuth } from "@/features/auth/AuthProvider";
+import {
+  DISPLAY_NAME_MAX,
+  validateDisplayName,
+} from "@/features/auth/validation";
+import { useFavorites } from "@/features/favorites/FavoritesProvider";
+import { ModerationEntry } from "@/features/moderation/ModerationEntry";
+import { triggerHaptic } from "@/lib/haptics";
+import { useSupabase } from "@/lib/supabase";
+import { colors, radius, shadows, spacing } from "@/theme/tokens";
 
-import { pickAvatar } from './pickAvatar';
+import { pickAvatar } from "./pickAvatar";
 import {
   avatarPublicUrl,
   BIO_MAX,
@@ -27,11 +30,15 @@ import {
   replaceAvatar,
   updateMyProfile,
   type MyProfile,
-} from './profileApi';
+} from "./profileApi";
 
-type Load = { state: 'loading' } | { state: 'error'; message: string } | { state: 'ready'; profile: MyProfile };
+type Load =
+  | { state: "loading" }
+  | { state: "error"; message: string }
+  | { state: "ready"; profile: MyProfile };
 
-const messageOf = (e: unknown) => (e instanceof ProfileError ? e.message : 'Có lỗi xảy ra. Vui lòng thử lại.');
+const messageOf = (e: unknown) =>
+  e instanceof ProfileError ? e.message : "Có lỗi xảy ra. Vui lòng thử lại.";
 
 export function ProfileView({ session }: { session: Session }) {
   const supabase = useSupabase();
@@ -39,13 +46,19 @@ export function ProfileView({ session }: { session: Session }) {
   const { items: favorites } = useFavorites();
   const userId = session.user.id;
 
-  const [load, setLoad] = useState<Load>({ state: 'loading' });
+  const [load, setLoad] = useState<Load>({ state: "loading" });
   const [editing, setEditing] = useState(false);
-  const [name, setName] = useState('');
-  const [bio, setBio] = useState('');
-  const [fieldErrors, setFieldErrors] = useState<{ name?: string; bio?: string }>({});
-  const [banner, setBanner] = useState<{ tone: 'error' | 'success'; message: string } | null>(null);
-  const [busy, setBusy] = useState<null | 'save' | 'avatar' | 'signout'>(null);
+  const [name, setName] = useState("");
+  const [bio, setBio] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<{
+    name?: string;
+    bio?: string;
+  }>({});
+  const [banner, setBanner] = useState<{
+    tone: "error" | "success";
+    message: string;
+  } | null>(null);
+  const [busy, setBusy] = useState<null | "save" | "avatar" | "signout">(null);
 
   const [attempt, setAttempt] = useState(0);
 
@@ -56,10 +69,14 @@ export function ProfileView({ session }: { session: Session }) {
     fetchMyProfile(supabase).then(
       (profile) => {
         if (!active) return;
-        setLoad(profile ? { state: 'ready', profile } : { state: 'error', message: 'Không tìm thấy hồ sơ của bạn.' });
+        setLoad(
+          profile
+            ? { state: "ready", profile }
+            : { state: "error", message: "Không tìm thấy hồ sơ của bạn." },
+        );
       },
       (e: unknown) => {
-        if (active) setLoad({ state: 'error', message: messageOf(e) });
+        if (active) setLoad({ state: "error", message: messageOf(e) });
       },
     );
     return () => {
@@ -68,19 +85,23 @@ export function ProfileView({ session }: { session: Session }) {
   }, [supabase, attempt]);
 
   function retry() {
-    setLoad({ state: 'loading' });
+    setLoad({ state: "loading" });
     setAttempt((n) => n + 1);
   }
 
-  if (load.state === 'loading') {
+  if (load.state === "loading") {
     return (
       <Screen centered testID="profile-loading">
-        <ActivityIndicator color={colors.primary} size="large" accessibilityLabel="Đang tải hồ sơ" />
+        <ActivityIndicator
+          color={colors.primary}
+          size="large"
+          accessibilityLabel="Đang tải hồ sơ"
+        />
       </Screen>
     );
   }
 
-  if (load.state === 'error') {
+  if (load.state === "error") {
     return (
       <Screen centered testID="profile-error">
         <EmptyState
@@ -91,7 +112,11 @@ export function ProfileView({ session }: { session: Session }) {
           action={
             <>
               <Button title="Thử lại" icon="refresh" onPress={retry} />
-              <Button title="Đăng xuất" variant="ghost" onPress={() => signOut()} />
+              <Button
+                title="Đăng xuất"
+                variant="ghost"
+                onPress={() => signOut()}
+              />
             </>
           }
         />
@@ -102,8 +127,8 @@ export function ProfileView({ session }: { session: Session }) {
   const { profile } = load;
 
   function startEdit() {
-    setName(profile.display_name ?? '');
-    setBio(profile.bio ?? '');
+    setName(profile.display_name ?? "");
+    setBio(profile.bio ?? "");
     setFieldErrors({});
     setBanner(null);
     setEditing(true);
@@ -113,21 +138,22 @@ export function ProfileView({ session }: { session: Session }) {
     const errors: { name?: string; bio?: string } = {};
     const nameError = validateDisplayName(name);
     if (nameError) errors.name = nameError;
-    if (bio.trim().length > BIO_MAX) errors.bio = `Giới thiệu tối đa ${BIO_MAX} ký tự.`;
+    if (bio.trim().length > BIO_MAX)
+      errors.bio = `Giới thiệu tối đa ${BIO_MAX} ký tự.`;
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
-    setBusy('save');
+    setBusy("save");
     setBanner(null);
     try {
       await updateMyProfile(supabase, userId, { displayName: name, bio });
       const fresh = await fetchMyProfile(supabase);
-      if (fresh) setLoad({ state: 'ready', profile: fresh });
-      triggerHaptic('success');
+      if (fresh) setLoad({ state: "ready", profile: fresh });
+      triggerHaptic("success");
       setEditing(false);
-      setBanner({ tone: 'success', message: 'Đã lưu hồ sơ.' });
+      setBanner({ tone: "success", message: "Đã lưu hồ sơ." });
     } catch (e) {
-      setBanner({ tone: 'error', message: messageOf(e) });
+      setBanner({ tone: "error", message: messageOf(e) });
     } finally {
       setBusy(null);
     }
@@ -139,29 +165,34 @@ export function ProfileView({ session }: { session: Session }) {
     try {
       picked = await pickAvatar();
     } catch {
-      setBanner({ tone: 'error', message: 'Không mở được thư viện ảnh.' });
+      setBanner({ tone: "error", message: "Không mở được thư viện ảnh." });
       return;
     }
     if (!picked) return;
-    setBusy('avatar');
+    setBusy("avatar");
     try {
-      const path = await replaceAvatar(supabase, userId, picked, profile.avatar_path);
-      setLoad({ state: 'ready', profile: { ...profile, avatar_path: path } });
-      triggerHaptic('success');
-      setBanner({ tone: 'success', message: 'Đã cập nhật ảnh đại diện.' });
+      const path = await replaceAvatar(
+        supabase,
+        userId,
+        picked,
+        profile.avatar_path,
+      );
+      setLoad({ state: "ready", profile: { ...profile, avatar_path: path } });
+      triggerHaptic("success");
+      setBanner({ tone: "success", message: "Đã cập nhật ảnh đại diện." });
     } catch (e) {
-      setBanner({ tone: 'error', message: messageOf(e) });
+      setBanner({ tone: "error", message: messageOf(e) });
     } finally {
       setBusy(null);
     }
   }
 
   async function onSignOut() {
-    setBusy('signout');
+    setBusy("signout");
     const r = await signOut();
     // On success this view unmounts; only an error leaves us here.
     if (r.error) {
-      setBanner({ tone: 'error', message: r.error });
+      setBanner({ tone: "error", message: r.error });
       setBusy(null);
     }
   }
@@ -183,7 +214,7 @@ export function ProfileView({ session }: { session: Session }) {
         </Pressable>
         <View style={styles.headerText}>
           <AppText variant="title" testID="profile-name">
-            {profile.display_name ?? 'Chưa đặt tên'}
+            {profile.display_name ?? "Chưa đặt tên"}
           </AppText>
           <AppText variant="caption" tone="muted">
             {session.user.email}
@@ -199,7 +230,13 @@ export function ProfileView({ session }: { session: Session }) {
         </View>
       </View>
 
-      {banner ? <Banner tone={banner.tone} message={banner.message} testID="profile-banner" /> : null}
+      {banner ? (
+        <Banner
+          tone={banner.tone}
+          message={banner.message}
+          testID="profile-banner"
+        />
+      ) : null}
 
       {editing ? (
         <View style={styles.card}>
@@ -221,8 +258,18 @@ export function ProfileView({ session }: { session: Session }) {
             multiline
             maxLength={BIO_MAX + 50}
           />
-          <Button title="Lưu" icon="checkmark" onPress={save} loading={busy === 'save'} />
-          <Button title="Hủy" variant="ghost" onPress={() => setEditing(false)} disabled={busy === 'save'} />
+          <Button
+            title="Lưu"
+            icon="checkmark"
+            onPress={save}
+            loading={busy === "save"}
+          />
+          <Button
+            title="Hủy"
+            variant="ghost"
+            onPress={() => setEditing(false)}
+            disabled={busy === "save"}
+          />
         </View>
       ) : (
         <>
@@ -231,21 +278,29 @@ export function ProfileView({ session }: { session: Session }) {
               <AppIcon name="reader-outline" size={18} tone="primary" />
               <AppText variant="heading">Giới thiệu</AppText>
             </View>
-            <AppText tone={profile.bio ? 'default' : 'muted'} testID="profile-bio">
-              {profile.bio ?? 'Chưa có giới thiệu.'}
+            <AppText
+              tone={profile.bio ? "default" : "muted"}
+              testID="profile-bio"
+            >
+              {profile.bio ?? "Chưa có giới thiệu."}
             </AppText>
           </View>
 
           <View style={styles.card}>
             <AppText variant="heading">Tài khoản</AppText>
-            <Button title="Sửa hồ sơ" icon="create-outline" onPress={startEdit} disabled={busy !== null} />
+            <Button
+              title="Sửa hồ sơ"
+              icon="create-outline"
+              onPress={startEdit}
+              disabled={busy !== null}
+            />
             <Button
               title="Đổi ảnh đại diện"
               icon="image-outline"
               variant="secondary"
               onPress={changeAvatar}
-              loading={busy === 'avatar'}
-              disabled={busy !== null && busy !== 'avatar'}
+              loading={busy === "avatar"}
+              disabled={busy !== null && busy !== "avatar"}
             />
             <ModerationEntry userId={userId} />
             <Button
@@ -253,8 +308,8 @@ export function ProfileView({ session }: { session: Session }) {
               icon="log-out-outline"
               variant="ghost"
               onPress={onSignOut}
-              loading={busy === 'signout'}
-              disabled={busy !== null && busy !== 'signout'}
+              loading={busy === "signout"}
+              disabled={busy !== null && busy !== "signout"}
             />
           </View>
         </>
@@ -265,12 +320,12 @@ export function ProfileView({ session }: { session: Session }) {
 
 const styles = StyleSheet.create({
   heroCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.lg,
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
@@ -278,14 +333,14 @@ const styles = StyleSheet.create({
   },
   headerText: { flex: 1, gap: spacing.xs },
   statRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.xs,
     marginTop: spacing.xxs,
   },
   statPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.xs,
     backgroundColor: colors.primarySoft,
     paddingHorizontal: spacing.sm,
@@ -295,7 +350,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     padding: spacing.lg,
     gap: spacing.md,
     borderWidth: 1,
@@ -303,8 +358,8 @@ const styles = StyleSheet.create({
     ...shadows.card,
   },
   cardTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.sm,
   },
 });

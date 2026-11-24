@@ -12,7 +12,9 @@ export type AppEnv = {
   supabasePublishableKey: string;
 };
 
-export type EnvResult = { ok: true; env: AppEnv } | { ok: false; problems: string[] };
+export type EnvResult =
+  | { ok: true; env: AppEnv }
+  | { ok: false; problems: string[] };
 
 export type RawEnv = {
   url: string | undefined;
@@ -21,7 +23,7 @@ export type RawEnv = {
 
 const SUPABASE_URL_RE = /^https:\/\/[a-z0-9]{20}\.supabase\.co$/;
 // The pre-rebuild project: read-only reference with a schema the app does not match (AGENTS.md).
-const OLD_PROJECT_REF = 'ihfuftmpsfgtwvmtfdja';
+const OLD_PROJECT_REF = "ihfuftmpsfgtwvmtfdja";
 
 export function rawEnvFromProcess(): RawEnv {
   return {
@@ -31,13 +33,13 @@ export function rawEnvFromProcess(): RawEnv {
 }
 
 function decodeJwtRole(token: string): string | null {
-  const part = token.split('.')[1];
-  if (!part || typeof globalThis.atob !== 'function') return null;
+  const part = token.split(".")[1];
+  if (!part || typeof globalThis.atob !== "function") return null;
   try {
-    const b64 = part.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+    const b64 = part.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
     const payload = JSON.parse(globalThis.atob(padded)) as { role?: unknown };
-    return typeof payload.role === 'string' ? payload.role : null;
+    return typeof payload.role === "string" ? payload.role : null;
   } catch {
     return null;
   }
@@ -45,28 +47,36 @@ function decodeJwtRole(token: string): string | null {
 
 export function validateEnv(raw: RawEnv): EnvResult {
   const problems: string[] = [];
-  const url = (raw.url ?? '').trim().replace(/\/+$/, '');
-  const key = (raw.key ?? '').trim();
+  const url = (raw.url ?? "").trim().replace(/\/+$/, "");
+  const key = (raw.key ?? "").trim();
 
   if (!url) {
-    problems.push('Thiếu EXPO_PUBLIC_SUPABASE_URL.');
+    problems.push("Thiếu EXPO_PUBLIC_SUPABASE_URL.");
   } else if (!SUPABASE_URL_RE.test(url)) {
-    problems.push('EXPO_PUBLIC_SUPABASE_URL phải có dạng https://<project-ref>.supabase.co.');
+    problems.push(
+      "EXPO_PUBLIC_SUPABASE_URL phải có dạng https://<project-ref>.supabase.co.",
+    );
   } else if (url.includes(OLD_PROJECT_REF)) {
-    problems.push('EXPO_PUBLIC_SUPABASE_URL đang trỏ tới project cũ (chỉ đọc). YoChef v2 dùng project bdhphjwhagygbwtfhhxn.');
+    problems.push(
+      "EXPO_PUBLIC_SUPABASE_URL đang trỏ tới project cũ (chỉ đọc). YoChef v2 dùng project bdhphjwhagygbwtfhhxn.",
+    );
   }
 
   if (!key) {
-    problems.push('Thiếu EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY.');
-  } else if (key.startsWith('sb_secret_')) {
-    problems.push('Khóa là secret key. App chỉ được dùng publishable key.');
-  } else if (key.startsWith('eyJ')) {
+    problems.push("Thiếu EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY.");
+  } else if (key.startsWith("sb_secret_")) {
+    problems.push("Khóa là secret key. App chỉ được dùng publishable key.");
+  } else if (key.startsWith("eyJ")) {
     const role = decodeJwtRole(key);
-    if (role !== 'anon') {
-      problems.push(`Khóa JWT có vai trò "${role ?? 'không đọc được'}". App chỉ được dùng khóa anon/publishable.`);
+    if (role !== "anon") {
+      problems.push(
+        `Khóa JWT có vai trò "${role ?? "không đọc được"}". App chỉ được dùng khóa anon/publishable.`,
+      );
     }
-  } else if (!key.startsWith('sb_publishable_') || key.includes('<')) {
-    problems.push('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY không phải publishable key (sb_publishable_...).');
+  } else if (!key.startsWith("sb_publishable_") || key.includes("<")) {
+    problems.push(
+      "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY không phải publishable key (sb_publishable_...).",
+    );
   }
 
   if (problems.length > 0) return { ok: false, problems };

@@ -1,11 +1,11 @@
-import { SignInPrompt } from '@/components/SignInPrompt';
-import { useAuth } from '@/features/auth/AuthProvider';
-import { ProfileView } from '@/features/profile/ProfileView';
+import { SignInPrompt } from "@/components/SignInPrompt";
+import { useAuth } from "@/features/auth/AuthProvider";
+import { ProfileView } from "@/features/profile/ProfileView";
 
 export function AccountScreen() {
   const { status, session } = useAuth();
 
-  if (status === 'signedIn' && session) {
+  if (status === "signedIn" && session) {
     // key: a different user gets a fresh view, never the previous user's state.
     return <ProfileView key={session.user.id} session={session} />;
   }

@@ -1,10 +1,17 @@
-import { useEffect, useState } from 'react';
-import { Animated, StyleSheet, View, type DimensionValue, type StyleProp, type ViewStyle } from 'react-native';
+import { useEffect, useState } from "react";
+import {
+  Animated,
+  StyleSheet,
+  View,
+  type DimensionValue,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 
-import { colors, radius, shadows, spacing } from '@/theme/tokens';
+import { colors, radius, shadows, spacing } from "@/theme/tokens";
 
 export function SkeletonBlock({
-  width = '100%',
+  width = "100%",
   height = 16,
   borderRadius = radius.sm,
   style,
@@ -19,8 +26,16 @@ export function SkeletonBlock({
   useEffect(() => {
     const anim = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 750, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0.55, duration: 750, useNativeDriver: true }),
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 750,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0.55,
+          duration: 750,
+          useNativeDriver: true,
+        }),
       ]),
     );
     anim.start();
@@ -50,9 +65,19 @@ export function RecipeCardSkeleton() {
   );
 }
 
-export function RecipeListSkeleton({ count = 3, testID }: { count?: number; testID?: string }) {
+export function RecipeListSkeleton({
+  count = 3,
+  testID,
+}: {
+  count?: number;
+  testID?: string;
+}) {
   return (
-    <View style={styles.list} testID={testID} accessibilityLabel="Đang tải công thức">
+    <View
+      style={styles.list}
+      testID={testID}
+      accessibilityLabel="Đang tải công thức"
+    >
       {Array.from({ length: count }, (_, i) => (
         <RecipeCardSkeleton key={i} />
       ))}
@@ -60,7 +85,13 @@ export function RecipeListSkeleton({ count = 3, testID }: { count?: number; test
   );
 }
 
-export function ListRowSkeleton({ count = 4, testID }: { count?: number; testID?: string }) {
+export function ListRowSkeleton({
+  count = 4,
+  testID,
+}: {
+  count?: number;
+  testID?: string;
+}) {
   return (
     <View style={styles.list} testID={testID}>
       {Array.from({ length: count }, (_, i) => (
@@ -88,7 +119,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     padding: spacing.sm,
     gap: spacing.md,
     borderWidth: 1,
@@ -101,13 +132,13 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   rowCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.md,
     padding: spacing.md,
     backgroundColor: colors.surface,
     borderRadius: radius.md,
-    borderCurve: 'continuous',
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: colors.border,
   },

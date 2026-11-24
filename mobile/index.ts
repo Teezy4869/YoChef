@@ -1,6 +1,6 @@
-import { registerRootComponent } from 'expo';
+import { registerRootComponent } from "expo";
 
-import App from './src/app/App';
+import App from "./src/app/App";
 
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App).
 registerRootComponent(App);

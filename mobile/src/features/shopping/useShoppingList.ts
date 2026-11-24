@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from "react";
 
-import type { YoChefClient } from '@/lib/supabase';
+import type { YoChefClient } from "@/lib/supabase";
 
 import {
   addManual,
@@ -13,10 +13,17 @@ import {
   type ManualErrors,
   type ManualInput,
   type ShoppingItem,
-} from './shoppingApi';
+} from "./shoppingApi";
 
-type Result = { userId: string; attempt: number; listId: string | null; items: ShoppingItem[]; error: string | null };
-const messageOf = (e: unknown) => (e instanceof Error ? e.message : 'Có lỗi xảy ra. Vui lòng thử lại.');
+type Result = {
+  userId: string;
+  attempt: number;
+  listId: string | null;
+  items: ShoppingItem[];
+  error: string | null;
+};
+const messageOf = (e: unknown) =>
+  e instanceof Error ? e.message : "Có lỗi xảy ra. Vui lòng thử lại.";
 
 /**
  * The signed-in user's default shopping list. Ticks and deletes show at once
@@ -35,7 +42,8 @@ export function useShoppingList(client: YoChefClient, userId: string) {
       const items = listId ? await fetchItems(client, listId) : [];
       return { listId, items };
     })().then(
-      ({ listId, items }) => active && setResult({ userId, attempt, listId, items, error: null }),
+      ({ listId, items }) =>
+        active && setResult({ userId, attempt, listId, items, error: null }),
       (e: unknown) =>
         active &&
         setResult((prev) => ({
@@ -55,11 +63,18 @@ export function useShoppingList(client: YoChefClient, userId: string) {
   const items = current?.items ?? [];
 
   const setItems = (fn: (items: ShoppingItem[]) => ShoppingItem[]) =>
-    setResult((prev) => (prev && prev.userId === userId ? { ...prev, items: fn(prev.items) } : prev));
+    setResult((prev) =>
+      prev && prev.userId === userId
+        ? { ...prev, items: fn(prev.items) }
+        : prev,
+    );
 
   const toggle = async (item: ShoppingItem) => {
     setActionError(null);
-    const flip = (checked: boolean) => setItems((list) => list.map((i) => (i.id === item.id ? { ...i, isChecked: checked } : i)));
+    const flip = (checked: boolean) =>
+      setItems((list) =>
+        list.map((i) => (i.id === item.id ? { ...i, isChecked: checked } : i)),
+      );
     flip(!item.isChecked);
     try {
       await setChecked(client, item.id, !item.isChecked);

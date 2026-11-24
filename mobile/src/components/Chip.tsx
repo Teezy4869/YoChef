@@ -1,16 +1,16 @@
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable, StyleSheet } from "react-native";
 
-import { triggerHaptic } from '@/lib/haptics';
-import { colors, radius, spacing, touchTarget } from '@/theme/tokens';
+import { triggerHaptic } from "@/lib/haptics";
+import { colors, radius, spacing, touchTarget } from "@/theme/tokens";
 
-import { AppIcon, type IconName, type IconTone } from './AppIcon';
-import { AppText } from './AppText';
+import { AppIcon, type IconName, type IconTone } from "./AppIcon";
+import { AppText } from "./AppText";
 
 export function Chip({
   label,
   selected,
   icon,
-  iconTone = 'primary',
+  iconTone = "primary",
   onPress,
 }: {
   label: string;
@@ -25,7 +25,7 @@ export function Chip({
       accessibilityLabel={label}
       accessibilityState={{ selected }}
       onPress={() => {
-        triggerHaptic('light');
+        triggerHaptic("light");
         onPress();
       }}
       hitSlop={4}
@@ -35,8 +35,14 @@ export function Chip({
         pressed ? styles.pressed : null,
       ]}
     >
-      {icon ? <AppIcon name={icon} size={15} tone={selected ? 'onPrimary' : iconTone} /> : null}
-      <AppText variant="label" tone={selected ? 'onPrimary' : 'default'}>
+      {icon ? (
+        <AppIcon
+          name={icon}
+          size={15}
+          tone={selected ? "onPrimary" : iconTone}
+        />
+      ) : null}
+      <AppText variant="label" tone={selected ? "onPrimary" : "default"}>
         {label}
       </AppText>
     </Pressable>
@@ -45,7 +51,7 @@ export function Chip({
 
 const styles = StyleSheet.create({
   chip: {
-    flexDirection: 'row',
+    flexDirection: "row",
     flexShrink: 0,
     gap: spacing.xs,
     minHeight: touchTarget - 10,
@@ -54,8 +60,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderStrong,
     backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   selected: { backgroundColor: colors.primary, borderColor: colors.primary },
   pressed: { opacity: 0.85 },

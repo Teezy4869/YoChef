@@ -1,16 +1,19 @@
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from "react-native";
 
-import { colors, radius } from '@/theme/tokens';
+import { colors, radius } from "@/theme/tokens";
 
-import { AppIcon } from './AppIcon';
-import { AppImage } from './AppImage';
-import { AppText } from './AppText';
+import { AppIcon } from "./AppIcon";
+import { AppImage } from "./AppImage";
+import { AppText } from "./AppText";
 
-export function initialsOf(name: string | null | undefined, fallback = '?'): string {
-  const words = (name ?? '').trim().split(/\s+/).filter(Boolean);
+export function initialsOf(
+  name: string | null | undefined,
+  fallback = "?",
+): string {
+  const words = (name ?? "").trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return fallback;
   const first = words[0][0];
-  const last = words.length > 1 ? words[words.length - 1][0] : '';
+  const last = words.length > 1 ? words[words.length - 1][0] : "";
   return (first + last).toUpperCase();
 }
 
@@ -36,8 +39,16 @@ export function Avatar({
           testID="avatar-image"
         />
       ) : (
-        <View style={[styles.base, styles.placeholder, box]} accessible accessibilityLabel="Chưa có ảnh đại diện">
-          <AppText variant="title" tone="primary" style={{ fontSize: size * 0.36, lineHeight: size * 0.44 }}>
+        <View
+          style={[styles.base, styles.placeholder, box]}
+          accessible
+          accessibilityLabel="Chưa có ảnh đại diện"
+        >
+          <AppText
+            variant="title"
+            tone="primary"
+            style={{ fontSize: size * 0.36, lineHeight: size * 0.44 }}
+          >
             {initialsOf(name)}
           </AppText>
         </View>
@@ -52,20 +63,20 @@ export function Avatar({
 }
 
 const styles = StyleSheet.create({
-  wrap: { position: 'relative' },
+  wrap: { position: "relative" },
   base: {
     backgroundColor: colors.surfaceMuted,
     borderWidth: 2,
     borderColor: colors.surface,
   },
   placeholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: colors.primarySoft,
     borderColor: colors.border,
   },
   editBadge: {
-    position: 'absolute',
+    position: "absolute",
     right: 0,
     bottom: 0,
     width: 28,
@@ -74,7 +85,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderWidth: 2,
     borderColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

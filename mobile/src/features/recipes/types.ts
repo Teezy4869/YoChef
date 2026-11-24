@@ -1,15 +1,18 @@
-export type Difficulty = 'easy' | 'medium' | 'hard';
+export type Difficulty = "easy" | "medium" | "hard";
 
 export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
-  easy: 'Dễ',
-  medium: 'Trung bình',
-  hard: 'Khó',
+  easy: "Dễ",
+  medium: "Trung bình",
+  hard: "Khó",
 };
 
-export const DIFFICULTY_TONE: Record<Difficulty, 'success' | 'star' | 'danger'> = {
-  easy: 'success',
-  medium: 'star',
-  hard: 'danger',
+export const DIFFICULTY_TONE: Record<
+  Difficulty,
+  "success" | "star" | "danger"
+> = {
+  easy: "success",
+  medium: "star",
+  hard: "danger",
 };
 
 /** One row of the recipe list. Unknown values are null, never 0 or ''. */
@@ -37,14 +40,14 @@ export type SearchFilters = {
 };
 
 export const EMPTY_FILTERS: SearchFilters = {
-  query: '',
+  query: "",
   categorySlug: null,
   difficulty: null,
   maxTotalMinutes: null,
 };
 
-export type QuantityBasis = 'book' | 'editor_estimate' | 'to_taste';
-export type ServingBasis = 'book' | 'editor_estimate' | 'inferred_yield';
+export type QuantityBasis = "book" | "editor_estimate" | "to_taste";
+export type ServingBasis = "book" | "editor_estimate" | "inferred_yield";
 
 export type IngredientLine = {
   sortOrder: number;

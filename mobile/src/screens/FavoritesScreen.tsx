@@ -1,21 +1,23 @@
-import { useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { useState } from "react";
+import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 
-import type { MainTabScreenProps } from '@/app/navigation/types';
-import { AppText } from '@/components/AppText';
-import { Button } from '@/components/Button';
-import { EmptyState } from '@/components/EmptyState';
-import { Screen } from '@/components/Screen';
-import { SignInPrompt } from '@/components/SignInPrompt';
-import { RecipeListSkeleton } from '@/components/Skeleton';
-import { useAuth } from '@/features/auth/AuthProvider';
-import { useFavorites } from '@/features/favorites/FavoritesProvider';
-import { coverUrl } from '@/features/recipes/recipeApi';
-import { RecipeCard } from '@/features/recipes/RecipeCard';
-import { useSupabase } from '@/lib/supabase';
-import { colors, spacing } from '@/theme/tokens';
+import type { MainTabScreenProps } from "@/app/navigation/types";
+import { AppText } from "@/components/AppText";
+import { Button } from "@/components/Button";
+import { EmptyState } from "@/components/EmptyState";
+import { Screen } from "@/components/Screen";
+import { SignInPrompt } from "@/components/SignInPrompt";
+import { RecipeListSkeleton } from "@/components/Skeleton";
+import { useAuth } from "@/features/auth/AuthProvider";
+import { useFavorites } from "@/features/favorites/FavoritesProvider";
+import { coverUrl } from "@/features/recipes/recipeApi";
+import { RecipeCard } from "@/features/recipes/RecipeCard";
+import { useSupabase } from "@/lib/supabase";
+import { colors, spacing } from "@/theme/tokens";
 
-export function FavoritesScreen({ navigation }: MainTabScreenProps<'Favorites'>) {
+export function FavoritesScreen({
+  navigation,
+}: MainTabScreenProps<"Favorites">) {
   const supabase = useSupabase();
   const { status } = useAuth();
   const { items, loading, error, reload } = useFavorites();
@@ -27,7 +29,7 @@ export function FavoritesScreen({ navigation }: MainTabScreenProps<'Favorites'>)
     setTimeout(() => setRefreshing(false), 300);
   };
 
-  if (status !== 'signedIn') {
+  if (status !== "signedIn") {
     return (
       <SignInPrompt
         title="Yêu thích"
@@ -70,7 +72,7 @@ export function FavoritesScreen({ navigation }: MainTabScreenProps<'Favorites'>)
             <Button
               title="Khám phá món Việt"
               icon="compass-outline"
-              onPress={() => navigation.navigate('Home')}
+              onPress={() => navigation.navigate("Home")}
             />
           }
         />
@@ -89,13 +91,21 @@ export function FavoritesScreen({ navigation }: MainTabScreenProps<'Favorites'>)
         data={items}
         keyExtractor={(r) => r.id}
         contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.primary}
+          />
+        }
         renderItem={({ item }) => (
           <RecipeCard
             variant="compact"
             recipe={item}
             imageUri={coverUrl(supabase, item.coverImagePath)}
-            onPress={() => navigation.navigate('RecipeDetail', { slug: item.slug })}
+            onPress={() =>
+              navigation.navigate("RecipeDetail", { slug: item.slug })
+            }
           />
         )}
       />

@@ -1,6 +1,6 @@
 // Recipe data access. Reads only: the Data API enforces that guests and users
 // see published recipes (RLS), and search runs in public.search_recipes().
-import type { YoChefClient } from '@/lib/supabase';
+import type { YoChefClient } from "@/lib/supabase";
 
 import type {
   Category,
@@ -12,35 +12,41 @@ import type {
   RecipeSummary,
   SearchFilters,
   ServingBasis,
-} from './types';
+} from "./types";
 
-export const COVER_BUCKET = 'recipe-images';
+export const COVER_BUCKET = "recipe-images";
 export const PAGE_SIZE = 20;
 
 export class RecipeError extends Error {}
 
-const NETWORK = 'Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.';
+const NETWORK = "Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.";
 
-export function fail(error: { message?: string } | null | undefined, fallback: string): never {
-  if (error?.message && /network|fetch/i.test(error.message)) throw new RecipeError(NETWORK);
+export function fail(
+  error: { message?: string } | null | undefined,
+  fallback: string,
+): never {
+  if (error?.message && /network|fetch/i.test(error.message))
+    throw new RecipeError(NETWORK);
   throw new RecipeError(fallback);
 }
 
-const DIFFICULTIES: readonly string[] = ['easy', 'medium', 'hard'];
+const DIFFICULTIES: readonly string[] = ["easy", "medium", "hard"];
 
 export function asDifficulty(v: unknown): Difficulty | null {
-  return typeof v === 'string' && DIFFICULTIES.includes(v) ? (v as Difficulty) : null;
+  return typeof v === "string" && DIFFICULTIES.includes(v)
+    ? (v as Difficulty)
+    : null;
 }
 
 /** Postgres numbers can arrive as strings; anything that is not a finite number is unknown. */
 export function asNumber(v: unknown): number | null {
-  if (v === null || v === undefined || v === '') return null;
-  const n = typeof v === 'number' ? v : Number(v);
+  if (v === null || v === undefined || v === "") return null;
+  const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : null;
 }
 
 export function asText(v: unknown): string | null {
-  return typeof v === 'string' && v.trim() !== '' ? v : null;
+  return typeof v === "string" && v.trim() !== "" ? v : null;
 }
 
 type SearchRow = Record<string, unknown>;
@@ -66,7 +72,7 @@ export async function searchRecipes(
   filters: SearchFilters,
   page: { limit?: number; offset?: number } = {},
 ): Promise<{ items: RecipeSummary[]; total: number }> {
-  const { data, error } = await client.rpc('search_recipes', {
+  const { data, error } = await client.rpc("search_recipes", {
     p_query: filters.query.trim() || null,
     p_category_slug: filters.categorySlug,
     p_difficulty: filters.difficulty,
@@ -74,7 +80,7 @@ export async function searchRecipes(
     p_limit: page.limit ?? PAGE_SIZE,
     p_offset: page.offset ?? 0,
   });
-  if (error) fail(error, 'Không tải được danh sách công thức.');
+  if (error) fail(error, "Không tải được danh sách công thức.");
   const rows = (data ?? []) as SearchRow[];
   return {
     items: rows.map(toSummary),
@@ -82,13 +88,24 @@ export async function searchRecipes(
   };
 }
 
-export async function fetchCategories(client: YoChefClient): Promise<Category[]> {
-  const { data, error } = await client.from('categories').select('slug,name').order('sort_order');
-  if (error) fail(error, 'Không tải được danh mục.');
-  return ((data ?? []) as { slug: string; name: string }[]).map((c) => ({ slug: c.slug, name: c.name }));
+export async function fetchCategories(
+  client: YoChefClient,
+): Promise<Category[]> {
+  const { data, error } = await client
+    .from("categories")
+    .select("slug,name")
+    .order("sort_order");
+  if (error) fail(error, "Không tải được danh mục.");
+  return ((data ?? []) as { slug: string; name: string }[]).map((c) => ({
+    slug: c.slug,
+    name: c.name,
+  }));
 }
 
-export function coverUrl(client: YoChefClient, path: string | null): string | null {
+export function coverUrl(
+  client: YoChefClient,
+  path: string | null,
+): string | null {
   if (!path) return null;
   return client.storage.from(COVER_BUCKET).getPublicUrl(path).data.publicUrl;
 }
@@ -96,39 +113,51 @@ export function coverUrl(client: YoChefClient, path: string | null): string | nu
 // --- Detail -------------------------------------------------------------------
 
 const DETAIL_SELECT =
-  'id,slug,name,description,difficulty,default_servings,serving_basis,serving_note,prep_time_minutes,cook_time_minutes,' +
-  'cover_image_path,category:categories(slug,name),source:recipe_sources(title,compiler,publication_year,usage_note),' +
-  'recipe_ingredients(sort_order,quantity,unit,quantity_basis,preparation_note,quantity_note,is_optional,ingredient:ingredients(id,name)),' +
-  'recipe_steps(step_number,instruction,timer_enabled,duration_seconds)';
+  "id,slug,name,description,difficulty,default_servings,serving_basis,serving_note,prep_time_minutes,cook_time_minutes," +
+  "cover_image_path,category:categories(slug,name),source:recipe_sources(title,compiler,publication_year,usage_note)," +
+  "recipe_ingredients(sort_order,quantity,unit,quantity_basis,preparation_note,quantity_note,is_optional,ingredient:ingredients(id,name))," +
+  "recipe_steps(step_number,instruction,timer_enabled,duration_seconds)";
 
 type Row = Record<string, unknown>;
 
 /** PostgREST returns a to-one embed as an object; tolerate a one-element array too. */
 export function one(v: unknown): Row | null {
   const x = Array.isArray(v) ? v[0] : v;
-  return x && typeof x === 'object' ? (x as Row) : null;
+  return x && typeof x === "object" ? (x as Row) : null;
 }
 
 function many(v: unknown): Row[] {
   return Array.isArray(v) ? (v as Row[]) : [];
 }
 
-const QUANTITY_BASIS: readonly string[] = ['book', 'editor_estimate', 'to_taste'];
-const SERVING_BASIS: readonly string[] = ['book', 'editor_estimate', 'inferred_yield'];
+const QUANTITY_BASIS: readonly string[] = [
+  "book",
+  "editor_estimate",
+  "to_taste",
+];
+const SERVING_BASIS: readonly string[] = [
+  "book",
+  "editor_estimate",
+  "inferred_yield",
+];
 
 function toIngredient(r: Row): IngredientLine | null {
   const ingredient = one(r.ingredient);
   const name = asText(ingredient?.name);
   const sortOrder = asNumber(r.sort_order);
   if (!name || sortOrder === null) return null;
-  const basis = (QUANTITY_BASIS.includes(String(r.quantity_basis)) ? r.quantity_basis : 'book') as QuantityBasis;
+  const basis = (
+    QUANTITY_BASIS.includes(String(r.quantity_basis))
+      ? r.quantity_basis
+      : "book"
+  ) as QuantityBasis;
   const q = asNumber(r.quantity);
   return {
     sortOrder,
     ingredientId: asText(ingredient?.id),
     name,
     // "To taste" is always null; a stray 0 from bad data is unknown too.
-    quantity: basis === 'to_taste' || q === null || q <= 0 ? null : q,
+    quantity: basis === "to_taste" || q === null || q <= 0 ? null : q,
     unit: asText(r.unit),
     basis,
     preparationNote: asText(r.preparation_note),
@@ -164,7 +193,9 @@ export function parseRecipeDetail(row: Row): RecipeDetail {
     categoryName: asText(category?.name),
     difficulty: asDifficulty(row.difficulty),
     defaultServings: asNumber(row.default_servings),
-    servingBasis: SERVING_BASIS.includes(String(row.serving_basis)) ? (row.serving_basis as ServingBasis) : null,
+    servingBasis: SERVING_BASIS.includes(String(row.serving_basis))
+      ? (row.serving_basis as ServingBasis)
+      : null,
     servingNote: asText(row.serving_note),
     prepTimeMinutes: asNumber(row.prep_time_minutes),
     cookTimeMinutes: asNumber(row.cook_time_minutes),
@@ -189,9 +220,17 @@ export function parseRecipeDetail(row: Row): RecipeDetail {
 }
 
 /** Null when the slug does not exist or the recipe is not published. */
-export async function fetchRecipeDetail(client: YoChefClient, slug: string): Promise<RecipeDetail | null> {
+export async function fetchRecipeDetail(
+  client: YoChefClient,
+  slug: string,
+): Promise<RecipeDetail | null> {
   // Explicit status: since 4.5 an editor's RLS also returns drafts, which the app never shows.
-  const { data, error } = await client.from('recipes').select(DETAIL_SELECT).eq('slug', slug).eq('status', 'published').maybeSingle();
-  if (error) fail(error, 'Không tải được công thức.');
+  const { data, error } = await client
+    .from("recipes")
+    .select(DETAIL_SELECT)
+    .eq("slug", slug)
+    .eq("status", "published")
+    .maybeSingle();
+  if (error) fail(error, "Không tải được công thức.");
   return data ? parseRecipeDetail(data as unknown as Row) : null;
 }
