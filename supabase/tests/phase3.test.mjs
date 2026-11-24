@@ -259,8 +259,8 @@ describe('3.4 comments', () => {
     as(db, role, uid, `select id from public.comments where id = $1`, [commentId]).then((r) => r.rows.length === 1);
   const setStatus = (status) => admin(db, `update public.comments set status = $1 where id = $2`, [status, commentId]);
 
-  it('a new comment waits for review and only its author sees it', async () => {
-    const ins = await post(alice, alice, publishedId, 'Ngon lắm!');
+  it('a new sensitive comment waits for review and only its author sees it', async () => {
+    const ins = await post(alice, alice, publishedId, 'Xem thêm tại https://spam.example.com');
     assert.equal(ins.error, null);
     assert.equal(ins.rows[0].status, 'pending');
     commentId = ins.rows[0].id;
@@ -287,13 +287,13 @@ describe('3.4 comments', () => {
     await admin(db, `delete from public.comments where id = $1`, [max.rows[0].id]);
   });
 
-  it('an approved comment is public; editing its content sends it back to review', async () => {
+  it('an approved comment is public; editing its content to sensitive text sends it back to review', async () => {
     await setStatus('approved');
     assert.deepEqual([await visible('anon', null), await visible('authenticated', bob)], [true, true]);
     const same = await as(db, 'authenticated', alice, `update public.comments set content = content where id = $1 returning status`, [commentId]);
     assert.deepEqual(same.rows, [{ status: 'approved' }]);
     const edit = await as(db, 'authenticated', alice,
-      `update public.comments set content = 'Ngon, hơi mặn' where id = $1 returning status`, [commentId]);
+      `update public.comments set content = 'Liên hệ 0912345678' where id = $1 returning status`, [commentId]);
     assert.deepEqual(edit.rows, [{ status: 'pending' }]);
     assert.deepEqual([await visible('anon', null), await visible('authenticated', bob)], [false, false]);
   });
@@ -477,7 +477,7 @@ describe('3.6 moderation', () => {
     [{ id: mod }] = await admin(db, `insert into auth.users (email) values ('mod3@example.test') returning id`);
     await admin(db, `insert into public.user_roles (user_id, role) values ($1, 'moderator')`, [mod]);
     [{ id: commentId }] = (await as(db, 'authenticated', alice,
-      `insert into public.comments (user_id, recipe_id, content) values ($1, $2, 'Chờ duyệt') returning id`, [alice, publishedId])).rows;
+      `insert into public.comments (user_id, recipe_id, content) values ($1, $2, 'Chờ duyệt https://spam.example.com') returning id`, [alice, publishedId])).rows;
     await admin(db, `insert into storage.objects (bucket_id, name) values ('cooking-photos', $1)`, [`${alice}/m1.jpg`]);
     [{ id: photoId }] = (await as(db, 'authenticated', alice,
       `insert into public.cooking_photos (user_id, recipe_id, storage_path) values ($1, $2, $3) returning id`,
@@ -524,8 +524,8 @@ describe('3.6 moderation', () => {
     assert.equal(await visible('anon', null, 'comments', commentId), true);
   });
 
-  it('editing an approved comment after moderation sends it back to review', async () => {
-    const edit = await as(db, 'authenticated', alice, `update public.comments set content = 'Đã sửa' where id = $1 returning status`, [commentId]);
+  it('editing an approved comment to sensitive content after moderation sends it back to review', async () => {
+    const edit = await as(db, 'authenticated', alice, `update public.comments set content = 'Đã sửa dm' where id = $1 returning status`, [commentId]);
     assert.deepEqual(edit.rows, [{ status: 'pending' }]);
     assert.equal(await visible('anon', null, 'comments', commentId), false);
   });

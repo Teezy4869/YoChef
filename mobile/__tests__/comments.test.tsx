@@ -111,7 +111,6 @@ describe('comments', () => {
     await openRecipe(fake);
     expect(screen.getAllByLabelText('Sửa bình luận')).toHaveLength(1); // only my own
     fireEvent.press(screen.getByLabelText('Sửa bình luận'));
-    expect(screen.getByText('Sau khi sửa, bình luận sẽ chờ duyệt lại.')).toBeTruthy();
     fireEvent.changeText(screen.getByLabelText('Sửa bình luận'), 'Đã sửa');
     fireEvent.press(screen.getByRole('button', { name: 'Lưu' }));
     expect(await screen.findByText('Đã sửa')).toBeTruthy();

@@ -63,18 +63,25 @@ function clean(text: string): string {
   return content;
 }
 
-export async function postComment(client: YoChefClient, userId: string, recipeId: string, text: string): Promise<void> {
+export async function postComment(client: YoChefClient, userId: string, recipeId: string, text: string): Promise<CommentStatus> {
   const content = clean(text);
-  const { error } = await client.from('comments').insert({ user_id: userId, recipe_id: recipeId, content });
+  const { data, error } = await client
+    .from('comments')
+    .insert({ user_id: userId, recipe_id: recipeId, content })
+    .select('status');
   if (error) fail(error, 'Không gửi được bình luận.');
+  const row = (data as { status?: unknown }[] | null)?.[0];
+  return row?.status === 'approved' ? 'approved' : 'pending';
 }
 
-export async function editComment(client: YoChefClient, id: string, text: string): Promise<void> {
+export async function editComment(client: YoChefClient, id: string, text: string): Promise<CommentStatus> {
   const content = clean(text);
-  const { data, error } = await client.from('comments').update({ content }).eq('id', id).select('id');
+  const { data, error } = await client.from('comments').update({ content }).eq('id', id).select('id,status');
   if (error) fail(error, 'Không sửa được bình luận.');
   // No row: it was rejected or removed meanwhile.
-  if ((data ?? []).length !== 1) throw new Error('Bình luận này không còn sửa được.');
+  const rows = (data ?? []) as { status?: unknown }[];
+  if (rows.length !== 1) throw new Error('Bình luận này không còn sửa được.');
+  return rows[0]?.status === 'approved' ? 'approved' : 'pending';
 }
 
 export async function deleteComment(client: YoChefClient, id: string): Promise<void> {

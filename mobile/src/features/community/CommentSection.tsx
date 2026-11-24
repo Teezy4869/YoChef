@@ -66,11 +66,11 @@ export function CommentSection({ recipeId }: { recipeId: string }) {
   const current = loaded && loaded.key.startsWith(`${userKey}#`) ? loaded : null;
   const refreshing = loaded?.key !== key;
 
-  const run = async (action: () => Promise<void>, success: string | null) => {
+  const run = async (action: () => Promise<string | null | void>) => {
     setNotice(null);
     setBusy(true);
     try {
-      await action();
+      const success = await action();
       triggerHaptic('success');
       setMode(null);
       if (success) setNotice({ tone: 'success', message: success });
@@ -85,9 +85,12 @@ export function CommentSection({ recipeId }: { recipeId: string }) {
   const send = () =>
     userId &&
     run(async () => {
-      await postComment(supabase, userId, recipeId, draft);
+      const status = await postComment(supabase, userId, recipeId, draft);
       setDraft('');
-    }, 'Đã gửi. Bình luận sẽ hiện công khai sau khi được duyệt.');
+      return status === 'approved'
+        ? 'Đã đăng bình luận.'
+        : 'Đã gửi. Bình luận sẽ hiện công khai sau khi được duyệt.';
+    });
 
   const draftError = lengthError(draft);
   return (
@@ -162,11 +165,7 @@ export function CommentSection({ recipeId }: { recipeId: string }) {
                     onChangeText={(text) => setMode({ ...editing, text })}
                     editable={!busy}
                     error={lengthError(editing.text)}
-                    hint={
-                      c.status === 'approved'
-                        ? 'Sau khi sửa, bình luận sẽ chờ duyệt lại.'
-                        : `${commentLength(editing.text)}/${COMMENT_MAX}`
-                    }
+                    hint={`${commentLength(editing.text)}/${COMMENT_MAX}`}
                   />
                   <View style={styles.actions}>
                     <Button
@@ -175,7 +174,12 @@ export function CommentSection({ recipeId }: { recipeId: string }) {
                       fullWidth={false}
                       loading={busy}
                       disabled={busy || editing.text.trim() === '' || lengthError(editing.text) !== null}
-                      onPress={() => run(() => editComment(supabase, c.id, editing.text), null)}
+                      onPress={() =>
+                        run(async () => {
+                          const status = await editComment(supabase, c.id, editing.text);
+                          return status === 'pending' ? 'Đã lưu. Bình luận sẽ hiện công khai sau khi được duyệt.' : null;
+                        })
+                      }
                     />
                     <Button title="Hủy" variant="ghost" size="sm" fullWidth={false} disabled={busy} onPress={() => setMode(null)} />
                   </View>
@@ -193,7 +197,7 @@ export function CommentSection({ recipeId }: { recipeId: string }) {
                     fullWidth={false}
                     loading={busy}
                     disabled={busy}
-                    onPress={() => run(() => deleteComment(supabase, c.id), null)}
+                    onPress={() => run(() => deleteComment(supabase, c.id))}
                   />
                   <Button title="Không xóa" variant="ghost" size="sm" fullWidth={false} disabled={busy} onPress={() => setMode(null)} />
                 </View>
