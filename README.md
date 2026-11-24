@@ -8,13 +8,13 @@
 
 | Thư mục | Nội dung |
 |---|---|
-| `app/` | Mobile app: Expo SDK 58, React Native 0.88.1, React 19.3, TypeScript strict |
+| `mobile/` | Mobile app: Expo SDK 58, React Native 0.88.1, React 19.3, TypeScript strict |
 | `admin/` | Admin web: Vite 6, React 18, React Router 7, Tailwind 3 |
 | `supabase/` | `migrations/` (nguồn sự thật duy nhất của schema), `functions/`, `seed/`, `tests/` |
 | `docs/` | Tài liệu dự án, gồm `docs/database/SCHEMA_V2.md` (Phase 0.3) |
 | `scripts/` | Script tiện ích, ví dụ live smoke (Phase 0.6) |
 
-`app/` và `admin/` là hai package npm độc lập (không dùng workspaces, để Metro không bị ảnh hưởng
+`mobile/` và `admin/` là hai package npm độc lập (không dùng workspaces, để Metro không bị ảnh hưởng
 bởi hoisting). Root chỉ chứa Supabase CLI và các lệnh gộp.
 
 ## Lệnh
@@ -58,7 +58,7 @@ npx supabase storage cp -r supabase/.seed-out/recipe-images ss:/// --linked --pr
 |---|---|---|
 | 1. Unit / UI | `npm run check` | typecheck, lint, test của app và admin |
 | 2. Database cục bộ | `npm run test:db` | Migration thật trên PGlite (PostgreSQL 17): RLS, grant, trigger, seed |
-| 3. Live | `npm run smoke:live` | REST và Storage thật của v2, vai trò khách, publishable key trong `app/.env` |
+| 3. Live | `npm run smoke:live` | REST và Storage thật của v2, vai trò khách, publishable key trong `mobile/.env` |
 | 3. Live (Công thức) | `npm run smoke:recipes` | Phase 2, khách, chỉ đọc: RPC `search_recipes` (bỏ dấu, lọc, phân trang), chi tiết một request, các quy tắc `NULL`. Cần migration `20261113120000` đã lên v2 |
 | 3. Live (Auth) | `npm run smoke:auth` | User thật trên v2: đăng nhập, trigger tạo profile, RLS khi đã đăng nhập, bucket `avatars`, đăng xuất. Cần thêm `.env.smoke` (`SMOKE_EMAIL`, `SMOKE_PASSWORD`); lần đầu chạy với `-- --signup` |
 

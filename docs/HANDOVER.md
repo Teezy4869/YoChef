@@ -13,7 +13,7 @@ YoChef là ứng dụng nấu ăn Việt Nam: tìm công thức, chỉnh khẩu 
 
 | Thành phần | Thư mục | Công nghệ |
 |---|---|---|
-| App di động | `app/` | Expo SDK 58, React Native 0.88.1, React 19.3, TypeScript, React Navigation 7 |
+| App di động | `mobile/` | Expo SDK 58, React Native 0.88.1, React 19.3, TypeScript, React Navigation 7 |
 | Admin web | `admin/` | Vite 6, React 18, React Router 7, Tailwind 3 |
 | Backend | `supabase/` | PostgreSQL 17 (migrations), Auth, Storage, Edge Functions |
 
@@ -71,7 +71,7 @@ Mật khẩu database: lưu ở `<trình quản lý mật khẩu>`. **Không ghi
 
 | Bí mật | Dùng ở | Được phép đặt ở | Nơi lưu thực tế |
 |---|---|---|---|
-| Publishable key | App, Admin (công khai, nhúng trong bundle) | `app/.env`, `admin/.env` | `app/.env` và `admin/.env` trên máy người bàn giao (không có trong git). Lấy lại: Dashboard → Project Settings → API Keys |
+| Publishable key | App, Admin (công khai, nhúng trong bundle) | `mobile/.env`, `admin/.env` | `mobile/.env` và `admin/.env` trên máy người bàn giao (không có trong git). Lấy lại: Dashboard → Project Settings → API Keys |
 | Mật khẩu database | Chỉ người quản trị, khi cần | Trình quản lý mật khẩu | `<tên trình quản lý mật khẩu>` |
 | Secret / service_role key | Chỉ Edge Function, không bao giờ ở client | Supabase tự cấp cho Edge Function (`SUPABASE_SERVICE_ROLE_KEY`) | Không lưu ở nơi nào khác; `youtube-search` và `youtube-refresh` dùng nó để ghi biên nhận và làm mới video |
 | `YOUTUBE_API_KEY` | Edge Function `youtube-search`, `youtube-refresh` | `supabase secrets set` | Đã đặt trên v2 (2026-11-14). Bản gốc: `<nơi lưu>` |
@@ -94,7 +94,7 @@ npm run install:all
 Tạo hai file môi trường từ mẫu (file thật đã bị git bỏ qua):
 
 ```bash
-cp app/.env.example app/.env
+cp mobile/.env.example mobile/.env
 cp admin/.env.example admin/.env
 ```
 
@@ -152,8 +152,8 @@ Ba tầng kiểm thử (một bước chỉ xong khi tầng 3 xanh cho phần ch
 |---|---|---|
 | 1. Unit / UI | `npm run check` | Không |
 | 2. Database cục bộ | `npm run test:db` | Zip dữ liệu (nếu thiếu, phần seed bị bỏ qua và báo rõ) |
-| 3. Live trên Supabase | `npm run smoke:live` | `app/.env` có URL và publishable key |
-| 3. Live, công thức (khách) | `npm run smoke:recipes` | `app/.env`; migration `20261113120000_recipe_search` đã lên v2 |
+| 3. Live trên Supabase | `npm run smoke:live` | `mobile/.env` có URL và publishable key |
+| 3. Live, công thức (khách) | `npm run smoke:recipes` | `mobile/.env`; migration `20261113120000_recipe_search` đã lên v2 |
 | 3. Live, người dùng đăng nhập | `npm run smoke:auth` | Như trên, thêm `.env.smoke` ở gốc repo với `SMOKE_EMAIL`, `SMOKE_PASSWORD` của hộp thư test |
 | 3. Live, admin và tích hợp | `npm run smoke:admin` | `.env.smoke` có thêm super admin S (`SMOKE_EMAIL_SUPER`, `SMOKE_PASSWORD_SUPER`) và editor E (`SMOKE_EMAIL_EDITOR`, `SMOKE_PASSWORD_EDITOR`), cùng A và M. S được gán `super_admin` bằng SQL; E do S gán trong smoke. Cần 3 Edge Function đã deploy và có secret. Mỗi lần chạy tốn khoảng 101 đơn vị hạn mức YouTube và để lại dòng trong nhật ký admin |
 | 3. Live, tính năng người dùng | `npm run smoke:user` | `.env.smoke` có thêm user B (`SMOKE_EMAIL_B`, `SMOKE_PASSWORD_B`) và moderator M (`SMOKE_EMAIL_MOD`, `SMOKE_PASSWORD_MOD`). Cả 3 là tài khoản test tạo bằng Add user + Auto Confirm; M chỉ có vai trò `moderator` |
@@ -171,7 +171,7 @@ npm run db:advisors   # chỉ còn các cảnh báo dự kiến đã chấp nh�
 ## 10. Chạy ứng dụng
 
 ```bash
-npm --prefix app start          # Expo (quét QR bằng Expo Go, hoặc nhấn a / w)
+npm --prefix mobile start          # Expo (quét QR bằng Expo Go, hoặc nhấn a / w)
 npm --prefix admin run dev      # Admin tại http://localhost:5173 (cần admin/.env, đăng nhập bằng tài khoản có vai trò)
 npm --prefix admin run build    # build admin
 ```
@@ -212,7 +212,7 @@ npm --prefix admin run build    # build admin
 - [ ] Người nhận clone được repo và `npm run install:all` chạy xong
 - [ ] Người nhận có quyền ghi GitHub: `<ghi chú>`
 - [ ] Người nhận có quyền vào Supabase project: `<ghi chú>`
-- [ ] Người nhận tự tạo `app/.env`, `admin/.env` (không nhận file từ người khác)
+- [ ] Người nhận tự tạo `mobile/.env`, `admin/.env` (không nhận file từ người khác)
 - [ ] `npm run check`, `npm run test:db`, `npm run smoke:live` đều xanh trên máy người nhận
 - [ ] Đã chuyển quyền sở hữu hoặc thêm người nhận vào: GitHub `<>`, Supabase `<>`, Google Cloud `<>`, USDA `<>`
 - [ ] Đã đổi hoặc thu hồi mọi key người bàn giao từng dùng (nếu rời dự án). Cần xử lý: publishable key hiện tại (đổi ở Dashboard → Project Settings → API Keys); token Supabase CLI tạo ngày 2026-11-08 (tên bắt đầu `cli_THEGIOILAP@`, thu hồi ở Dashboard → Account → Access Tokens); thêm: `<nếu có>`

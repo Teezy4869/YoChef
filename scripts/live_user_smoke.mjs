@@ -4,7 +4,7 @@
 //
 //   npm run smoke:user
 //
-// Needs app/.env (URL + publishable key) and, in .env.smoke at the repo root
+// Needs mobile/.env (URL + publishable key) and, in .env.smoke at the repo root
 // (git-ignored): SMOKE_EMAIL / SMOKE_PASSWORD (user A, the smoke:auth user) and
 // SMOKE_EMAIL_B / SMOKE_PASSWORD_B (user B). Use test accounts, never real staff.
 // From step 3.6 also SMOKE_EMAIL_MOD / SMOKE_PASSWORD_MOD: user M, a test account

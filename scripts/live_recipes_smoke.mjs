@@ -3,7 +3,7 @@
 // project, as a GUEST with the publishable key. Read-only by construction
 // (GET and RPC reads only); creates and changes nothing.
 //
-//   npm run smoke:recipes                    (loads app/.env)
+//   npm run smoke:recipes                    (loads mobile/.env)
 //   node --env-file=<file> scripts/live_recipes_smoke.mjs [--log <path>]
 //
 // Needs migration 20261113120000_recipe_search to be applied on v2 first.

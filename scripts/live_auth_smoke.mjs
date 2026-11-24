@@ -7,7 +7,7 @@
 //   npm run smoke:auth -- --signup     create the test user once (then confirm the email if asked)
 //   npm run smoke:auth                 run the checks as that user
 //
-// Needs app/.env (URL + publishable key) and SMOKE_EMAIL / SMOKE_PASSWORD,
+// Needs mobile/.env (URL + publishable key) and SMOKE_EMAIL / SMOKE_PASSWORD,
 // read from .env.smoke at the repo root (git-ignored) or the environment.
 // Use a dedicated test mailbox, never a staff account.
 //

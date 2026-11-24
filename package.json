@@ -4,10 +4,10 @@
   "version": "0.1.0",
   "description": "YoChef rebuild (v2): Expo mobile app, Vite admin web, Supabase migrations.",
   "scripts": {
-    "install:all": "npm install && npm --prefix app install && npm --prefix admin install",
-    "typecheck": "npm --prefix app run typecheck && npm --prefix admin run typecheck",
-    "lint": "npm --prefix app run lint && npm --prefix admin run lint",
-    "test": "npm --prefix app test && npm --prefix admin test",
+    "install:all": "npm install && npm --prefix mobile install && npm --prefix admin install",
+    "typecheck": "npm --prefix mobile run typecheck && npm --prefix admin run typecheck",
+    "lint": "npm --prefix mobile run lint && npm --prefix admin run lint",
+    "test": "npm --prefix mobile test && npm --prefix admin test",
     "check": "npm run typecheck && npm run lint && npm test",
     "supabase": "supabase",
     "test:db": "node --test supabase/tests/*.test.mjs",
@@ -16,11 +16,11 @@
     "db:advisors": "node scripts/sb.mjs db advisors",
     "db:verify": "node scripts/db_verify.mjs",
     "seed:build": "node supabase/seed/import_recipes.mjs",
-    "smoke:live": "node --env-file=app/.env scripts/live_smoke.mjs",
-    "smoke:auth": "node --env-file=app/.env --env-file-if-exists=.env.smoke scripts/live_auth_smoke.mjs",
-    "smoke:recipes": "node --env-file=app/.env scripts/live_recipes_smoke.mjs",
-    "smoke:user": "node --env-file=app/.env --env-file-if-exists=.env.smoke scripts/live_user_smoke.mjs",
-    "smoke:admin": "node --env-file=app/.env --env-file-if-exists=.env.smoke scripts/live_admin_smoke.mjs"
+    "smoke:live": "node --env-file=mobile/.env scripts/live_smoke.mjs",
+    "smoke:auth": "node --env-file=mobile/.env --env-file-if-exists=.env.smoke scripts/live_auth_smoke.mjs",
+    "smoke:recipes": "node --env-file=mobile/.env scripts/live_recipes_smoke.mjs",
+    "smoke:user": "node --env-file=mobile/.env --env-file-if-exists=.env.smoke scripts/live_user_smoke.mjs",
+    "smoke:admin": "node --env-file=mobile/.env --env-file-if-exists=.env.smoke scripts/live_admin_smoke.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.3.15",

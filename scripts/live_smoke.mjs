@@ -4,7 +4,7 @@
 // probe either targets a row that cannot exist or carries a value that fails a
 // CHECK constraint, so even a broken permission setup cannot create data.
 //
-//   npm run smoke:live                       (loads app/.env)
+//   npm run smoke:live                       (loads mobile/.env)
 //   node --env-file=<file> scripts/live_smoke.mjs [--log <path>]
 //
 // Never prints the key. Refuses to run with a secret or service_role key.

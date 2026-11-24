@@ -17,6 +17,7 @@ jest.mock('expo-notifications', () => ({
 
 // The first test of a suite on a cold Jest cache needs well over the default 1 s for findBy*/waitFor.
 require('@testing-library/react-native/pure').configure({ asyncUtilTimeout: 5000 });
+jest.setTimeout(15000);
 
 // Safe-area provider renders nothing without native metrics; use the library's own Jest mock.
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);

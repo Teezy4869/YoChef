@@ -1,5 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
@@ -42,7 +42,11 @@ function ShoppingView({ userId }: { userId: string }) {
   const list = useShoppingList(supabase, userId);
   const { reload } = list;
   // Items added from a recipe page appear when the tab comes back into view.
-  useFocusEffect(reload);
+  useFocusEffect(
+    useCallback(() => {
+      reload();
+    }, [reload]),
+  );
 
   const [label, setLabel] = useState('');
   const [quantity, setQuantity] = useState('');

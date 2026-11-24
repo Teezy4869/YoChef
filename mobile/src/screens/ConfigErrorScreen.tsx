@@ -11,7 +11,7 @@ export function ConfigErrorScreen({ problems }: { problems: string[] }) {
     <Screen centered testID="config-error">
       <AppText variant="title">Chưa cấu hình xong</AppText>
       <AppText tone="muted">
-        YoChef không kết nối tới máy chủ khi cấu hình chưa hợp lệ. Người phát triển cần sửa file app/.env rồi
+        YoChef không kết nối tới máy chủ khi cấu hình chưa hợp lệ. Người phát triển cần sửa file mobile/.env rồi
         khởi động lại.
       </AppText>
       <View style={styles.list}>

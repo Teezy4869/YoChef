@@ -1,4 +1,4 @@
-// Fail-closed environment check, the same rules as the mobile app (app/src/lib/env.ts).
+// Fail-closed environment check, the same rules as the mobile app (mobile/src/lib/env.ts).
 // Every VITE_* value ships in the browser bundle, so only the project URL and the
 // publishable key are allowed; anything else stops the admin before a client exists.
 

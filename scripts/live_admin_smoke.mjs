@@ -3,7 +3,7 @@
 //
 //   npm run smoke:admin
 //
-// Needs app/.env (URL + publishable key) and, in .env.smoke (git-ignored), test
+// Needs mobile/.env (URL + publishable key) and, in .env.smoke (git-ignored), test
 // accounts only, never real staff:
 //   SMOKE_EMAIL / SMOKE_PASSWORD               user A, no staff role
 //   SMOKE_EMAIL_MOD / SMOKE_PASSWORD_MOD       moderator M

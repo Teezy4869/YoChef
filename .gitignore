@@ -12,6 +12,8 @@ expo-env.d.ts
 *.orig.*
 app/ios/
 app/android/
+mobile/ios/
+mobile/android/
 
 # Logs
 npm-debug.*
