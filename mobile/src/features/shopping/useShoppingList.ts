@@ -9,6 +9,7 @@ import {
   parseManual,
   removeChecked,
   removeItem,
+  setAllChecked,
   setChecked,
   type ManualErrors,
   type ManualInput,
@@ -109,6 +110,19 @@ export function useShoppingList(client: YoChefClient, userId: string) {
     }
   };
 
+  const checkAll = async () => {
+    if (!current?.listId || !items.some((i) => !i.isChecked)) return;
+    setActionError(null);
+    const before = items;
+    setItems((list) => list.map((i) => ({ ...i, isChecked: true })));
+    try {
+      await setAllChecked(client, current.listId, true);
+    } catch (e) {
+      setItems(() => before);
+      setActionError(messageOf(e));
+    }
+  };
+
   /** Validates, saves, then appends; returns field errors to show, or null when added. */
   const add = async (input: ManualInput): Promise<ManualErrors | null> => {
     setActionError(null);
@@ -134,6 +148,7 @@ export function useShoppingList(client: YoChefClient, userId: string) {
     toggle,
     remove,
     clearChecked,
+    checkAll,
     add,
     reload: useCallback(() => setAttempt((n) => n + 1), []),
   };

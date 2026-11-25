@@ -304,7 +304,21 @@ function ShoppingView({ userId }: { userId: string }) {
 
       {toBuy.length > 0 ? (
         <View style={styles.sectionCard} testID="shopping-to-buy">
-          <AppText variant="heading">Cần mua</AppText>
+          <View style={styles.sectionHeaderRow}>
+            <AppText variant="heading">Cần mua</AppText>
+            <Button
+              title="Chọn tất cả"
+              icon="checkmark-done-outline"
+              variant="soft"
+              size="sm"
+              fullWidth={false}
+              onPress={() => {
+                triggerHaptic("success");
+                void list.checkAll();
+              }}
+              testID="check-all-btn"
+            />
+          </View>
           {toBuy.map((i) => (
             <ItemRow
               key={i.id}
@@ -558,6 +572,12 @@ const styles = StyleSheet.create({
     ...shadows.card,
   },
   boughtHead: { gap: spacing.xxs },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
   boughtActions: { gap: spacing.xs, marginTop: spacing.xs },
   item: {
     flexDirection: "row",

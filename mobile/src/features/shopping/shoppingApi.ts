@@ -248,6 +248,19 @@ export async function setChecked(
     fail(error, "Không cập nhật được món này.");
 }
 
+export async function setAllChecked(
+  client: YoChefClient,
+  listId: string,
+  checked: boolean,
+): Promise<void> {
+  const { error } = await client
+    .from("shopping_list_items")
+    .update({ is_checked: checked })
+    .eq("shopping_list_id", listId)
+    .eq("is_checked", !checked);
+  if (error) fail(error, "Không cập nhật được danh sách.");
+}
+
 export async function removeItem(
   client: YoChefClient,
   itemId: string,

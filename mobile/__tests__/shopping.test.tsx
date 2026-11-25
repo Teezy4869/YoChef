@@ -155,4 +155,25 @@ describe('shopping list', () => {
     await waitFor(() => expect(items(fake).map((i) => i.id)).toEqual(['i2']));
     expect(screen.queryByTestId('shopping-bought')).toBeNull();
   });
+
+  it('checks all remaining items at once and rolls back on failure', async () => {
+    const fake = setup();
+    fake.tables.shopping_lists = [{ id: 'l1', user_id: USER, name: 'Danh sách mua sắm', created_at: '2026-11-14T00:00:00Z' }];
+    fake.tables.shopping_list_items = [
+      { id: 'i1', shopping_list_id: 'l1', label: 'Gừng', quantity: 50, unit: 'g', note: null, is_checked: false, sort_order: 0 },
+      { id: 'i2', shopping_list_id: 'l1', label: 'Quế', quantity: null, unit: null, note: null, is_checked: false, sort_order: 1 },
+    ];
+    await openShoppingTab();
+    expect(await screen.findByTestId('shopping-to-buy')).toBeTruthy();
+
+    fake.failNext('shopping_list_items', 'update');
+    fireEvent.press(screen.getByTestId('check-all-btn'));
+    expect(await screen.findByText('Không cập nhật được danh sách.')).toBeTruthy();
+    expect(screen.getByTestId('shopping-progress')).toHaveTextContent('Đã mua 0/2');
+
+    fireEvent.press(screen.getByTestId('check-all-btn'));
+    await waitFor(() => expect(screen.queryByTestId('shopping-to-buy')).toBeNull());
+    expect(screen.getByTestId('shopping-progress')).toHaveTextContent('Đã mua 2/2');
+    expect(items(fake).every((i) => i.is_checked)).toBe(true);
+  });
 });
