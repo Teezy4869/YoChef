@@ -16,16 +16,6 @@ import type {
 } from "@/features/recipes/types";
 import type { YoChefClient } from "@/lib/supabase";
 
-import {
-  isMissingBackendFeature,
-  localAddOrMergePantryItems,
-  localDeductPantryIngredients,
-  localFetchPantry,
-  localMatchRecipesFromPantry,
-  localRemovePantryItem,
-  localUpdatePantryItem,
-} from "./localPantryFallback";
-
 export type PantryGroup =
   | "meat_seafood"
   | "vegetables"
@@ -345,10 +335,7 @@ export async function fetchPantry(
     )
     .eq("user_id", userId)
     .order("updated_at", { ascending: false });
-  if (error) {
-    if (isMissingBackendFeature(error)) return localFetchPantry(userId);
-    fail(error, "Không tải được tủ lạnh.");
-  }
+  if (error) fail(error, "Không tải được tủ lạnh.");
   return ((data ?? []) as unknown as Record<string, unknown>[])
     .map(toPantryItem)
     .filter((x): x is PantryItem => x !== null);
@@ -364,7 +351,6 @@ export async function addOrMergePantryItems(
   client: YoChefClient,
   items: PantryEntryInput[],
   shoppingItemIds?: string[],
-  userId?: string,
 ): Promise<void> {
   if (items.length === 0) return;
   const payload = items.map((i) => ({
@@ -377,31 +363,20 @@ export async function addOrMergePantryItems(
     p_shopping_item_ids:
       shoppingItemIds && shoppingItemIds.length > 0 ? shoppingItemIds : null,
   });
-  if (error) {
-    if (userId && isMissingBackendFeature(error)) {
-      return localAddOrMergePantryItems(client, userId, items, shoppingItemIds);
-    }
-    fail(error, "Không cập nhật được tủ lạnh.");
-  }
+  if (error) fail(error, "Không cập nhật được tủ lạnh.");
 }
 
 export async function updatePantryItem(
   client: YoChefClient,
   pantryId: string,
   patch: { quantity: number; unit: string },
-  userId?: string,
 ): Promise<void> {
   const { data, error } = await client
     .from("user_pantry")
     .update({ quantity: patch.quantity, unit: patch.unit.trim() })
     .eq("id", pantryId)
     .select("id");
-  if (error) {
-    if (userId && isMissingBackendFeature(error)) {
-      return localUpdatePantryItem(userId, pantryId, patch);
-    }
-    fail(error, "Không cập nhật được nguyên liệu trong tủ.");
-  }
+  if (error) fail(error, "Không cập nhật được nguyên liệu trong tủ.");
   if (!data || data.length !== 1)
     fail(null, "Không cập nhật được nguyên liệu trong tủ.");
 }
@@ -409,18 +384,12 @@ export async function updatePantryItem(
 export async function removePantryItem(
   client: YoChefClient,
   pantryId: string,
-  userId?: string,
 ): Promise<void> {
   const { error } = await client
     .from("user_pantry")
     .delete()
     .eq("id", pantryId);
-  if (error) {
-    if (userId && isMissingBackendFeature(error)) {
-      return localRemovePantryItem(userId, pantryId);
-    }
-    fail(error, "Không xóa được nguyên liệu khỏi tủ.");
-  }
+  if (error) fail(error, "Không xóa được nguyên liệu khỏi tủ.");
 }
 
 export type DeductPantryInput = {
@@ -432,7 +401,6 @@ export type DeductPantryInput = {
 export async function deductPantryIngredients(
   client: YoChefClient,
   items: DeductPantryInput[],
-  userId?: string,
 ): Promise<void> {
   if (items.length === 0) return;
   const payload = items
@@ -446,29 +414,18 @@ export async function deductPantryIngredients(
   const { error } = await client.rpc("deduct_pantry_ingredients", {
     p_items: payload,
   });
-  if (error) {
-    if (userId && isMissingBackendFeature(error)) {
-      return localDeductPantryIngredients(userId, items);
-    }
-    fail(error, "Không trừ được nguyên liệu trong tủ lạnh.");
-  }
+  if (error) fail(error, "Không trừ được nguyên liệu trong tủ lạnh.");
 }
 
 export async function matchRecipesFromPantry(
   client: YoChefClient,
   page: { limit?: number; offset?: number } = {},
-  userId?: string,
 ): Promise<{ items: PantryMatchRecipe[]; total: number }> {
   const { data, error } = await client.rpc("match_recipes_from_pantry", {
     p_limit: page.limit ?? 20,
     p_offset: page.offset ?? 0,
   });
-  if (error) {
-    if (userId && isMissingBackendFeature(error)) {
-      return localMatchRecipesFromPantry(client, userId, page);
-    }
-    fail(error, "Không gợi ý được món ăn từ tủ lạnh.");
-  }
+  if (error) fail(error, "Không gợi ý được món ăn từ tủ lạnh.");
   const rows = (data ?? []) as Record<string, unknown>[];
   const total =
     rows.length > 0 ? (asNumber(rows[0].total_count) ?? rows.length) : 0;

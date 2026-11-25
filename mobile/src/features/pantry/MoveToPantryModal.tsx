@@ -8,7 +8,6 @@ import { BottomSheetModal } from "@/components/BottomSheetModal";
 import { Button } from "@/components/Button";
 import { Chip } from "@/components/Chip";
 import { TextField } from "@/components/TextField";
-import { useAuth } from "@/features/auth/AuthProvider";
 import type { ShoppingItem } from "@/features/shopping/shoppingApi";
 import { triggerHaptic } from "@/lib/haptics";
 import { useSupabase } from "@/lib/supabase";
@@ -48,7 +47,6 @@ export function MoveToPantryModal({
   onMoved: () => void;
 }) {
   const supabase = useSupabase();
-  const { session } = useAuth();
   const [catalog, setCatalog] = useState<CatalogIngredient[]>([]);
   const [drafts, setDrafts] = useState<DraftRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -158,12 +156,7 @@ export function MoveToPantryModal({
     setError(null);
     setSaving(true);
     try {
-      await addOrMergePantryItems(
-        supabase,
-        entries,
-        shoppingIds,
-        session?.user.id,
-      );
+      await addOrMergePantryItems(supabase, entries, shoppingIds);
       triggerHaptic("success");
       onMoved();
     } catch (e) {

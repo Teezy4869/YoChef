@@ -100,7 +100,7 @@ export function HomeScreen({ navigation }: MainTabScreenProps<"Home">) {
   useEffect(() => {
     if (!pantryOnly) return;
     let active = true;
-    matchRecipesFromPantry(supabase, { limit: 40, offset: 0 }, userId).then(
+    matchRecipesFromPantry(supabase, { limit: 40, offset: 0 }).then(
       (res) =>
         active &&
         setPantryResult({

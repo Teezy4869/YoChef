@@ -44,7 +44,6 @@ type DeductRow = {
 export function DeductPantryModal({
   visible,
   client,
-  userId,
   recipe,
   servings,
   pantryItems,
@@ -53,7 +52,6 @@ export function DeductPantryModal({
 }: {
   visible: boolean;
   client: YoChefClient;
-  userId?: string;
   recipe: RecipeDetail;
   servings: number;
   pantryItems: PantryItem[];
@@ -180,7 +178,7 @@ export function DeductPantryModal({
 
     setBusy(true);
     try {
-      await deductPantryIngredients(client, payload, userId);
+      await deductPantryIngredients(client, payload);
       triggerHaptic("success");
       onDone();
     } catch (e) {

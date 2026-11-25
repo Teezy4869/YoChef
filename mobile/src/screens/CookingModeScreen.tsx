@@ -675,7 +675,6 @@ function CookingRun({
         <DeductPantryModal
           visible
           client={supabase}
-          userId={userId ?? undefined}
           recipe={recipe}
           servings={effectiveServings}
           pantryItems={pantry.items}
