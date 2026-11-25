@@ -149,6 +149,7 @@ describe('recipe detail screen', () => {
   it('shows ingredients in order with book quantities, estimates and to-taste', async () => {
     await openDetail();
     await screen.findByTestId('recipe-detail');
+    fireEvent.press(screen.getByTestId('toggle-ingredients-btn'));
     const qty = screen.getAllByTestId('ingredient-qty').map((n) => n.props.children);
     expect(qty).toEqual(['500 g', '2½ muỗng canh', 'vừa ăn', '≈ 300 ml']);
     expect(screen.getByText('Nước dừa (tùy chọn)')).toBeTruthy();
@@ -158,6 +159,7 @@ describe('recipe detail screen', () => {
   it('scales quantities with the stepper and returns to the default', async () => {
     await openDetail();
     await screen.findByTestId('recipe-detail');
+    fireEvent.press(screen.getByTestId('toggle-ingredients-btn'));
     expect(screen.getByTestId('servings-value')).toHaveTextContent('4 người');
     fireEvent.press(screen.getByRole('button', { name: 'Tăng khẩu phần' }));
     fireEvent.press(screen.getByRole('button', { name: 'Tăng khẩu phần' }));
@@ -202,5 +204,44 @@ describe('recipe detail screen', () => {
   it('says so when the recipe is not found or not published', async () => {
     await openDetail(null);
     expect(await screen.findByTestId('recipe-detail-notfound')).toBeTruthy();
+  });
+
+  it('collapses long ingredient and step lists and toggles full view', async () => {
+    await openDetail(
+      detailRow({
+        recipe_ingredients: [
+          { sort_order: 1, quantity: 100, unit: 'g', quantity_basis: 'book', is_optional: false, ingredient: { name: 'Nguyên liệu 1' } },
+          { sort_order: 2, quantity: 200, unit: 'g', quantity_basis: 'book', is_optional: false, ingredient: { name: 'Nguyên liệu 2' } },
+          { sort_order: 3, quantity: 300, unit: 'g', quantity_basis: 'book', is_optional: false, ingredient: { name: 'Nguyên liệu 3' } },
+          { sort_order: 4, quantity: 400, unit: 'g', quantity_basis: 'book', is_optional: false, ingredient: { name: 'Nguyên liệu 4' } },
+          { sort_order: 5, quantity: 500, unit: 'g', quantity_basis: 'book', is_optional: false, ingredient: { name: 'Nguyên liệu 5' } },
+          { sort_order: 6, quantity: 600, unit: 'g', quantity_basis: 'book', is_optional: false, ingredient: { name: 'Nguyên liệu 6' } },
+        ],
+        recipe_steps: [
+          { step_number: 1, instruction: 'Bước 1', timer_enabled: false, duration_seconds: null },
+          { step_number: 2, instruction: 'Bước 2', timer_enabled: false, duration_seconds: null },
+          { step_number: 3, instruction: 'Bước 3', timer_enabled: false, duration_seconds: null },
+          { step_number: 4, instruction: 'Bước 4', timer_enabled: false, duration_seconds: null },
+          { step_number: 5, instruction: 'Bước 5', timer_enabled: false, duration_seconds: null },
+        ],
+      }),
+    );
+    await screen.findByTestId('recipe-detail');
+
+    expect(screen.getAllByTestId('ingredient-row')).toHaveLength(3);
+    expect(screen.queryByText('Nguyên liệu 4')).toBeNull();
+    fireEvent.press(screen.getByTestId('toggle-ingredients-btn'));
+    expect(screen.getAllByTestId('ingredient-row')).toHaveLength(6);
+    expect(screen.getByText('Nguyên liệu 4')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('toggle-ingredients-btn'));
+    expect(screen.getAllByTestId('ingredient-row')).toHaveLength(3);
+
+    expect(screen.getAllByTestId('step-row')).toHaveLength(3);
+    expect(screen.queryByText('Bước 4')).toBeNull();
+    fireEvent.press(screen.getByTestId('toggle-steps-btn'));
+    expect(screen.getAllByTestId('step-row')).toHaveLength(5);
+    expect(screen.getByText('Bước 4')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('toggle-steps-btn'));
+    expect(screen.getAllByTestId('step-row')).toHaveLength(3);
   });
 });

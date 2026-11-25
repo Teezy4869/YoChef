@@ -54,6 +54,9 @@ const SERVING_BASIS_LABEL: Record<ServingBasis, string> = {
   inferred_yield: "Khẩu phần suy ra từ thành phẩm",
 };
 
+const COLLAPSED_INGREDIENTS_LIMIT = 3;
+const COLLAPSED_STEPS_LIMIT = 3;
+
 export function RecipeDetailScreen({
   route,
   navigation,
@@ -169,6 +172,8 @@ function RecipeDetailView({
   } | null>(null);
   const [showMissingModal, setShowMissingModal] = useState(false);
   const [addingMissing, setAddingMissing] = useState(false);
+  const [ingredientsExpanded, setIngredientsExpanded] = useState(false);
+  const [stepsExpanded, setStepsExpanded] = useState(false);
 
   const availability = useMemo(
     () =>
@@ -236,6 +241,20 @@ function RecipeDetailView({
     ? DIFFICULTY_LABEL[recipe.difficulty]
     : null;
   const hasStickyBar = recipe.steps.length > 0;
+  const hasMoreIngredients =
+    recipe.ingredients.length > COLLAPSED_INGREDIENTS_LIMIT;
+  const visibleIngredients =
+    hasMoreIngredients && !ingredientsExpanded
+      ? recipe.ingredients.slice(0, COLLAPSED_INGREDIENTS_LIMIT)
+      : recipe.ingredients;
+  const hiddenIngredientsCount =
+    recipe.ingredients.length - COLLAPSED_INGREDIENTS_LIMIT;
+  const hasMoreSteps = recipe.steps.length > COLLAPSED_STEPS_LIMIT;
+  const visibleSteps =
+    hasMoreSteps && !stepsExpanded
+      ? recipe.steps.slice(0, COLLAPSED_STEPS_LIMIT)
+      : recipe.steps;
+  const hiddenStepsCount = recipe.steps.length - COLLAPSED_STEPS_LIMIT;
 
   return (
     <View style={styles.screen}>
@@ -405,12 +424,42 @@ function RecipeDetailView({
             ) : null}
 
             <IngredientRows
-              ingredients={recipe.ingredients}
+              ingredients={visibleIngredients}
               defaultServings={base}
               servings={servings}
               availability={availability?.lines}
               onAddMissing={userId ? addSingleMissing : undefined}
             />
+            {hasMoreIngredients ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={
+                  ingredientsExpanded
+                    ? "Ẩn bớt nguyên liệu"
+                    : `Hiện thêm ${hiddenIngredientsCount} nguyên liệu`
+                }
+                onPress={() => {
+                  triggerHaptic("light");
+                  setIngredientsExpanded((v) => !v);
+                }}
+                style={({ pressed }) => [
+                  styles.expandBtn,
+                  pressed ? styles.expandBtnPressed : null,
+                ]}
+                testID="toggle-ingredients-btn"
+              >
+                <AppText variant="label" tone="primary">
+                  {ingredientsExpanded
+                    ? "Ẩn bớt"
+                    : `Hiện thêm ${hiddenIngredientsCount} nguyên liệu`}
+                </AppText>
+                <AppIcon
+                  name={ingredientsExpanded ? "chevron-up" : "chevron-down"}
+                  size={16}
+                  tone="primary"
+                />
+              </Pressable>
+            ) : null}
             {shopNotice ? (
               <Banner tone={shopNotice.tone} message={shopNotice.text} />
             ) : null}
@@ -426,46 +475,82 @@ function RecipeDetailView({
             {recipe.steps.length === 0 ? (
               <AppText tone="muted">Chưa có các bước thực hiện.</AppText>
             ) : (
-              <View style={styles.timeline}>
-                {recipe.steps.map((s, idx) => {
-                  const isLast = idx === recipe.steps.length - 1;
-                  return (
-                    <View
-                      key={s.stepNumber}
-                      style={styles.step}
-                      testID="step-row"
-                    >
-                      <View style={styles.stepRail}>
-                        <View style={styles.badge}>
-                          <AppText variant="label" tone="onPrimary" tabularNums>
-                            {s.stepNumber}
-                          </AppText>
-                        </View>
-                        {!isLast ? <View style={styles.railLine} /> : null}
-                      </View>
-                      <View style={styles.stepBody}>
-                        <AppText>{s.instruction}</AppText>
-                        {s.timerEnabled && s.durationSeconds !== null ? (
-                          <View style={styles.timerChip}>
-                            <AppIcon
-                              name="timer-outline"
-                              size={14}
-                              tone="primary"
-                            />
+              <>
+                <View style={styles.timeline}>
+                  {visibleSteps.map((s, idx) => {
+                    const isLast = idx === visibleSteps.length - 1;
+                    return (
+                      <View
+                        key={s.stepNumber}
+                        style={styles.step}
+                        testID="step-row"
+                      >
+                        <View style={styles.stepRail}>
+                          <View style={styles.badge}>
                             <AppText
-                              variant="caption"
-                              tone="primary"
-                              style={styles.timerChipText}
+                              variant="label"
+                              tone="onPrimary"
+                              tabularNums
                             >
-                              {`Hẹn giờ ${formatSeconds(s.durationSeconds)}`}
+                              {s.stepNumber}
                             </AppText>
                           </View>
-                        ) : null}
+                          {!isLast ? <View style={styles.railLine} /> : null}
+                        </View>
+                        <View style={styles.stepBody}>
+                          <AppText>{s.instruction}</AppText>
+                          {s.timerEnabled && s.durationSeconds !== null ? (
+                            <View style={styles.timerChip}>
+                              <AppIcon
+                                name="timer-outline"
+                                size={14}
+                                tone="primary"
+                              />
+                              <AppText
+                                variant="caption"
+                                tone="primary"
+                                style={styles.timerChipText}
+                              >
+                                {`Hẹn giờ ${formatSeconds(s.durationSeconds)}`}
+                              </AppText>
+                            </View>
+                          ) : null}
+                        </View>
                       </View>
-                    </View>
-                  );
-                })}
-              </View>
+                    );
+                  })}
+                </View>
+                {hasMoreSteps ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      stepsExpanded
+                        ? "Ẩn bớt các bước"
+                        : `Hiện thêm ${hiddenStepsCount} bước`
+                    }
+                    onPress={() => {
+                      triggerHaptic("light");
+                      setStepsExpanded((v) => !v);
+                    }}
+                    style={({ pressed }) => [
+                      styles.expandBtn,
+                      pressed ? styles.expandBtnPressed : null,
+                    ]}
+                    testID="toggle-steps-btn"
+                  >
+                    <AppText variant="label" tone="primary">
+                      {stepsExpanded
+                        ? "Ẩn bớt"
+                        : `Hiện thêm ${hiddenStepsCount} bước`}
+                    </AppText>
+                    <AppIcon
+                      name={stepsExpanded ? "chevron-up" : "chevron-down"}
+                      size={16}
+                      tone="primary"
+                    />
+                  </Pressable>
+                ) : null}
+              </>
             )}
           </View>
 
@@ -688,6 +773,18 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   stepOff: { opacity: 0.4 },
+  expandBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    minHeight: touchTarget - 4,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
+  },
+  expandBtnPressed: { opacity: 0.75 },
   timeline: { gap: spacing.xs },
   step: { flexDirection: "row", gap: spacing.md },
   stepRail: { alignItems: "center", width: 28 },
