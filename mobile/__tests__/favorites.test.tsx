@@ -62,6 +62,7 @@ describe('favorites', () => {
     act(() => fake.setSession(fakeSession({ id: USER }), 'TOKEN_REFRESHED'));
     await openFavoritesTab();
     const list = await screen.findByTestId('favorites');
+    expect(within(list).getByRole('button', { name: 'Bỏ Thịt lợn kho cốt dừa khỏi yêu thích' })).toBeTruthy();
     fireEvent.press(within(list).getByRole('button', { name: /^Thịt lợn kho cốt dừa\./ }));
     expect(await screen.findByRole('button', { name: 'Bỏ khỏi yêu thích' })).toBeTruthy();
   });

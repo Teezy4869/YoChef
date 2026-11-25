@@ -195,9 +195,9 @@ export function RecipeCard({
           ]}
         >
           <AppIcon
-            name={favorited ? "heart" : "heart-outline"}
+            name={favorited ? "heart-dislike-outline" : "heart-outline"}
             size={18}
-            tone={favorited ? "primary" : "default"}
+            tone={favorited ? "muted" : "default"}
           />
         </Pressable>
       </View>
@@ -478,14 +478,18 @@ const styles = StyleSheet.create({
   },
   compactFavBtn: {
     position: "absolute",
-    right: spacing.xs,
+    right: spacing.sm,
     top: "50%",
     marginTop: -18,
     width: 36,
     height: 36,
     borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
+    ...shadows.card,
   },
   metaRow: {
     flexDirection: "row",
